@@ -66,7 +66,7 @@ export default function Home() {
   const favoritesAnchorId = "favorites";
 
   const [filterCity, setFilterCity] = useState("");
-  const [filterConnector, setFilterConnector] = useState<string>("all");
+  const [filterConnector, setFilterConnector] = useState<string>("");
   const [filterMinPower, setFilterMinPower] = useState<number | "">("");
   const [filterMaxPrice, setFilterMaxPrice] = useState<number | "">("");
   const [highlightStationId, setHighlightStationId] = useState<string | null>(null);
