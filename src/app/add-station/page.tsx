@@ -1,0 +1,518 @@
+"use client";
+
+import { useEffect, useMemo, useRef, useState } from "react";
+import { onAuthStateChanged, type User } from "firebase/auth";
+
+import { getClientAuth } from "@/lib/firebaseClient";
+import { createStation } from "@/lib/firestoreClient";
+
+declare global {
+  interface Window {
+    L?: unknown;
+  }
+}
+
+export default function AddStationPage() {
+  const version = process.env.NEXT_PUBLIC_APP_VERSION ?? "dev";
+  const buildStamp = process.env.NEXT_PUBLIC_BUILD_STAMP ?? "";
+  const [user, setUser] = useState<User | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [createdId, setCreatedId] = useState<string | null>(null);
+
+  const [city, setCity] = useState("");
+  const [region, setRegion] = useState("");
+  const [connectorType, setConnectorType] = useState("Type 2 (עם כבל מובנה)");
+  const [powerKw, setPowerKw] = useState<number>(11);
+  const [exactAddress, setExactAddress] = useState("");
+  const [hostName, setHostName] = useState("");
+  const [hostPhone, setHostPhone] = useState("");
+  const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [mapReady, setMapReady] = useState(false);
+  const mapRef = useRef<any>(null);
+  const markerRef = useRef<any>(null);
+  const [pricingType, setPricingType] = useState("לפי שעה");
+  const [priceIls, setPriceIls] = useState<number>(20);
+  const [notes, setNotes] = useState("");
+  const [showConnectorHelp, setShowConnectorHelp] = useState(false);
+  const [showPricingHelp, setShowPricingHelp] = useState(false);
+  const [availability, setAvailability] = useState<
+    Array<{ dayKey: string; label: string; enabled: boolean; start: string; end: string }>
+  >([
+    { dayKey: "sun", label: "א׳", enabled: true, start: "08:00", end: "20:00" },
+    { dayKey: "mon", label: "ב׳", enabled: true, start: "08:00", end: "20:00" },
+    { dayKey: "tue", label: "ג׳", enabled: true, start: "08:00", end: "20:00" },
+    { dayKey: "wed", label: "ד׳", enabled: true, start: "08:00", end: "20:00" },
+    { dayKey: "thu", label: "ה׳", enabled: true, start: "08:00", end: "20:00" },
+    { dayKey: "fri", label: "ו׳", enabled: true, start: "08:00", end: "20:00" },
+    { dayKey: "sat", label: "ש׳", enabled: true, start: "08:00", end: "20:00" },
+  ]);
+
+  useEffect(() => {
+    const auth = getClientAuth();
+    return onAuthStateChanged(auth, (u) => setUser(u));
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if ((window as { L?: unknown }).L) {
+      setMapReady(true);
+      return;
+    }
+
+    const existing = document.querySelector('link[data-leaflet="1"]');
+    if (!existing) {
+      const link = document.createElement("link");
+      link.rel = "stylesheet";
+      link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+      link.setAttribute("data-leaflet", "1");
+      document.head.appendChild(link);
+    }
+
+    const script = document.createElement("script");
+    script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+    script.async = true;
+    script.onload = () => setMapReady(true);
+    script.onerror = () => setError("שגיאה בטעינת מפה");
+    document.body.appendChild(script);
+  }, []);
+
+  useEffect(() => {
+    if (!mapReady) return;
+    if (typeof window === "undefined") return;
+    const L = (window as { L?: any }).L;
+    if (!L) return;
+
+    const el = document.getElementById("station-map");
+    if (!el) return;
+    if ((el as any)._leaflet_id) return;
+
+    const map = L.map(el).setView([32.0853, 34.7818], 9);
+    mapRef.current = map;
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: "&copy; OpenStreetMap",
+    }).addTo(map);
+
+    function quantize1km(lat: number, lng: number) {
+      const latStep = 0.009;
+      const lngStep = 0.011;
+      const qLat = Math.round(lat / latStep) * latStep;
+      const qLng = Math.round(lng / lngStep) * lngStep;
+      return { lat: Number(qLat.toFixed(6)), lng: Number(qLng.toFixed(6)) };
+    }
+
+    map.on("click", (e: any) => {
+      const q = quantize1km(e.latlng.lat, e.latlng.lng);
+      setLocation(q);
+      if (markerRef.current) markerRef.current.remove();
+      markerRef.current = L.marker([q.lat, q.lng]).addTo(map);
+    });
+
+    return () => {
+      markerRef.current = null;
+      mapRef.current = null;
+      map.remove();
+    };
+  }, [mapReady]);
+
+  useEffect(() => {
+    if (!mapReady) return;
+    const L = (window as { L?: any }).L;
+    if (!L) return;
+    const map = mapRef.current;
+    if (!map) return;
+
+    if (!location) {
+      if (markerRef.current) {
+        markerRef.current.remove();
+        markerRef.current = null;
+      }
+      return;
+    }
+
+    if (markerRef.current) {
+      markerRef.current.setLatLng([location.lat, location.lng]);
+    } else {
+      markerRef.current = L.marker([location.lat, location.lng]).addTo(map);
+    }
+    map.setView([location.lat, location.lng], 14);
+  }, [location, mapReady]);
+
+  useEffect(() => {
+    if (!user) return;
+    if (!hostName && user.displayName) setHostName(user.displayName);
+    if (!hostPhone && user.phoneNumber) setHostPhone(user.phoneNumber);
+  }, [user, hostName, hostPhone]);
+
+  const canSubmit = useMemo(() => {
+    return (
+      !!user &&
+      city.trim().length > 0 &&
+      region.trim().length > 0 &&
+      connectorType.trim().length > 0 &&
+      Number.isFinite(powerKw) &&
+      powerKw > 0 &&
+      exactAddress.trim().length > 0 &&
+      hostName.trim().length > 0 &&
+      hostPhone.trim().length > 0 &&
+      availability.some((d) => d.enabled && d.start.trim() && d.end.trim()) &&
+      pricingType.trim().length > 0 &&
+      Number.isFinite(priceIls) &&
+      priceIls > 0
+    );
+  }, [
+    user,
+    city,
+    region,
+    connectorType,
+    powerKw,
+    exactAddress,
+    hostName,
+    hostPhone,
+    availability,
+    pricingType,
+    priceIls,
+  ]);
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setCreatedId(null);
+
+    if (!user) {
+      setError("נדרשת התחברות כדי להוסיף עמדה");
+      return;
+    }
+
+    if (!canSubmit) {
+      setError("אנא מלא את כל השדות");
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const firstEnabled = availability.find((d) => d.enabled);
+      if (!firstEnabled) throw new Error("בחר לפחות יום אחד בזמינות");
+
+      const generatedTitle = `עמדה ב${city.trim()}`;
+      const id = await createStation({
+        title: generatedTitle,
+        city: city.trim(),
+        region: region.trim(),
+        connectorType: connectorType.trim(),
+        powerKw,
+        exactAddress: exactAddress.trim(),
+        location: location ?? undefined,
+        hostName: hostName.trim(),
+        hostPhone: hostPhone.trim(),
+        notes: notes.trim(),
+        hoursStart: firstEnabled.start,
+        hoursEnd: firstEnabled.end,
+        availability: availability.map((d) => ({
+          dayKey: d.dayKey,
+          enabled: d.enabled,
+          start: d.start,
+          end: d.end,
+        })),
+        ownerUid: user.uid,
+        pricingType,
+        priceIls,
+      });
+      setCreatedId(id);
+      window.location.href = "/";
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "שגיאה לא צפויה");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="min-h-dvh bg-white text-zinc-900" dir="rtl">
+      <main className="mx-auto w-full max-w-xl px-6 py-10 text-right">
+        <div className="flex items-start justify-between gap-4">
+          <div />
+          <a className="text-sm font-medium text-zinc-900 hover:underline" href="/">
+            חזרה
+          </a>
+        </div>
+
+        {!user ? (
+          <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+            נדרשת התחברות כדי להוסיף עמדה.
+          </div>
+        ) : null}
+
+        {error ? (
+          <div className="mt-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            {error}
+          </div>
+        ) : null}
+
+        {createdId ? (
+          <div className="mt-6 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
+            העמדה נשמרה בהצלחה. מזהה: {createdId}
+          </div>
+        ) : null}
+
+        <form className="mt-6 space-y-4" onSubmit={onSubmit}>
+          <div>
+            <label className="text-sm font-medium">יישוב</label>
+            <input
+              className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-right text-sm text-zinc-900 placeholder:text-zinc-400"
+              value={city}
+              onChange={(e) => setCity(e.target.value)}
+              placeholder="לדוגמה: רעננה"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium">אזור בארץ</label>
+            <select
+              className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-right text-sm text-zinc-900"
+              value={region}
+              onChange={(e) => setRegion(e.target.value)}
+            >
+              <option value="">בחר אזור</option>
+              <option value="גולן">גולן</option>
+              <option value="גליל עליון">גליל עליון</option>
+              <option value="גליל תחתון">גליל תחתון</option>
+              <option value="חיפה והקריות">חיפה והקריות</option>
+              <option value="עמקים">עמקים</option>
+              <option value="השומרון">השומרון</option>
+              <option value="מערב בנימין">מערב בנימין</option>
+              <option value="ירושלים וסביבתה">ירושלים וסביבתה</option>
+              <option value="מרכז">מרכז</option>
+              <option value="שרון">שרון</option>
+              <option value="שפלה">שפלה</option>
+              <option value="יהודה (גוש עציון וחברון)">יהודה (גוש עציון וחברון)</option>
+              <option value="דרום">דרום</option>
+              <option value="אילת והערבה">אילת והערבה</option>
+            </select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium">חיבור</label>
+                <button
+                  type="button"
+                  className="text-xs font-medium text-zinc-500 hover:text-zinc-700"
+                  onClick={() => setShowConnectorHelp((s) => !s)}
+                >
+                  ?
+                </button>
+              </div>
+              <select
+                className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-right text-sm text-zinc-900"
+                value={connectorType}
+                onChange={(e) => setConnectorType(e.target.value)}
+              >
+                <option value="Type 2 (עם כבל מובנה)">Type 2 (עם כבל מובנה)</option>
+                <option value="Type 2 (שקע בלבד - דורש כבל מהנהג)">
+                  Type 2 (שקע בלבד - דורש כבל מהנהג)
+                </option>
+                <option value="אחר (Type 1 וכו')">אחר (Type 1 וכו')</option>
+              </select>
+              {showConnectorHelp ? (
+                <div className="mt-2 text-xs text-zinc-500">
+                  חיבור הוא סוג התקע הפיזי שמתחבר לרכב. Type 2 הוא הסטנדרט הנפוץ בישראל.
+                  אם מדובר בשקע בלבד, הנהג צריך להביא כבל מהבגאז'.
+                </div>
+              ) : null}
+            </div>
+            <div>
+              <label className="text-sm font-medium">הספק (kW)</label>
+              <input
+                className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-right text-sm text-zinc-900 placeholder:text-zinc-400"
+                value={String(powerKw)}
+                onChange={(e) => setPowerKw(Number(e.target.value))}
+                inputMode="decimal"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="text-sm font-medium">כתובת מדויקת</label>
+            <input
+              className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-right text-sm text-zinc-900 placeholder:text-zinc-400"
+              value={exactAddress}
+              onChange={(e) => setExactAddress(e.target.value)}
+              placeholder="רחוב, מספר, דירה/שער, הערות"
+            />
+          </div>
+
+          <div className="rounded-2xl border border-zinc-100 bg-zinc-50 p-4">
+            <div className="text-sm font-medium">מיקום על המפה (בקירוב של כ-1 ק"מ)</div>
+            <div className="mt-1 text-xs text-zinc-500">
+              לחץ על המפה כדי לבחור מיקום מקורב. אנו שומרים מיקום בקירוב כדי לשמור על פרטיות.
+            </div>
+            <div className="mt-3 overflow-hidden rounded-xl border border-zinc-200 bg-white">
+              <div id="station-map" className="h-56 w-full" />
+            </div>
+            <div className="mt-2 flex items-center justify-between gap-3 text-xs text-zinc-600">
+              <div>
+                {location ? `נבחר: ${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}` : "לא נבחר מיקום"}
+              </div>
+              {location ? (
+                <button
+                  type="button"
+                  className="text-xs font-medium text-zinc-700 hover:underline"
+                  onClick={() => setLocation(null)}
+                >
+                  נקה מיקום
+                </button>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-sm font-medium">שם מארח</label>
+              <input
+                className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-right text-sm text-zinc-900 placeholder:text-zinc-400"
+                value={hostName}
+                onChange={(e) => setHostName(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium">טלפון מארח</label>
+              <input
+                className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-right text-sm text-zinc-900 placeholder:text-zinc-400"
+                value={hostPhone}
+                onChange={(e) => setHostPhone(e.target.value)}
+                placeholder="+972..."
+              />
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-zinc-100 bg-zinc-50 p-4">
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium">תמחור</label>
+              <button
+                type="button"
+                className="text-xs font-medium text-zinc-500 hover:text-zinc-700"
+                onClick={() => setShowPricingHelp((s) => !s)}
+              >
+                ?
+              </button>
+            </div>
+
+            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <label className="text-xs font-medium text-zinc-600">סוג תמחור</label>
+                <select
+                  className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-right text-sm text-zinc-900"
+                  value={pricingType}
+                  onChange={(e) => setPricingType(e.target.value)}
+                >
+                  <option value="לפי שעה">לפי שעה</option>
+                  <option value="מחיר קבוע לטעינה">מחיר קבוע לטעינה</option>
+                  <option value='לפי קוט"ש'>לפי קוט"ש</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-zinc-600">מחיר מבוקש (₪)</label>
+                <input
+                  className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-right text-sm text-zinc-900"
+                  value={String(priceIls)}
+                  onChange={(e) => setPriceIls(Number(e.target.value))}
+                  inputMode="decimal"
+                />
+              </div>
+            </div>
+
+            <div className="mt-2 text-xs text-zinc-500">
+              מומלץ לבקש כ-20₪ לשעת טעינה כדי לכסות את עלות החשמל וליהנות מרווח קטן על השירות.
+            </div>
+
+            {showPricingHelp ? (
+              <div className="mt-2 text-xs text-zinc-500">
+                אפשר לבחור תמחור לפי שעה (הכי פשוט), מחיר קבוע לטעינה, או לפי קוט"ש (למתקדמים עם מדידה באפליקציה).
+              </div>
+            ) : null}
+          </div>
+
+          <div className="rounded-2xl border border-zinc-100 bg-zinc-50 p-4">
+            <div className="text-sm font-medium">זמינות (יום ושעות)</div>
+            <div className="mt-1 text-xs text-zinc-500">
+              בחר באילו ימים ניתן להטעין ובאילו שעות.
+            </div>
+
+            <div className="mt-3 space-y-2">
+              {availability.map((d, idx) => (
+                <div
+                  key={d.dayKey}
+                  className="grid grid-cols-[60px_1fr_1fr] items-center gap-2"
+                >
+                  <label className="flex items-center justify-start gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={d.enabled}
+                      onChange={(e) =>
+                        setAvailability((prev) =>
+                          prev.map((x, i) =>
+                            i === idx ? { ...x, enabled: e.target.checked } : x
+                          )
+                        )
+                      }
+                    />
+                    <span className="text-sm">{d.label}</span>
+                  </label>
+
+                  <input
+                    className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-right text-sm text-zinc-900 disabled:opacity-50"
+                    type="time"
+                    value={typeof d.start === "string" ? d.start : ""}
+                    disabled={!d.enabled}
+                    onChange={(e) =>
+                      setAvailability((prev) =>
+                        prev.map((x, i) => (i === idx ? { ...x, start: e.target.value } : x))
+                      )
+                    }
+                  />
+
+                  <input
+                    className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-right text-sm text-zinc-900 disabled:opacity-50"
+                    type="time"
+                    value={typeof d.end === "string" ? d.end : ""}
+                    disabled={!d.enabled}
+                    onChange={(e) =>
+                      setAvailability((prev) =>
+                        prev.map((x, i) => (i === idx ? { ...x, end: e.target.value } : x))
+                      )
+                    }
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="text-sm font-medium">הערות (אופציונלי)</label>
+            <textarea
+              className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-right text-sm text-zinc-900 placeholder:text-zinc-400"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={3}
+              placeholder="לדוגמה: נא לתאם מראש, חניה בכניסה לבית, יש כלב בחצר"
+            />
+          </div>
+
+          <button
+            className="w-full rounded-full bg-black px-4 py-3 text-sm font-medium text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={!canSubmit || saving}
+            type="submit"
+          >
+            {saving ? "שומר..." : "שמור עמדה"}
+          </button>
+        </form>
+
+        <div className="mt-10 text-center text-xs text-zinc-400">
+          v{version}{buildStamp ? ` · ${buildStamp}` : ""}
+        </div>
+      </main>
+    </div>
+  );
+}
