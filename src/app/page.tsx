@@ -55,9 +55,10 @@ export default function Home() {
   const favoritesAnchorId = "favorites";
 
   const [filterCity, setFilterCity] = useState("");
-  const [filterConnector, setFilterConnector] = useState("");
+  const [filterConnector, setFilterConnector] = useState<string>("all");
   const [filterMinPower, setFilterMinPower] = useState<number | "">("");
   const [filterMaxPrice, setFilterMaxPrice] = useState<number | "">("");
+  const [highlightStationId, setHighlightStationId] = useState<string | null>(null);
 
   const isAdmin = useMemo(() => isAdminEmail(user?.email), [user?.email]);
 
@@ -187,7 +188,7 @@ export default function Home() {
 
   const shareStation = useCallback(async (stationId: string, title: string) => {
     try {
-      const url = `${window.location.origin}/reveal?stationId=${encodeURIComponent(stationId)}`;
+      const url = `${window.location.origin}/?stationId=${encodeURIComponent(stationId)}`;
       if (navigator.share) {
         await navigator.share({ title, url });
         return;
@@ -198,6 +199,23 @@ export default function Home() {
     } catch {
       setError("לא ניתן לשתף כרגע");
     }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const stationId = new URLSearchParams(window.location.search).get("stationId");
+    if (!stationId) return;
+
+    setActiveSection("stations");
+    setHighlightStationId(stationId);
+    setTimeout(() => {
+      document.getElementById(stationsAnchorId)?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 0);
+    const t = setTimeout(() => setHighlightStationId(null), 4000);
+    return () => clearTimeout(t);
   }, []);
 
   useEffect(() => {
@@ -778,7 +796,9 @@ export default function Home() {
               {filteredStations.map((s) => (
                 <div
                   key={s.id}
-                  className="rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm"
+                  className={`rounded-2xl border bg-white p-5 shadow-sm transition-colors ${
+                    highlightStationId === s.id ? "border-emerald-400 bg-emerald-50/30" : "border-zinc-100"
+                  }`}
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div>
