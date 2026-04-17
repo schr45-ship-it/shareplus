@@ -75,12 +75,13 @@ export default function Home() {
   const [revealStation, setRevealStation] = useState<StationPublic | null>(null);
   const [revealSaving, setRevealSaving] = useState(false);
   const [revealForm, setRevealForm] = useState({
-    coupon: "עם ישראל",
+    coupon: "",
     firstName: "",
     lastName: "",
     email: "",
     phone: "",
     address: "",
+    carType: "",
   });
   const [revealedById, setRevealedById] = useState<Record<string, RevealData>>({});
 
@@ -411,12 +412,13 @@ export default function Home() {
     setError(null);
     setRevealStation(station);
     setRevealForm({
-      coupon: "עם ישראל",
+      coupon: "",
       firstName: "",
       lastName: "",
       email: "",
       phone: "",
       address: "",
+      carType: "",
     });
     setRevealOpen(true);
   }, []);
@@ -425,6 +427,31 @@ export default function Home() {
     try {
       setError(null);
       if (!revealStation) return;
+
+      if (!revealForm.coupon.trim()) {
+        setError("חסר לך קופון");
+        return;
+      }
+      if (!revealForm.firstName.trim()) {
+        setError("חסר לך השם");
+        return;
+      }
+      if (!revealForm.lastName.trim()) {
+        setError("חסר לך שם משפחה");
+        return;
+      }
+      if (!revealForm.phone.trim()) {
+        setError("חסר לך טלפון");
+        return;
+      }
+      if (!revealForm.address.trim()) {
+        setError("חסרה לך כתובת");
+        return;
+      }
+      if (!revealForm.carType.trim()) {
+        setError("חסר לך סוג הרכב");
+        return;
+      }
 
       setRevealSaving(true);
       const res = await fetch("/api/reveal-coupon", {
@@ -440,6 +467,7 @@ export default function Home() {
           email: revealForm.email,
           phone: revealForm.phone,
           address: revealForm.address,
+          carType: revealForm.carType,
         }),
       });
 
@@ -954,12 +982,22 @@ export default function Home() {
               <div>
                 <label className="text-xs font-medium text-zinc-600">קופון</label>
                 <input
+                  type="password"
                   className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-right text-sm"
                   value={revealForm.coupon}
                   onChange={(e) => setRevealForm((p) => ({ ...p, coupon: e.target.value }))}
+                  placeholder="הכנס קופון"
                 />
               </div>
-              <div />
+              <div>
+                <label className="text-xs font-medium text-zinc-600">סוג הרכב</label>
+                <input
+                  className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-right text-sm"
+                  value={revealForm.carType}
+                  onChange={(e) => setRevealForm((p) => ({ ...p, carType: e.target.value }))}
+                  placeholder="לדוגמה: Tesla Model 3"
+                />
+              </div>
               <div>
                 <label className="text-xs font-medium text-zinc-600">שם</label>
                 <input
