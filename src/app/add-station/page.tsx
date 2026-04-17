@@ -18,6 +18,7 @@ export default function AddStationPage() {
   const [user, setUser] = useState<User | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [missingFields, setMissingFields] = useState<string[]>([]);
   const [createdId, setCreatedId] = useState<string | null>(null);
 
   const [city, setCity] = useState("");
@@ -47,6 +48,33 @@ export default function AddStationPage() {
     { dayKey: "fri", label: "ו׳", enabled: true, start: "08:00", end: "20:00" },
     { dayKey: "sat", label: "ש׳", enabled: true, start: "08:00", end: "20:00" },
   ]);
+
+  function quantize1km(lat: number, lng: number) {
+    const latStep = 0.009;
+    const lngStep = 0.011;
+    const qLat = Math.round(lat / latStep) * latStep;
+    const qLng = Math.round(lng / lngStep) * lngStep;
+    return { lat: Number(qLat.toFixed(6)), lng: Number(qLng.toFixed(6)) };
+  }
+
+  function computeMissingFields() {
+    const misses: string[] = [];
+    if (!user) misses.push("התחברות");
+    if (!city.trim()) misses.push("יישוב");
+    if (!region.trim()) misses.push("אזור בארץ");
+    if (!connectorType.trim()) misses.push("חיבור");
+    if (!Number.isFinite(powerKw) || powerKw <= 0) misses.push("הספק (kW)");
+    if (!exactAddress.trim()) misses.push("כתובת מדויקת");
+    if (!hostName.trim()) misses.push("שם מארח");
+    if (!hostPhone.trim()) misses.push("טלפון מארח");
+    if (!pricingType.trim()) misses.push("סוג תמחור");
+    if (!Number.isFinite(priceIls) || priceIls <= 0) misses.push("מחיר מבוקש (₪)");
+
+    const hasAvailability = availability.some((d) => d.enabled && d.start.trim() && d.end.trim());
+    if (!hasAvailability) misses.push("זמינות (יום ושעות)");
+
+    return misses;
+  }
 
   useEffect(() => {
     const auth = getClientAuth();
@@ -93,14 +121,6 @@ export default function AddStationPage() {
       maxZoom: 19,
       attribution: "&copy; OpenStreetMap",
     }).addTo(map);
-
-    function quantize1km(lat: number, lng: number) {
-      const latStep = 0.009;
-      const lngStep = 0.011;
-      const qLat = Math.round(lat / latStep) * latStep;
-      const qLng = Math.round(lng / lngStep) * lngStep;
-      return { lat: Number(qLat.toFixed(6)), lng: Number(qLng.toFixed(6)) };
-    }
 
     map.on("click", (e: any) => {
       const q = quantize1km(e.latlng.lat, e.latlng.lng);
@@ -175,9 +195,35 @@ export default function AddStationPage() {
     priceIls,
   ]);
 
+  async function useMyLocation() {
+    setError(null);
+    if (typeof window === "undefined") return;
+    if (!navigator.geolocation) {
+      setError("הדפדפן לא תומך במיקום");
+      return;
+    }
+
+    try {
+      const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 60000,
+        });
+      });
+      const q = quantize1km(pos.coords.latitude, pos.coords.longitude);
+      setLocation(q);
+      const map = mapRef.current;
+      if (map) map.setView([q.lat, q.lng], 14);
+    } catch {
+      setError("לא ניתן לקבל מיקום. בדוק הרשאות דפדפן.");
+    }
+  }
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setMissingFields([]);
     setCreatedId(null);
 
     if (!user) {
@@ -186,7 +232,9 @@ export default function AddStationPage() {
     }
 
     if (!canSubmit) {
-      setError("אנא מלא את כל השדות");
+      const misses = computeMissingFields();
+      setMissingFields(misses);
+      setError("חסרים שדות חובה");
       return;
     }
 
@@ -247,6 +295,17 @@ export default function AddStationPage() {
         {error ? (
           <div className="mt-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
             {error}
+          </div>
+        ) : null}
+
+        {missingFields.length ? (
+          <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            <div className="font-semibold">חסרים:</div>
+            <div className="mt-2 space-y-1">
+              {missingFields.map((f) => (
+                <div key={f}>- {f}</div>
+              ))}
+            </div>
           </div>
         ) : null}
 
@@ -347,6 +406,16 @@ export default function AddStationPage() {
             <div className="text-sm font-medium">מיקום על המפה (בקירוב של כ-1 ק"מ)</div>
             <div className="mt-1 text-xs text-zinc-500">
               לחץ על המפה כדי לבחור מיקום מקורב. אנו שומרים מיקום בקירוב כדי לשמור על פרטיות.
+            </div>
+            <div className="mt-3 flex justify-end">
+              <button
+                type="button"
+                className="rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-900 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={!mapReady}
+                onClick={() => void useMyLocation()}
+              >
+                לפי המיקום שלי
+              </button>
             </div>
             <div className="mt-3 overflow-hidden rounded-xl border border-zinc-200 bg-white">
               <div id="station-map" className="h-56 w-full" />

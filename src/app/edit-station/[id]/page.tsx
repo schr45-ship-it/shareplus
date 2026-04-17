@@ -244,6 +244,39 @@ export default function EditStationPage({
     map.setView([location.lat, location.lng], 14);
   }, [location, mapReady]);
 
+  async function useMyLocation() {
+    setError(null);
+    if (typeof window === "undefined") return;
+    if (!navigator.geolocation) {
+      setError("הדפדפן לא תומך במיקום");
+      return;
+    }
+
+    function quantize1km(lat: number, lng: number) {
+      const latStep = 0.009;
+      const lngStep = 0.011;
+      const qLat = Math.round(lat / latStep) * latStep;
+      const qLng = Math.round(lng / lngStep) * lngStep;
+      return { lat: Number(qLat.toFixed(6)), lng: Number(qLng.toFixed(6)) };
+    }
+
+    try {
+      const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 60000,
+        });
+      });
+      const q = quantize1km(pos.coords.latitude, pos.coords.longitude);
+      setLocation(q);
+      const map = mapRef.current;
+      if (map) map.setView([q.lat, q.lng], 14);
+    } catch {
+      setError("לא ניתן לקבל מיקום. בדוק הרשאות דפדפן.");
+    }
+  }
+
   const canSubmit = useMemo(() => {
     return (
       !!user &&
@@ -486,6 +519,16 @@ export default function EditStationPage({
             <div className="text-sm font-medium">מיקום על המפה (בקירוב של כ-1 ק"מ)</div>
             <div className="mt-1 text-xs text-zinc-500">
               לחץ על המפה כדי לבחור מיקום מקורב. אנו שומרים מיקום בקירוב כדי לשמור על פרטיות.
+            </div>
+            <div className="mt-3 flex justify-end">
+              <button
+                type="button"
+                className="rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-900 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={!mapReady}
+                onClick={() => void useMyLocation()}
+              >
+                לפי המיקום שלי
+              </button>
             </div>
             <div className="mt-3 overflow-hidden rounded-xl border border-zinc-200 bg-white">
               <div id="station-map" className="h-56 w-full" />
