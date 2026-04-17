@@ -1,13 +1,11 @@
-import { cert, getApps, initializeApp, type App } from "firebase-admin/app";
+import { applicationDefault, cert, getApps, initializeApp, type App } from "firebase-admin/app";
 import { getAuth, type Auth } from "firebase-admin/auth";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
 
 function getServiceAccount() {
   const raw = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
   if (!raw) {
-    throw new Error(
-      "Missing FIREBASE_SERVICE_ACCOUNT_KEY env var (JSON string of Firebase service account)"
-    );
+    return null;
   }
 
   try {
@@ -35,8 +33,9 @@ function getAdminApp() {
   if (cachedApp) return cachedApp;
   cachedApp = getApps().length > 0 ? getApps()[0] : null;
   if (!cachedApp) {
+    const serviceAccount = getServiceAccount();
     cachedApp = initializeApp({
-      credential: cert(getServiceAccount()),
+      credential: serviceAccount ? cert(serviceAccount) : applicationDefault(),
     });
   }
   return cachedApp;
