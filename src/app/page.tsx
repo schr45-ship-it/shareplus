@@ -24,6 +24,17 @@ type StationPublic = {
   isActive?: boolean;
 };
 
+type RevealData = {
+  title: string;
+  stationId: string;
+  exactAddress: string;
+  expiresAt: string;
+  contact: {
+    phone: string;
+    name: string;
+  };
+};
+
 type MyStation = StationPublic & {
   exactAddress?: string;
   hostPhone?: string;
@@ -59,6 +70,19 @@ export default function Home() {
   const [filterMinPower, setFilterMinPower] = useState<number | "">("");
   const [filterMaxPrice, setFilterMaxPrice] = useState<number | "">("");
   const [highlightStationId, setHighlightStationId] = useState<string | null>(null);
+
+  const [revealOpen, setRevealOpen] = useState(false);
+  const [revealStation, setRevealStation] = useState<StationPublic | null>(null);
+  const [revealSaving, setRevealSaving] = useState(false);
+  const [revealForm, setRevealForm] = useState({
+    coupon: "עם ישראל",
+    firstName: "",
+    lastName: "",
+    email: "",
+    phone: "",
+    address: "",
+  });
+  const [revealedById, setRevealedById] = useState<Record<string, RevealData>>({});
 
   const isAdmin = useMemo(() => isAdminEmail(user?.email), [user?.email]);
 
@@ -383,41 +407,54 @@ export default function Home() {
     );
   }, [user]);
 
-  const startCheckout = useCallback(
-    async (stationId: string) => {
+  const openReveal = useCallback((station: StationPublic) => {
+    setError(null);
+    setRevealStation(station);
+    setRevealForm({
+      coupon: "עם ישראל",
+      firstName: "",
+      lastName: "",
+      email: "",
+      phone: "",
+      address: "",
+    });
+    setRevealOpen(true);
+  }, []);
+
+  const submitReveal = useCallback(async () => {
+    try {
       setError(null);
+      if (!revealStation) return;
 
-      let currentUser = user;
-      if (!currentUser) {
-        await signInWithGoogle();
-        currentUser = getClientAuth().currentUser;
-      }
-
-      if (!currentUser) {
-        setError("ההתחברות נכשלה. נסה שוב.");
-        return;
-      }
-
-      const token = await getIdToken(currentUser);
-      const res = await fetch("/api/checkout", {
+      setRevealSaving(true);
+      const res = await fetch("/api/reveal-coupon", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ stationId }),
+        body: JSON.stringify({
+          stationId: revealStation.id,
+          coupon: revealForm.coupon,
+          firstName: revealForm.firstName,
+          lastName: revealForm.lastName,
+          email: revealForm.email,
+          phone: revealForm.phone,
+          address: revealForm.address,
+        }),
       });
 
-      if (!res.ok) {
-        const data = (await res.json().catch(() => ({}))) as { error?: string };
-        throw new Error(data.error ?? "Checkout failed");
-      }
+      const json = (await res.json().catch(() => ({}))) as RevealData & { error?: string };
+      if (!res.ok) throw new Error(json.error ?? "שגיאה בחשיפה");
 
-      const data = (await res.json()) as { url: string };
-      window.location.href = data.url;
-    },
-    [user]
-  );
+      setRevealedById((prev) => ({ ...prev, [revealStation.id]: json }));
+      setRevealOpen(false);
+      setRevealStation(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "שגיאה לא צפויה");
+    } finally {
+      setRevealSaving(false);
+    }
+  }, [revealForm, revealStation]);
 
   return (
     <div className="min-h-dvh bg-white text-zinc-900" dir="rtl">
@@ -825,10 +862,23 @@ export default function Home() {
                     <div className="flex shrink-0 flex-col gap-2">
                       <button
                         className="rounded-full bg-black px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
-                        onClick={() => void startCheckout(s.id).catch((e) => setError(String(e)))}
+                        onClick={() => openReveal(s)}
                       >
-                        חשוף פרטי קשר (1₪)
+                        חשוף פרטי קשר
                       </button>
+
+                      {revealedById[s.id]?.contact?.phone ? (
+                        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-right text-xs text-emerald-900">
+                          <div className="font-semibold">פרטי קשר:</div>
+                          <div className="mt-1">טלפון: {revealedById[s.id].contact.phone}</div>
+                          {revealedById[s.id].contact.name ? (
+                            <div className="mt-1">שם מארח: {revealedById[s.id].contact.name}</div>
+                          ) : null}
+                          {revealedById[s.id].exactAddress ? (
+                            <div className="mt-1">כתובת: {revealedById[s.id].exactAddress}</div>
+                          ) : null}
+                        </div>
+                      ) : null}
 
                       <button
                         type="button"
@@ -871,6 +921,113 @@ export default function Home() {
           v{version}{buildStamp ? ` · ${buildStamp}` : ""}
         </div>
       </main>
+
+      {revealOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" dir="rtl">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-5 text-right shadow-xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="text-base font-semibold">חשיפת פרטי קשר</div>
+                <div className="mt-1 text-sm text-zinc-600">
+                  הכנס קופון והשלם פרטים בסיסיים כדי לראות את פרטי הקשר.
+                </div>
+              </div>
+              <button
+                type="button"
+                className="rounded-full px-3 py-1 text-sm font-medium text-zinc-600 hover:bg-zinc-50"
+                onClick={() => {
+                  setRevealOpen(false);
+                  setRevealStation(null);
+                }}
+              >
+                סגור
+              </button>
+            </div>
+
+            {revealStation ? (
+              <div className="mt-3 rounded-xl border border-zinc-100 bg-zinc-50 p-3 text-sm text-zinc-700">
+                עמדה: <span className="font-semibold">{revealStation.title}</span>
+              </div>
+            ) : null}
+
+            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <label className="text-xs font-medium text-zinc-600">קופון</label>
+                <input
+                  className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-right text-sm"
+                  value={revealForm.coupon}
+                  onChange={(e) => setRevealForm((p) => ({ ...p, coupon: e.target.value }))}
+                />
+              </div>
+              <div />
+              <div>
+                <label className="text-xs font-medium text-zinc-600">שם</label>
+                <input
+                  className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-right text-sm"
+                  value={revealForm.firstName}
+                  onChange={(e) => setRevealForm((p) => ({ ...p, firstName: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-zinc-600">שם משפחה</label>
+                <input
+                  className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-right text-sm"
+                  value={revealForm.lastName}
+                  onChange={(e) => setRevealForm((p) => ({ ...p, lastName: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-zinc-600">טלפון</label>
+                <input
+                  className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-right text-sm"
+                  value={revealForm.phone}
+                  onChange={(e) => setRevealForm((p) => ({ ...p, phone: e.target.value }))}
+                  placeholder="050..."
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-zinc-600">מייל (לא חובה)</label>
+                <input
+                  className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-right text-sm"
+                  value={revealForm.email}
+                  onChange={(e) => setRevealForm((p) => ({ ...p, email: e.target.value }))}
+                  placeholder="name@email.com"
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="text-xs font-medium text-zinc-600">כתובת</label>
+                <input
+                  className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-right text-sm"
+                  value={revealForm.address}
+                  onChange={(e) => setRevealForm((p) => ({ ...p, address: e.target.value }))}
+                  placeholder="עיר, רחוב, מספר"
+                />
+              </div>
+            </div>
+
+            <div className="mt-4 flex justify-end gap-3">
+              <button
+                type="button"
+                className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium hover:bg-zinc-50"
+                onClick={() => {
+                  setRevealOpen(false);
+                  setRevealStation(null);
+                }}
+              >
+                ביטול
+              </button>
+              <button
+                type="button"
+                className="rounded-full bg-black px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={revealSaving}
+                onClick={() => void submitReveal()}
+              >
+                {revealSaving ? "שולח..." : "חשוף"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
