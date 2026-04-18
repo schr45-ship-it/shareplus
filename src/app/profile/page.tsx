@@ -118,7 +118,7 @@ export default function ProfilePage() {
       }
 
       const ok = window.confirm(
-        "אזהרה: מחיקת משתמש היא פעולה בלתי הפיכה.\n\nהאם למחוק את המשתמש שלך מ-SharePlus?"
+        "שים לב: המחיקה היא סופית.\nהאם אתה בטוח שברצונך למחוק?"
       );
       if (!ok) return;
 
@@ -312,21 +312,15 @@ export default function ProfilePage() {
             )}
           </div>
 
-          <div className="rounded-2xl border border-red-100 bg-red-50 p-5">
-            <div className="text-sm font-semibold text-red-800">אזור מסוכן</div>
-            <div className="mt-1 text-xs text-red-700">
-              מחיקת משתמש תמחק את החשבון שלך מהמערכת. פעולה זו אינה ניתנת לשחזור.
-            </div>
-            <div className="mt-4 flex justify-end">
-              <button
-                type="button"
-                className="rounded-full border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
-                disabled={deleting}
-                onClick={() => void deleteAccount()}
-              >
-                {deleting ? "מוחק..." : "מחק משתמש"}
-              </button>
-            </div>
+          <div className="flex justify-end">
+            <button
+              type="button"
+              className="rounded-full border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={deleting}
+              onClick={() => void deleteAccount()}
+            >
+              {deleting ? "מוחק..." : "מחק משתמש"}
+            </button>
           </div>
         </div>
       </main>
