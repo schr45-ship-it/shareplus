@@ -982,7 +982,12 @@ export default function Home() {
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div>
-                      <div className="text-sm font-semibold">{s.title}</div>
+                      <a
+                        className="text-sm font-semibold text-zinc-900 hover:underline"
+                        href={`/stations/${encodeURIComponent(s.id)}`}
+                      >
+                        {s.title}
+                      </a>
                       <div className="mt-1 text-sm text-zinc-600">
                         {s.city} · {s.connectorType} · {s.powerKw}kW
                       </div>
@@ -1017,9 +1022,11 @@ export default function Home() {
 
                       <button
                         className="rounded-full bg-black px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
-                        onClick={() => openReveal(s)}
+                        onClick={() => {
+                          window.location.href = `/stations/${encodeURIComponent(s.id)}`;
+                        }}
                       >
-                        שלח בקשה
+                        פרטים ושליחת בקשה
                       </button>
 
                       {isAdmin ? (
