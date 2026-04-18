@@ -469,7 +469,7 @@ export default function Home() {
 
   const startSignIn = useCallback(async () => {
     if (typeof window !== "undefined") {
-      window.sessionStorage.setItem("shareplus_terms_prompt", "1");
+      (window as unknown as Record<string, unknown>)["__shareplusTermsPrompt"] = true;
       window.dispatchEvent(new Event("shareplus:terms-prompt"));
     }
     await signInWithGoogle();

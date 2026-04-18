@@ -9,7 +9,7 @@ import { getClientAuth } from "@/lib/firebaseClient";
 import { getClientDb } from "@/lib/firestoreClient";
 
 const TERMS_VERSION = "2026-04-18";
-const TERMS_PROMPT_KEY = "shareplus_terms_prompt";
+const TERMS_WINDOW_FLAG = "__shareplusTermsPrompt";
 
 export default function TermsGate() {
   const [user, setUser] = useState<User | null>(null);
@@ -28,13 +28,10 @@ export default function TermsGate() {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    const current = window.sessionStorage.getItem(TERMS_PROMPT_KEY) === "1";
+    const current = Boolean((window as unknown as Record<string, unknown>)[TERMS_WINDOW_FLAG]);
     setPromptEnabled(current);
 
-    const handler = () => {
-      const enabled = window.sessionStorage.getItem(TERMS_PROMPT_KEY) === "1";
-      setPromptEnabled(enabled);
-    };
+    const handler = () => setPromptEnabled(true);
 
     window.addEventListener("shareplus:terms-prompt", handler);
     return () => window.removeEventListener("shareplus:terms-prompt", handler);
@@ -72,7 +69,7 @@ export default function TermsGate() {
         }
 
         if (already && typeof window !== "undefined") {
-          window.sessionStorage.removeItem(TERMS_PROMPT_KEY);
+          (window as unknown as Record<string, unknown>)[TERMS_WINDOW_FLAG] = false;
           setPromptEnabled(false);
         }
       } catch (e) {
@@ -111,7 +108,7 @@ export default function TermsGate() {
       );
       setNeedsAccept(false);
       if (typeof window !== "undefined") {
-        window.sessionStorage.removeItem(TERMS_PROMPT_KEY);
+        (window as unknown as Record<string, unknown>)[TERMS_WINDOW_FLAG] = false;
         setPromptEnabled(false);
       }
     } catch (e) {
