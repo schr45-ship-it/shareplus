@@ -9,6 +9,7 @@ import { getClientAuth } from "@/lib/firebaseClient";
 import { getClientDb } from "@/lib/firestoreClient";
 
 const TERMS_VERSION = "2026-04-18";
+const TERMS_PROMPT_KEY = "shareplus_terms_prompt";
 
 export default function TermsGate() {
   const [user, setUser] = useState<User | null>(null);
@@ -17,10 +18,26 @@ export default function TermsGate() {
   const [accepted, setAccepted] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [promptEnabled, setPromptEnabled] = useState(false);
 
   useEffect(() => {
     const auth = getClientAuth();
     return onAuthStateChanged(auth, (u) => setUser(u));
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const current = window.sessionStorage.getItem(TERMS_PROMPT_KEY) === "1";
+    setPromptEnabled(current);
+
+    const handler = () => {
+      const enabled = window.sessionStorage.getItem(TERMS_PROMPT_KEY) === "1";
+      setPromptEnabled(enabled);
+    };
+
+    window.addEventListener("shareplus:terms-prompt", handler);
+    return () => window.removeEventListener("shareplus:terms-prompt", handler);
   }, []);
 
   useEffect(() => {
@@ -30,6 +47,12 @@ export default function TermsGate() {
       try {
         setLoading(true);
         setError(null);
+
+        if (!promptEnabled) {
+          setNeedsAccept(false);
+          setAccepted(false);
+          return;
+        }
 
         if (!user) {
           setNeedsAccept(false);
@@ -47,6 +70,11 @@ export default function TermsGate() {
           setNeedsAccept(!already);
           setAccepted(false);
         }
+
+        if (already && typeof window !== "undefined") {
+          window.sessionStorage.removeItem(TERMS_PROMPT_KEY);
+          setPromptEnabled(false);
+        }
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : "שגיאה לא צפויה");
       } finally {
@@ -58,7 +86,7 @@ export default function TermsGate() {
     return () => {
       cancelled = true;
     };
-  }, [user]);
+  }, [promptEnabled, user]);
 
   const accept = useCallback(async () => {
     try {
@@ -82,6 +110,10 @@ export default function TermsGate() {
         { merge: true }
       );
       setNeedsAccept(false);
+      if (typeof window !== "undefined") {
+        window.sessionStorage.removeItem(TERMS_PROMPT_KEY);
+        setPromptEnabled(false);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "שגיאה לא צפויה");
     } finally {
@@ -89,7 +121,7 @@ export default function TermsGate() {
     }
   }, [accepted, user]);
 
-  if (loading || !needsAccept) return null;
+  if (loading || !promptEnabled || !needsAccept) return null;
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4" dir="rtl">

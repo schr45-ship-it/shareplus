@@ -467,12 +467,20 @@ export default function Home() {
     }
   }, [user]);
 
+  const startSignIn = useCallback(async () => {
+    if (typeof window !== "undefined") {
+      window.sessionStorage.setItem("shareplus_terms_prompt", "1");
+      window.dispatchEvent(new Event("shareplus:terms-prompt"));
+    }
+    await signInWithGoogle();
+  }, []);
+
   const headerRight = useMemo(() => {
     if (!user) {
       return (
         <button
           className="rounded-full bg-black px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
-          onClick={() => void signInWithGoogle()}
+          onClick={() => void startSignIn()}
         >
           התחבר עם Google
         </button>
@@ -499,7 +507,7 @@ export default function Home() {
         </button>
       </div>
     );
-  }, [enablePush, user]);
+  }, [enablePush, startSignIn, user]);
 
   const openReveal = useCallback((station: StationPublic) => {
     setError(null);
