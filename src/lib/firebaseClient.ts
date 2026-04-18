@@ -5,6 +5,12 @@ import {
   signInWithPopup,
   type Auth,
 } from "firebase/auth";
+import {
+  getMessaging,
+  getToken,
+  isSupported,
+  type Messaging,
+} from "firebase/messaging";
 
 const firebaseConfig = {
   apiKey:
@@ -25,6 +31,7 @@ const firebaseConfig = {
 
 let cachedApp: FirebaseApp | null = null;
 let cachedAuth: Auth | null = null;
+let cachedMessaging: Messaging | null = null;
 
 function getClientApp() {
   if (cachedApp) return cachedApp;
@@ -39,6 +46,26 @@ export function getClientAuth(): Auth {
   if (cachedAuth) return cachedAuth;
   cachedAuth = getAuth(getClientApp());
   return cachedAuth;
+}
+
+export async function getClientMessaging(): Promise<Messaging | null> {
+  if (cachedMessaging) return cachedMessaging;
+  if (!(await isSupported())) return null;
+  cachedMessaging = getMessaging(getClientApp());
+  return cachedMessaging;
+}
+
+export async function getWebPushToken(): Promise<string | null> {
+  const messaging = await getClientMessaging();
+  if (!messaging) return null;
+
+  const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
+  if (!vapidKey) {
+    throw new Error("Missing NEXT_PUBLIC_FIREBASE_VAPID_KEY");
+  }
+
+  const token = await getToken(messaging, { vapidKey });
+  return token || null;
 }
 
 export async function signInWithGoogle() {
