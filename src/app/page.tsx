@@ -36,7 +36,7 @@ type RevealData = {
 };
 
 type MyStation = StationPublic & {
-  exactAddress?: string;
+  street?: string;
   hostPhone?: string;
   hostName?: string;
   isActive?: boolean;
@@ -643,8 +643,8 @@ export default function Home() {
                                 {s.priceNote ? (
                                   <div className="mt-1 text-xs text-zinc-500">{s.priceNote}</div>
                                 ) : null}
-                                {s.exactAddress ? (
-                                  <div className="mt-1 text-xs text-zinc-500">כתובת: {s.exactAddress}</div>
+                                {s.street ? (
+                                  <div className="mt-1 text-xs text-zinc-500">רחוב: {s.street}</div>
                                 ) : null}
                                 {s.hostPhone ? (
                                   <div className="mt-1 text-xs text-zinc-500">טלפון: {s.hostPhone}</div>
@@ -903,7 +903,7 @@ export default function Home() {
                             <div className="mt-1">שם מארח: {revealedById[s.id].contact.name}</div>
                           ) : null}
                           {revealedById[s.id].exactAddress ? (
-                            <div className="mt-1">כתובת: {revealedById[s.id].exactAddress}</div>
+                            <div className="mt-1">רחוב: {revealedById[s.id].exactAddress}</div>
                           ) : null}
                         </div>
                       ) : null}

@@ -25,13 +25,14 @@ export default function AddStationPage() {
   const [region, setRegion] = useState("");
   const [connectorType, setConnectorType] = useState("Type 2 (עם כבל מובנה)");
   const [powerKw, setPowerKw] = useState<number>(11);
-  const [exactAddress, setExactAddress] = useState("");
+  const [street, setStreet] = useState("");
   const [hostName, setHostName] = useState("");
   const [hostPhone, setHostPhone] = useState("");
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [mapReady, setMapReady] = useState(false);
   const mapRef = useRef<any>(null);
   const markerRef = useRef<any>(null);
+  const [geocoding, setGeocoding] = useState(false);
   const [pricingType, setPricingType] = useState("לפי שעה");
   const [priceIls, setPriceIls] = useState<number>(20);
   const [notes, setNotes] = useState("");
@@ -64,7 +65,7 @@ export default function AddStationPage() {
     if (!region.trim()) misses.push("אזור בארץ");
     if (!connectorType.trim()) misses.push("חיבור");
     if (!Number.isFinite(powerKw) || powerKw <= 0) misses.push("הספק (kW)");
-    if (!exactAddress.trim()) misses.push("כתובת מדויקת");
+    if (!street.trim()) misses.push("רחוב");
     if (!hostName.trim()) misses.push("שם מארח");
     if (!hostPhone.trim()) misses.push("טלפון מארח");
     if (!pricingType.trim()) misses.push("סוג תמחור");
@@ -173,7 +174,7 @@ export default function AddStationPage() {
       connectorType.trim().length > 0 &&
       Number.isFinite(powerKw) &&
       powerKw > 0 &&
-      exactAddress.trim().length > 0 &&
+      street.trim().length > 0 &&
       hostName.trim().length > 0 &&
       hostPhone.trim().length > 0 &&
       availability.some((d) => d.enabled && d.start.trim() && d.end.trim()) &&
@@ -187,13 +188,50 @@ export default function AddStationPage() {
     region,
     connectorType,
     powerKw,
-    exactAddress,
+    street,
     hostName,
     hostPhone,
     availability,
     pricingType,
     priceIls,
   ]);
+
+  async function setLocationFromStreet() {
+    setError(null);
+    if (!street.trim() || !city.trim()) {
+      setError("כדי לאתר מיקום אוטומטי, מלא רחוב ויישוב");
+      return;
+    }
+
+    try {
+      setGeocoding(true);
+      const query = `${street.trim()}, ${city.trim()}, Israel`;
+      const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(
+        query
+      )}`;
+      const res = await fetch(url, {
+        headers: {
+          Accept: "application/json",
+        },
+      });
+      if (!res.ok) throw new Error("לא ניתן לאתר מיקום כרגע");
+      const data = (await res.json().catch(() => null)) as null | Array<{ lat?: string; lon?: string }>;
+      const first = Array.isArray(data) ? data[0] : null;
+      const lat = first?.lat ? Number(first.lat) : NaN;
+      const lng = first?.lon ? Number(first.lon) : NaN;
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        throw new Error("לא זוהה רחוב. נסה לבחור על המפה.");
+      }
+      const q = quantize1km(lat, lng);
+      setLocation(q);
+      const map = mapRef.current;
+      if (map) map.setView([q.lat, q.lng], 14);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "שגיאה לא צפויה");
+    } finally {
+      setGeocoding(false);
+    }
+  }
 
   async function useMyLocation() {
     setError(null);
@@ -250,7 +288,7 @@ export default function AddStationPage() {
         region: region.trim(),
         connectorType: connectorType.trim(),
         powerKw,
-        exactAddress: exactAddress.trim(),
+        street: street.trim(),
         location: location ?? undefined,
         hostName: hostName.trim(),
         hostPhone: hostPhone.trim(),
@@ -393,12 +431,12 @@ export default function AddStationPage() {
           </div>
 
           <div>
-            <label className="text-sm font-medium">כתובת מדויקת</label>
+            <label className="text-sm font-medium">רחוב</label>
             <input
               className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-right text-sm text-zinc-900 placeholder:text-zinc-400"
-              value={exactAddress}
-              onChange={(e) => setExactAddress(e.target.value)}
-              placeholder="רחוב, מספר, דירה/שער, הערות"
+              value={street}
+              onChange={(e) => setStreet(e.target.value)}
+              placeholder="נא לא לרשום מספר בית מדויק"
             />
           </div>
 
@@ -407,7 +445,15 @@ export default function AddStationPage() {
             <div className="mt-1 text-xs text-zinc-500">
               לחץ על המפה כדי לבחור מיקום מקורב. אנו שומרים מיקום בקירוב כדי לשמור על פרטיות.
             </div>
-            <div className="mt-3 flex justify-end">
+            <div className="mt-3 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                className="rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-900 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={!mapReady || geocoding}
+                onClick={() => void setLocationFromStreet()}
+              >
+                {geocoding ? "מאתר..." : "אתר לפי רחוב"}
+              </button>
               <button
                 type="button"
                 className="rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-900 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"

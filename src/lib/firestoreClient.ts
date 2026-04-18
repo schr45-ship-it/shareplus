@@ -51,7 +51,7 @@ export async function createStation(input: {
   region: string;
   connectorType: string;
   powerKw: number;
-  exactAddress: string;
+  street: string;
   location?: { lat: number; lng: number };
   hostPhone: string;
   hostName: string;
@@ -80,7 +80,8 @@ export type StationDoc = {
   region: string;
   connectorType: string;
   powerKw: number;
-  exactAddress: string;
+  street: string;
+  exactAddress?: string;
   location?: { lat: number; lng: number };
   hostPhone: string;
   hostName: string;

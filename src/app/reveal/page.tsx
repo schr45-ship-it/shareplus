@@ -85,7 +85,7 @@ export default function RevealPage() {
         ) : data ? (
           <div className="mt-6 rounded-2xl border border-zinc-100 p-5">
             <div className="text-sm font-semibold">{data.title}</div>
-            <div className="mt-2 text-sm text-zinc-700">כתובת מדויקת: {data.exactAddress}</div>
+            <div className="mt-2 text-sm text-zinc-700">רחוב: {data.exactAddress}</div>
             <div className="mt-2 text-sm text-zinc-700">
               טלפון מארח: {data.contact.phone} {data.contact.name ? `(${data.contact.name})` : ""}
             </div>

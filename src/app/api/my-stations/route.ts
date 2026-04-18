@@ -34,6 +34,7 @@ export async function GET(req: Request) {
         priceNote?: string;
         pricingType?: string;
         priceIls?: number;
+        street?: string;
         exactAddress?: string;
         hostPhone?: string;
         hostName?: string;
@@ -53,7 +54,7 @@ export async function GET(req: Request) {
         priceNote: data.priceNote,
         pricingType: data.pricingType,
         priceIls: data.priceIls,
-        exactAddress: data.exactAddress,
+        street: data.street ?? data.exactAddress,
         hostPhone: data.hostPhone,
         hostName: data.hostName,
         isActive: data.isActive,

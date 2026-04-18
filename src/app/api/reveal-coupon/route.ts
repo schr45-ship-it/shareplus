@@ -56,6 +56,7 @@ export async function POST(req: Request) {
     }
 
     const station = stationDoc.data() as {
+      street?: string;
       exactAddress?: string;
       hostPhone?: string;
       hostName?: string;
@@ -85,7 +86,7 @@ export async function POST(req: Request) {
         phone: station.hostPhone ?? "",
         name: station.hostName ?? "",
       },
-      exactAddress: station.exactAddress ?? "",
+      exactAddress: station.street ?? station.exactAddress ?? "",
       title: station.title ?? "עמדה",
     });
   } catch (e) {
