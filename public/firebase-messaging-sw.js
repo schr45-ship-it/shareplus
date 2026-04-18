@@ -1,40 +1,35 @@
 /* eslint-disable no-undef */
-importScripts("https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js");
-importScripts("https://www.gstatic.com/firebasejs/10.12.5/firebase-messaging-compat.js");
+self.addEventListener("push", (event) => {
+  let payload = {};
+  try {
+    payload = event.data ? event.data.json() : {};
+  } catch {
+    payload = {};
+  }
 
-firebase.initializeApp({
-  apiKey: "AIzaSyDGdqwlq_oS_jlupgGnQdlacmcNB8puteI",
-  authDomain: "shareplus1.firebaseapp.com",
-  projectId: "shareplus1",
-  storageBucket: "shareplus1.firebasestorage.app",
-  messagingSenderId: "222377089673",
-  appId: "1:222377089673:web:7f7902e202bae6acc88458",
-});
-
-const messaging = firebase.messaging();
-
-messaging.onBackgroundMessage((payload) => {
   const title = payload?.notification?.title ?? payload?.data?.title ?? "SharePlus";
   const body = payload?.notification?.body ?? payload?.data?.body ?? "";
 
   const requestId = payload?.data?.requestId ?? "";
   const deepLink = payload?.data?.deepLink ?? (requestId ? `/?requestId=${encodeURIComponent(requestId)}` : "/");
 
-  self.registration.showNotification(title, {
-    body,
-    data: {
-      deepLink,
-      requestId,
-      actionType: payload?.data?.type ?? "",
-    },
-    actions: requestId
-      ? [
-          { action: "ACCEPT", title: "כן, פנוי" },
-          { action: "DECLINE", title: "לא פנוי" },
-          { action: "COUNTER", title: "הצע זמן אחר" },
-        ]
-      : undefined,
-  });
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body,
+      data: {
+        deepLink,
+        requestId,
+        actionType: payload?.data?.type ?? "",
+      },
+      actions: requestId
+        ? [
+            { action: "ACCEPT", title: "כן, פנוי" },
+            { action: "DECLINE", title: "לא פנוי" },
+            { action: "COUNTER", title: "הצע זמן אחר" },
+          ]
+        : undefined,
+    })
+  );
 });
 
 self.addEventListener("notificationclick", (event) => {
