@@ -18,6 +18,7 @@ type StationPublic = {
   notes?: string;
   hoursStart?: string;
   hoursEnd?: string;
+  availability?: Array<{ dayKey: string; enabled: boolean; start: string; end: string }>;
   priceNote?: string;
   pricingType?: string;
   priceIls?: number;
@@ -69,6 +70,9 @@ export default function Home() {
   const [filterConnector, setFilterConnector] = useState<string>("");
   const [filterMinPower, setFilterMinPower] = useState<number | "">("");
   const [filterMaxPrice, setFilterMaxPrice] = useState<number | "">("");
+  const [filterDate, setFilterDate] = useState<string>("");
+  const [filterTimeFrom, setFilterTimeFrom] = useState<string>("");
+  const [filterTimeTo, setFilterTimeTo] = useState<string>("");
   const [highlightStationId, setHighlightStationId] = useState<string | null>(null);
 
   const [revealOpen, setRevealOpen] = useState(false);
@@ -112,6 +116,29 @@ export default function Home() {
     const connectorNeedle = filterConnector.trim();
     const minPower = filterMinPower === "" ? null : Number(filterMinPower);
     const maxPrice = filterMaxPrice === "" ? null : Number(filterMaxPrice);
+    const dateStr = filterDate.trim();
+    const tFrom = filterTimeFrom.trim();
+    const tTo = filterTimeTo.trim();
+
+    function parseHHMM(v: string) {
+      const m = /^([0-1]\d|2[0-3]):([0-5]\d)$/.exec(v);
+      if (!m) return null;
+      const h = Number(m[1]);
+      const min = Number(m[2]);
+      return h * 60 + min;
+    }
+
+    function dayKeyFromDate(dateIso: string): "sun" | "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | null {
+      const d = new Date(`${dateIso}T00:00:00`);
+      if (!Number.isFinite(d.getTime())) return null;
+      const idx = d.getDay();
+      return (['sun','mon','tue','wed','thu','fri','sat'] as const)[idx] ?? null;
+    }
+
+    const needTimeFilter = Boolean(dateStr && tFrom && tTo);
+    const reqFromMin = needTimeFilter ? parseHHMM(tFrom) : null;
+    const reqToMin = needTimeFilter ? parseHHMM(tTo) : null;
+    const reqDay = needTimeFilter ? dayKeyFromDate(dateStr) : null;
 
     return stations.filter((s) => {
       if ((s as { isActive?: boolean }).isActive === false) return false;
@@ -125,9 +152,35 @@ export default function Home() {
         if (s.priceIls > maxPrice) return false;
       }
 
+      if (needTimeFilter) {
+        if (reqFromMin == null || reqToMin == null || reqDay == null) return false;
+        if (reqFromMin >= reqToMin) return false;
+
+        const avail = s.availability;
+        if (!Array.isArray(avail) || !avail.length) return false;
+
+        const slot = avail.find((a) => a?.enabled && a.dayKey === reqDay);
+        if (!slot) return false;
+        const slotFrom = parseHHMM(String(slot.start ?? ""));
+        const slotTo = parseHHMM(String(slot.end ?? ""));
+        if (slotFrom == null || slotTo == null) return false;
+
+        const overlaps = reqFromMin < slotTo && reqToMin > slotFrom;
+        if (!overlaps) return false;
+      }
+
       return true;
     });
-  }, [stations, filterCity, filterConnector, filterMinPower, filterMaxPrice]);
+  }, [
+    stations,
+    filterCity,
+    filterConnector,
+    filterMinPower,
+    filterMaxPrice,
+    filterDate,
+    filterTimeFrom,
+    filterTimeTo,
+  ]);
 
   useEffect(() => {
     const auth = getClientAuth();
@@ -802,6 +855,38 @@ export default function Home() {
               </div>
             </div>
 
+            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div>
+                <label className="text-xs font-medium text-zinc-600">תאריך</label>
+                <input
+                  type="date"
+                  className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-right text-sm text-zinc-900"
+                  value={filterDate}
+                  onChange={(e) => setFilterDate(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-zinc-600">משעה</label>
+                <input
+                  type="time"
+                  className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-right text-sm text-zinc-900"
+                  value={filterTimeFrom}
+                  onChange={(e) => setFilterTimeFrom(e.target.value)}
+                  step={300}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-zinc-600">עד שעה</label>
+                <input
+                  type="time"
+                  className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-right text-sm text-zinc-900"
+                  value={filterTimeTo}
+                  onChange={(e) => setFilterTimeTo(e.target.value)}
+                  step={300}
+                />
+              </div>
+            </div>
+
             <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
                 <label className="text-xs font-medium text-zinc-600">הספק מינימלי (kW)</label>
@@ -843,6 +928,9 @@ export default function Home() {
                   setFilterConnector("");
                   setFilterMinPower("");
                   setFilterMaxPrice("");
+                  setFilterDate("");
+                  setFilterTimeFrom("");
+                  setFilterTimeTo("");
                 }}
               >
                 נקה סינון

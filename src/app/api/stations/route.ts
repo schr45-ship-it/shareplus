@@ -17,6 +17,7 @@ export async function GET() {
         notes?: string;
         hoursStart?: string;
         hoursEnd?: string;
+        availability?: Array<{ dayKey: string; enabled: boolean; start: string; end: string }>;
         priceNote?: string;
         pricingType?: string;
         priceIls?: number;
@@ -33,6 +34,7 @@ export async function GET() {
         notes: data.notes,
         hoursStart: data.hoursStart,
         hoursEnd: data.hoursEnd,
+        availability: Array.isArray(data.availability) ? data.availability : undefined,
         priceNote: data.priceNote,
         pricingType: data.pricingType,
         priceIls: data.priceIls,
