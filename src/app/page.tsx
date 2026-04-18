@@ -480,19 +480,22 @@ export default function Home() {
     }
 
     return (
-      <div className="flex items-center gap-3">
-        <button
-          className="rounded-full border border-zinc-200 px-4 py-2 text-sm font-medium hover:bg-zinc-50"
-          onClick={() => void enablePush()}
-        >
-          הפעל התראות
-        </button>
-        <span className="text-sm text-zinc-600">{user.email ?? user.displayName}</span>
+      <div className="flex flex-row-reverse items-center gap-3">
         <button
           className="rounded-full border border-zinc-200 px-4 py-2 text-sm font-medium hover:bg-zinc-50"
           onClick={() => void signOut(getClientAuth())}
         >
           התנתק
+        </button>
+        <span className="text-sm text-zinc-600">{user.email ?? user.displayName}</span>
+        <a className="text-sm font-medium text-zinc-900 hover:underline" href="/profile">
+          הפרופיל שלי
+        </a>
+        <button
+          className="rounded-full border border-zinc-200 px-4 py-2 text-sm font-medium hover:bg-zinc-50"
+          onClick={() => void enablePush()}
+        >
+          הפעל התראות
         </button>
       </div>
     );
@@ -578,6 +581,47 @@ export default function Home() {
       </header>
 
       <main className="mx-auto w-full max-w-5xl px-6 pb-12 text-center">
+        {user ? (
+          <div className="mx-auto mb-4 flex w-full max-w-5xl justify-start" dir="rtl">
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveSection("myStations");
+                  setShowMyStations(true);
+                  setShowFavorites(false);
+                  setTimeout(() => {
+                    document.getElementById(myStationsAnchorId)?.scrollIntoView({
+                      behavior: "smooth",
+                      block: "start",
+                    });
+                  }, 0);
+                }}
+                className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-center text-sm font-medium text-zinc-900 hover:bg-zinc-50"
+              >
+                📍 העמדות שלי
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveSection("favorites");
+                  setShowFavorites(true);
+                  setShowMyStations(false);
+                  setTimeout(() => {
+                    document.getElementById(favoritesAnchorId)?.scrollIntoView({
+                      behavior: "smooth",
+                      block: "start",
+                    });
+                  }, 0);
+                }}
+                className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-center text-sm font-medium text-zinc-900 hover:bg-zinc-50"
+              >
+                ♡ המועדפים שלי
+              </button>
+            </div>
+          </div>
+        ) : null}
+
         <div className="mx-auto mb-6 w-full max-w-xl rounded-2xl border border-zinc-100 bg-white p-4">
           <div className="flex flex-col items-center gap-3">
             <div className="overflow-hidden rounded-2xl border border-zinc-100">
@@ -621,50 +665,6 @@ export default function Home() {
                     }`}
                   >
                     🔎 חפש עמדה
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setActiveSection("myStations");
-                      setShowMyStations(true);
-                      setShowFavorites(false);
-                      setTimeout(() => {
-                        document.getElementById(myStationsAnchorId)?.scrollIntoView({
-                          behavior: "smooth",
-                          block: "start",
-                        });
-                      }, 0);
-                    }}
-                    className={`rounded-full px-4 py-2 text-center text-sm font-medium transition-colors ${
-                      activeSection === "myStations"
-                        ? "bg-black text-white"
-                        : "border border-zinc-200 bg-white text-zinc-900 hover:bg-zinc-50"
-                    }`}
-                  >
-                    📍 העמדות שלי
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setActiveSection("favorites");
-                      setShowFavorites(true);
-                      setShowMyStations(false);
-                      setTimeout(() => {
-                        document.getElementById(favoritesAnchorId)?.scrollIntoView({
-                          behavior: "smooth",
-                          block: "start",
-                        });
-                      }, 0);
-                    }}
-                    className={`rounded-full px-4 py-2 text-center text-sm font-medium transition-colors ${
-                      activeSection === "favorites"
-                        ? "bg-black text-white"
-                        : "border border-zinc-200 bg-white text-zinc-900 hover:bg-zinc-50"
-                    }`}
-                  >
-                    ♡ המועדפים שלי
                   </button>
 
                   <a
