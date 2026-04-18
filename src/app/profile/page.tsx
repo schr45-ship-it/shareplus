@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 
-import { getClientAuth } from "@/lib/firebaseClient";
+import { getClientAuth, getWebPushToken } from "@/lib/firebaseClient";
 import { getClientDb } from "@/lib/firestoreClient";
 import { getIdToken } from "@/lib/auth";
 
@@ -18,7 +18,9 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [pushSaving, setPushSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pushStatus, setPushStatus] = useState<NotificationPermission | null>(null);
 
   const [displayName, setDisplayName] = useState("");
   const [phone, setPhone] = useState("");
@@ -26,6 +28,15 @@ export default function ProfilePage() {
   useEffect(() => {
     const auth = getClientAuth();
     return onAuthStateChanged(auth, (u) => setUser(u));
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!("Notification" in window)) {
+      setPushStatus(null);
+      return;
+    }
+    setPushStatus(Notification.permission);
   }, []);
 
   useEffect(() => {
@@ -130,6 +141,63 @@ export default function ProfilePage() {
     }
   }, [user]);
 
+  const registerPushToken = useCallback(async () => {
+    try {
+      setError(null);
+      if (!user) {
+        setError("נדרשת התחברות");
+        return;
+      }
+      if (typeof window === "undefined") return;
+      if (!("Notification" in window)) {
+        setError("הדפדפן לא תומך בהתראות");
+        return;
+      }
+
+      setPushSaving(true);
+
+      const permission = await Notification.requestPermission();
+      setPushStatus(permission);
+      if (permission !== "granted") {
+        if (permission === "denied") {
+          setError("ההתראות חסומות בהגדרות הדפדפן שלך");
+        } else {
+          setError("לא אישרת קבלת התראות");
+        }
+        return;
+      }
+
+      if ("serviceWorker" in navigator) {
+        await navigator.serviceWorker.register("/firebase-messaging-sw.js");
+      }
+
+      const pushToken = await getWebPushToken();
+      if (!pushToken) {
+        setError("לא ניתן לקבל טוקן להתראות");
+        return;
+      }
+
+      const idToken = await getIdToken(user);
+      const res = await fetch("/api/push/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ token: pushToken }),
+      });
+      const json = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+      if (!res.ok) throw new Error(json.error ?? "שגיאה ברישום התראות");
+
+      setError("התראות הופעלו בהצלחה");
+      setTimeout(() => setError(null), 2000);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "שגיאה לא צפויה");
+    } finally {
+      setPushSaving(false);
+    }
+  }, [user]);
+
   if (!user) {
     return (
       <div className="min-h-dvh bg-white text-zinc-900" dir="rtl">
@@ -196,6 +264,52 @@ export default function ProfilePage() {
                 {saving ? "שומר..." : "שמור"}
               </button>
             </div>
+          </div>
+
+          <div className="rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm">
+            <div className="text-sm font-semibold">ניהול התראות</div>
+
+            {typeof window !== "undefined" && !("Notification" in window) ? (
+              <div className="mt-2 text-sm text-zinc-700">הדפדפן לא תומך בהתראות.</div>
+            ) : pushStatus === "denied" ? (
+              <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                <div className="font-semibold">ההתראות חסומות בהגדרות הדפדפן שלך</div>
+                <div className="mt-2 text-xs text-amber-900">
+                  כדי לבטל חסימה:
+                  <div className="mt-1">
+                    1) לחץ על סמל המנעול ליד כתובת האתר
+                  </div>
+                  <div className="mt-1">2) בחר Notifications → Allow</div>
+                  <div className="mt-1">3) רענן את הדף וחזור לכאן</div>
+                </div>
+              </div>
+            ) : pushStatus === "granted" ? (
+              <div className="mt-2 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+                <div className="font-semibold">הכל תקין — התראות פעילות</div>
+                <div className="mt-2 flex justify-end">
+                  <button
+                    type="button"
+                    className="rounded-full border border-emerald-200 bg-white px-4 py-2 text-sm font-medium hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={pushSaving}
+                    onClick={() => void registerPushToken()}
+                  >
+                    {pushSaving ? "בודק..." : "רענן רישום התראות"}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-2 flex items-center justify-between gap-3 rounded-xl border border-zinc-100 bg-zinc-50 p-4">
+                <div className="text-sm text-zinc-700">התראות עדיין לא הופעלו.</div>
+                <button
+                  type="button"
+                  className="rounded-full bg-black px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={pushSaving}
+                  onClick={() => void registerPushToken()}
+                >
+                  {pushSaving ? "מפעיל..." : "הפעל התראות"}
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="rounded-2xl border border-red-100 bg-red-50 p-5">
