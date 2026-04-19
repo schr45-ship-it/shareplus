@@ -296,9 +296,23 @@ export default function Home() {
           },
           cache: "no-store",
         });
-        if (!res.ok) throw new Error("Failed to load my stations");
-        const data = (await res.json()) as { stations: MyStation[] };
-        if (!cancelled) setMyStations(data.stations);
+        const data = (await res.json().catch(() => ({}))) as
+          | { stations: MyStation[] }
+          | { error?: string };
+
+        if (!res.ok) {
+          if (res.status === 401) {
+            if (!cancelled) setMyStations([]);
+            return;
+          }
+          throw new Error(
+            "error" in data && data.error
+              ? data.error
+              : `Failed to load my stations (HTTP ${res.status})`
+          );
+        }
+
+        if (!cancelled) setMyStations((data as { stations: MyStation[] }).stations);
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : "Unexpected error");
       } finally {
@@ -500,6 +514,12 @@ export default function Home() {
 
     return (
       <div className="flex flex-row-reverse items-center gap-3">
+        <a
+          className="rounded-full border border-zinc-200 px-4 py-2 text-sm font-medium hover:bg-zinc-50"
+          href="/reports"
+        >
+          דוחות
+        </a>
         <button
           className="rounded-full border border-zinc-200 px-4 py-2 text-sm font-medium hover:bg-zinc-50"
           onClick={() => void signOut(getClientAuth())}
@@ -631,6 +651,12 @@ export default function Home() {
               >
                 ♡ המועדפים שלי
               </button>
+              <a
+                className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-center text-sm font-medium text-zinc-900 hover:bg-zinc-50"
+                href="/reports"
+              >
+                📊 דוחות
+              </a>
             </div>
           </div>
         ) : null}
@@ -785,7 +811,7 @@ export default function Home() {
                     )}
                   </div>
                 ) : (
-                  <div className="text-sm text-zinc-600">לחץ על "העמדות שלי" כדי לראות את העמדות שלך.</div>
+                  null
                 )}
               </div>
             </div>
@@ -852,13 +878,14 @@ export default function Home() {
                 </div>
               )
             ) : (
-              <div className="mt-3 text-sm text-zinc-600">לחץ על "הצג" כדי לראות את המועדפים שלך.</div>
+              null
             )}
           </section>
         ) : null}
 
-        <section className="mt-8" id={stationsAnchorId}>
-          <h2 className="text-base font-semibold">עמדות</h2>
+        {activeSection === "stations" ? (
+          <section className="mt-8" id={stationsAnchorId}>
+            <h2 className="text-base font-semibold">עמדות</h2>
 
           <div className="mt-4 rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -1057,7 +1084,8 @@ export default function Home() {
               ))}
             </div>
           )}
-        </section>
+          </section>
+        ) : null}
 
         <div className="mt-10 pb-6 text-center text-xs text-zinc-400">
           v{version}{buildStamp ? ` · ${buildStamp}` : ""}

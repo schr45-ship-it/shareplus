@@ -80,6 +80,49 @@ export default function ProfilePage() {
     };
   }, [user]);
 
+  const disablePushOnThisDevice = useCallback(async () => {
+    try {
+      setError(null);
+      if (!user) {
+        setError("נדרשת התחברות");
+        return;
+      }
+      if (typeof window === "undefined") return;
+
+      const ok = window.confirm(
+        "לבטל התראות במכשיר הזה?\n\nהפעולה תסיר את המכשיר מרשימת ההתראות. כדי לחסום לחלוטין, יש לשנות הרשאות התראות בהגדרות הדפדפן (סמל המנעול בשורת הכתובת)."
+      );
+      if (!ok) return;
+
+      setPushSaving(true);
+
+      const pushToken = await getWebPushToken().catch(() => null);
+      if (!pushToken) {
+        setError(
+          "לא ניתן להסיר אוטומטית את הטוקן. כדי לבטל התראות: לחץ על סמל המנעול ליד הכתובת → Notifications → Block"
+        );
+        return;
+      }
+
+      const idToken = await getIdToken(user);
+      const res = await fetch(`/api/push/register?token=${encodeURIComponent(pushToken)}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${idToken}`,
+        },
+      });
+      const json = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+      if (!res.ok) throw new Error(json.error ?? "שגיאה בביטול התראות");
+
+      setError("התראות בוטלו במכשיר הזה");
+      setTimeout(() => setError(null), 2000);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "שגיאה לא צפויה");
+    } finally {
+      setPushSaving(false);
+    }
+  }, [user]);
+
   const canSave = useMemo(() => {
     return Boolean(user) && displayName.trim().length > 0;
   }, [displayName, user]);
@@ -418,7 +461,15 @@ export default function ProfilePage() {
                 <div className="mt-1 text-xs">
                   מכשיר נוכחי: {typeof navigator !== "undefined" ? navigator.platform : ""}
                 </div>
-                <div className="mt-2 flex justify-end">
+                <div className="mt-2 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    className="rounded-full border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={pushSaving}
+                    onClick={() => void disablePushOnThisDevice()}
+                  >
+                    בטל התראות
+                  </button>
                   <button
                     type="button"
                     className="rounded-full border border-emerald-200 bg-white px-4 py-2 text-sm font-medium hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50"

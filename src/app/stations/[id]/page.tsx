@@ -171,7 +171,12 @@ export default function StationPage() {
       });
 
       const json = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
-      if (!res.ok) throw new Error(json.error ?? "שגיאה בשליחת בקשה");
+      if (!res.ok) {
+        if (res.status === 429) {
+          throw new Error(json.error ?? "ניתן לשלוח עד 3 בקשות ביום. נסה שוב מחר.");
+        }
+        throw new Error(json.error ?? "שגיאה בשליחת בקשה");
+      }
 
       setRevealOpen(false);
       setError("הבקשה נשלחה לבעל העמדה");
