@@ -1072,7 +1072,7 @@ export default function Home() {
                   <button
                     type="button"
                     aria-label={favoriteIds.has(s.id) ? "הסר מהמועדפים" : "הוסף למועדפים"}
-                    className="absolute left-4 top-4 inline-flex h-9 w-9 items-center justify-center rounded-full border border-zinc-200 bg-white text-zinc-700 shadow-sm hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="absolute bottom-4 left-4 inline-flex h-9 w-9 items-center justify-center rounded-full border border-zinc-200 bg-white text-zinc-700 shadow-sm hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
                     disabled={togglingFavId === s.id}
                     onClick={() => void toggleFavorite(s.id)}
                   >
