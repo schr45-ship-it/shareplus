@@ -1065,17 +1065,39 @@ export default function Home() {
               {filteredStations.map((s) => (
                 <div
                   key={s.id}
-                  className={`rounded-2xl border bg-white p-5 shadow-sm transition-colors ${
+                  className={`relative rounded-2xl border bg-white p-5 shadow-sm transition-colors ${
                     highlightStationId === s.id ? "border-emerald-400 bg-emerald-50/30" : "border-zinc-100"
                   }`}
                 >
+                  <button
+                    type="button"
+                    aria-label={favoriteIds.has(s.id) ? "הסר מהמועדפים" : "הוסף למועדפים"}
+                    className="absolute left-4 top-4 inline-flex h-9 w-9 items-center justify-center rounded-full border border-zinc-200 bg-white text-zinc-700 shadow-sm hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={togglingFavId === s.id}
+                    onClick={() => void toggleFavorite(s.id)}
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 24 24"
+                      className="h-4 w-4"
+                      fill={favoriteIds.has(s.id) ? "currentColor" : "none"}
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78Z" />
+                    </svg>
+                  </button>
+
                   <div className="flex items-start justify-between gap-4">
                     <div>
                       <a
                         className="text-sm font-semibold text-zinc-900 hover:underline"
                         href={`/stations/${encodeURIComponent(s.id)}`}
                       >
-                        {s.title}
+                        {String(s.title ?? "").replace(/^\s*עמד(?:ה|ת)\s*/u, "")}
                       </a>
                       <div className="mt-1 text-sm text-zinc-600">
                         {s.city} · {s.connectorType} · {s.powerKw}kW
@@ -1097,18 +1119,6 @@ export default function Home() {
                     </div>
 
                     <div className="flex shrink-0 flex-col gap-2">
-                      <button
-                        className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
-                        disabled={togglingFavId === s.id}
-                        onClick={() => void toggleFavorite(s.id)}
-                      >
-                        {togglingFavId === s.id
-                          ? "מעדכן..."
-                          : favoriteIds.has(s.id)
-                            ? "הסר מהמועדפים שלי"
-                            : "תוסיף למועדפים שלי"}
-                      </button>
-
                       <button
                         className="rounded-full bg-black px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
                         onClick={() => {
