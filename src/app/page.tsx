@@ -467,7 +467,12 @@ export default function Home() {
         await navigator.serviceWorker.register("/firebase-messaging-sw.js");
       }
 
-      const pushToken = await getWebPushToken();
+      let reg: ServiceWorkerRegistration | undefined;
+      if ("serviceWorker" in navigator) {
+        reg = (await navigator.serviceWorker.getRegistration("/")) ?? undefined;
+      }
+
+      const pushToken = await getWebPushToken(reg);
       if (!pushToken) {
         setError("לא ניתן לקבל טוקן להתראות");
         return;

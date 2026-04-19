@@ -55,7 +55,9 @@ export async function getClientMessaging(): Promise<Messaging | null> {
   return cachedMessaging;
 }
 
-export async function getWebPushToken(): Promise<string | null> {
+export async function getWebPushToken(
+  serviceWorkerRegistration?: ServiceWorkerRegistration
+): Promise<string | null> {
   const messaging = await getClientMessaging();
   if (!messaging) return null;
 
@@ -64,7 +66,10 @@ export async function getWebPushToken(): Promise<string | null> {
     throw new Error("Missing NEXT_PUBLIC_FIREBASE_VAPID_KEY");
   }
 
-  const token = await getToken(messaging, { vapidKey });
+  const token = await getToken(messaging, {
+    vapidKey,
+    ...(serviceWorkerRegistration ? { serviceWorkerRegistration } : {}),
+  });
   return token || null;
 }
 

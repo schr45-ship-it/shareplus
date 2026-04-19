@@ -97,7 +97,12 @@ export default function ProfilePage() {
 
       setPushSaving(true);
 
-      const pushToken = await getWebPushToken().catch(() => null);
+      let reg: ServiceWorkerRegistration | undefined;
+      if ("serviceWorker" in navigator) {
+        reg = await navigator.serviceWorker.getRegistration("/");
+      }
+
+      const pushToken = await getWebPushToken(reg).catch(() => null);
       if (!pushToken) {
         setError(
           "לא ניתן להסיר אוטומטית את הטוקן. כדי לבטל התראות: לחץ על סמל המנעול ליד הכתובת → Notifications → Block"
@@ -261,9 +266,16 @@ export default function ProfilePage() {
         await navigator.serviceWorker.register("/firebase-messaging-sw.js");
       }
 
-      const pushToken = await getWebPushToken();
+      let reg: ServiceWorkerRegistration | undefined;
+      if ("serviceWorker" in navigator) {
+        reg = (await navigator.serviceWorker.getRegistration("/")) ?? undefined;
+      }
+
+      const pushToken = await getWebPushToken(reg);
       if (!pushToken) {
-        setError("לא ניתן לקבל טוקן להתראות");
+        setError(
+          "לא ניתן לקבל טוקן להתראות. בדוק שקיים NEXT_PUBLIC_FIREBASE_VAPID_KEY בפרודקשן וש-Service Worker נטען בהצלחה."
+        );
         return;
       }
 
