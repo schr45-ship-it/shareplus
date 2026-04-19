@@ -1,9 +1,14 @@
 import { NextResponse } from "next/server";
 
-import { getAdminAuth, getAdminDb } from "@/lib/firebaseAdmin";
+import { getAdminAuth, getAdminDb, getAdminMessaging } from "@/lib/firebaseAdmin";
 import { getStripe } from "@/lib/stripe";
+import { sendEmailSendGrid } from "@/lib/sendgrid";
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+function digitsOnlyPhone(v: string) {
+  return String(v ?? "").replace(/[^0-9]/g, "");
+}
 
 export async function POST(req: Request) {
   try {
@@ -48,7 +53,13 @@ export async function POST(req: Request) {
 
     const purchaseId = `${decoded.uid}_${stationId}`;
 
-    await adminDb.collection("revealPurchases").doc(purchaseId).set(
+    const purchaseRef = adminDb.collection("revealPurchases").doc(purchaseId);
+    const purchaseSnap = await purchaseRef.get();
+    const alreadyNotifiedOwner = purchaseSnap.exists
+      ? Boolean((purchaseSnap.data() as { ownerNotifiedAt?: unknown }).ownerNotifiedAt)
+      : false;
+
+    await purchaseRef.set(
       {
         uid: decoded.uid,
         stationId,
@@ -71,14 +82,93 @@ export async function POST(req: Request) {
       hostPhone?: string;
       hostName?: string;
       title?: string;
+      ownerUid?: string;
     };
+
+    const ownerPhone = station.hostPhone ?? "";
+    const ownerWhatsappUrl = ownerPhone ? `https://wa.me/${digitsOnlyPhone(ownerPhone)}` : "";
+
+    if (!alreadyNotifiedOwner) {
+      const ownerUid = (station.ownerUid ?? "").trim();
+      if (ownerUid) {
+        const seekerUserSnap = await adminDb.collection("users").doc(decoded.uid).get();
+        const seekerPhone = seekerUserSnap.exists
+          ? String((seekerUserSnap.data() as { phone?: string }).phone ?? "")
+          : "";
+        const seekerWhatsappUrl = seekerPhone ? `https://wa.me/${digitsOnlyPhone(seekerPhone)}` : "";
+
+        const ownerSnap = await adminDb.collection("users").doc(ownerUid).get();
+        const ownerData = ownerSnap.exists
+          ? (ownerSnap.data() as {
+              notificationPreferences?: { pushEnabled?: boolean; emailEnabled?: boolean };
+            })
+          : null;
+        const pushEnabled = ownerData?.notificationPreferences?.pushEnabled ?? true;
+        const emailEnabled = ownerData?.notificationPreferences?.emailEnabled ?? false;
+
+        if (pushEnabled) {
+          const tokensSnap = await adminDb
+            .collection("users")
+            .doc(ownerUid)
+            .collection("pushTokens")
+            .get();
+
+          const tokens = tokensSnap.docs
+            .map((d) => (d.data() as { token?: string }).token)
+            .filter((t): t is string => typeof t === "string" && t.trim().length > 0);
+
+          if (tokens.length > 0) {
+            const title = "SharePlus – חשיפה בוצעה";
+            const body = seekerPhone
+              ? `משתמש שילם וחשף פרטים. טלפון המחפש: ${seekerPhone}`
+              : "משתמש שילם וחשף פרטים. טלפון המחפש לא נשמר בפרופיל.";
+            await getAdminMessaging().sendEachForMulticast({
+              tokens,
+              data: {
+                type: "REVEAL_PURCHASED",
+                stationId,
+                title,
+                body,
+                seekerPhone,
+                seekerWhatsappUrl,
+                deepLink: `/stations/${encodeURIComponent(stationId)}`,
+              },
+            });
+          }
+        }
+
+        if (emailEnabled) {
+          try {
+            const ownerUser = await adminAuth.getUser(ownerUid);
+            const ownerEmail = (ownerUser.email ?? "").trim();
+            if (ownerEmail) {
+              const subject = "SharePlus – משתמש חשף פרטים לאחר תשלום";
+              const text = seekerPhone
+                ? `משתמש שילם וחשף פרטים לעמדה שלך (${station.title ?? "עמדה"}).\nטלפון המחפש: ${seekerPhone}${seekerWhatsappUrl ? `\nWhatsApp: ${seekerWhatsappUrl}` : ""}\n`
+                : `משתמש שילם וחשף פרטים לעמדה שלך (${station.title ?? "עמדה"}).\nטלפון המחפש לא נשמר בפרופיל.\n`;
+              await sendEmailSendGrid({ to: ownerEmail, subject, text });
+            }
+          } catch {
+            // best-effort
+          }
+        }
+
+        await purchaseRef.set(
+          {
+            ownerNotifiedAt: new Date(now),
+          },
+          { merge: true }
+        );
+      }
+    }
 
     return NextResponse.json({
       stationId,
       expiresAt: expiresAt.toISOString(),
       contact: {
-        phone: station.hostPhone ?? "",
+        phone: ownerPhone,
         name: station.hostName ?? "",
+        whatsappUrl: ownerWhatsappUrl,
       },
       exactAddress: station.street ?? station.exactAddress ?? "",
       title: station.title ?? "עמדה",

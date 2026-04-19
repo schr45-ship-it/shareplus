@@ -14,6 +14,7 @@ type RevealData = {
   contact: {
     phone: string;
     name: string;
+    whatsappUrl?: string;
   };
 };
 
@@ -98,7 +99,10 @@ export default function RevealPage() {
               </a>
               <a
                 className="rounded-full border border-zinc-200 px-4 py-2 text-sm font-medium hover:bg-zinc-50"
-                href={`https://wa.me/${data.contact.phone.replace(/[^0-9]/g, "")}`}
+                href={
+                  data.contact.whatsappUrl ||
+                  `https://wa.me/${data.contact.phone.replace(/[^0-9]/g, "")}`
+                }
                 target="_blank"
                 rel="noreferrer"
               >

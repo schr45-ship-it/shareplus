@@ -644,7 +644,7 @@ export default function Home() {
                     });
                   }, 0);
                 }}
-                className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-center text-sm font-medium text-zinc-900 hover:bg-zinc-50"
+                className="inline-flex min-w-[140px] items-center justify-center gap-2 rounded-full border border-zinc-200 bg-white px-4 py-2 text-center text-sm font-medium text-zinc-900 hover:bg-zinc-50"
               >
                 📍 העמדות שלי
               </button>
@@ -661,18 +661,18 @@ export default function Home() {
                     });
                   }, 0);
                 }}
-                className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-center text-sm font-medium text-zinc-900 hover:bg-zinc-50"
+                className="inline-flex min-w-[140px] items-center justify-center gap-2 rounded-full border border-zinc-200 bg-white px-4 py-2 text-center text-sm font-medium text-zinc-900 hover:bg-zinc-50"
               >
-                ♡ המועדפים שלי
+                ♡ מעודפים
               </button>
               <a
-                className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-center text-sm font-medium text-zinc-900 hover:bg-zinc-50"
+                className="inline-flex min-w-[140px] items-center justify-center gap-2 rounded-full border border-zinc-200 bg-white px-4 py-2 text-center text-sm font-medium text-zinc-900 hover:bg-zinc-50"
                 href="/reports"
               >
                 📊 דוחות
               </a>
               <a
-                className="flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-4 py-2 text-center text-sm font-medium text-zinc-900 hover:bg-zinc-50"
+                className="inline-flex min-w-[140px] items-center justify-center gap-2 rounded-full border border-zinc-200 bg-white px-4 py-2 text-center text-sm font-medium text-zinc-900 hover:bg-zinc-50"
                 href="/profile"
               >
                 <svg
@@ -868,7 +868,7 @@ export default function Home() {
         {user && activeSection === "favorites" ? (
           <section className="mt-8" id={favoritesAnchorId}>
             <div className="flex items-center justify-between">
-              <h2 className="text-base font-semibold">המועדפים שלי</h2>
+              <h2 className="text-base font-semibold">מעודפים</h2>
               <button
                 type="button"
                 className="text-sm font-medium text-zinc-700 hover:underline"
