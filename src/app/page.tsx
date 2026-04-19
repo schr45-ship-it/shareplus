@@ -330,11 +330,22 @@ export default function Home() {
           },
           cache: "no-store",
         });
-        if (!res.ok) throw new Error("Failed to load favorites");
-        const data = (await res.json()) as { stations: StationPublic[] };
+        const data = (await res.json().catch(() => ({}))) as
+          | { stations: StationPublic[] }
+          | { error?: string };
+
+        if (!res.ok) {
+          if (res.status === 401) {
+            setFavorites([]);
+            setFavoriteIds(new Set());
+            return;
+          }
+          throw new Error("error" in data && data.error ? data.error : `Failed to load favorites (HTTP ${res.status})`);
+        }
         if (cancelled) return;
-        setFavorites(data.stations);
-        setFavoriteIds(new Set(data.stations.map((s) => s.id)));
+        const stationsData = (data as { stations: StationPublic[] }).stations;
+        setFavorites(stationsData);
+        setFavoriteIds(new Set(stationsData.map((s) => s.id)));
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : "Unexpected error");
       } finally {
