@@ -12,6 +12,10 @@ export async function POST(req: Request) {
 
     const body = (await req.json().catch(() => null)) as null | {
       token?: string;
+      deviceLabel?: string;
+      deviceType?: string;
+      timezone?: string;
+      locale?: string;
     };
 
     const pushToken = (body?.token ?? "").trim();
@@ -29,11 +33,20 @@ export async function POST(req: Request) {
       .collection("pushTokens")
       .doc(pushToken);
 
+    const deviceLabel = (body?.deviceLabel ?? "").trim() || null;
+    const deviceType = (body?.deviceType ?? "").trim() || null;
+    const timezone = (body?.timezone ?? "").trim() || null;
+    const locale = (body?.locale ?? "").trim() || null;
+
     await ref.set(
       {
         token: pushToken,
         platform: "web",
         browser: "chrome",
+        deviceLabel,
+        deviceType,
+        timezone,
+        locale,
         updatedAt: new Date(),
         createdAt: new Date(),
         userAgent: req.headers.get("user-agent") ?? null,

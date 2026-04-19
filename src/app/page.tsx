@@ -499,15 +499,9 @@ export default function Home() {
         <a className="text-sm font-medium text-zinc-900 hover:underline" href="/profile">
           הפרופיל שלי
         </a>
-        <button
-          className="rounded-full border border-zinc-200 px-4 py-2 text-sm font-medium hover:bg-zinc-50"
-          onClick={() => void enablePush()}
-        >
-          הפעל התראות
-        </button>
       </div>
     );
-  }, [enablePush, startSignIn, user]);
+  }, [startSignIn, user]);
 
   const openReveal = useCallback((station: StationPublic) => {
     setError(null);

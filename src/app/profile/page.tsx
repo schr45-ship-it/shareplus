@@ -11,6 +11,10 @@ import { getIdToken } from "@/lib/auth";
 type ProfileDoc = {
   displayName?: string;
   phone?: string;
+  notificationPreferences?: {
+    pushEnabled?: boolean;
+    emailEnabled?: boolean;
+  };
 };
 
 export default function ProfilePage() {
@@ -19,11 +23,14 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [pushSaving, setPushSaving] = useState(false);
+  const [prefSaving, setPrefSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pushStatus, setPushStatus] = useState<NotificationPermission | null>(null);
 
   const [displayName, setDisplayName] = useState("");
   const [phone, setPhone] = useState("");
+  const [prefPush, setPrefPush] = useState(true);
+  const [prefEmail, setPrefEmail] = useState(true);
 
   useEffect(() => {
     const auth = getClientAuth();
@@ -57,6 +64,8 @@ export default function ProfilePage() {
         if (!cancelled) {
           setDisplayName(data?.displayName ?? user.displayName ?? "");
           setPhone(data?.phone ?? "");
+          setPrefPush(data?.notificationPreferences?.pushEnabled ?? true);
+          setPrefEmail(data?.notificationPreferences?.emailEnabled ?? true);
         }
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : "שגיאה לא צפויה");
@@ -184,7 +193,18 @@ export default function ProfilePage() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${idToken}`,
         },
-        body: JSON.stringify({ token: pushToken }),
+        body: JSON.stringify({
+          token: pushToken,
+          deviceLabel: typeof navigator !== "undefined" ? navigator.platform : "",
+          deviceType:
+            typeof navigator !== "undefined" && /android/i.test(navigator.userAgent)
+              ? "android"
+              : typeof navigator !== "undefined" && /iphone|ipad|ipod/i.test(navigator.userAgent)
+                ? "ios"
+                : "desktop",
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          locale: typeof navigator !== "undefined" ? navigator.language : "",
+        }),
       });
       const json = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
       if (!res.ok) throw new Error(json.error ?? "שגיאה ברישום התראות");
@@ -197,6 +217,42 @@ export default function ProfilePage() {
       setPushSaving(false);
     }
   }, [user]);
+
+  const saveNotificationPreferences = useCallback(
+    async (next: { pushEnabled: boolean; emailEnabled: boolean }) => {
+      try {
+        setError(null);
+        if (!user) {
+          setError("נדרשת התחברות");
+          return;
+        }
+
+        setPrefSaving(true);
+        const idToken = await getIdToken(user);
+        const res = await fetch("/api/notification-preferences", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${idToken}`,
+          },
+          body: JSON.stringify(next),
+        });
+        const json = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+        if (!res.ok) throw new Error(json.error ?? "שגיאה בשמירת העדפות");
+
+        setPrefPush(next.pushEnabled);
+        setPrefEmail(next.emailEnabled);
+
+        setError("נשמר");
+        setTimeout(() => setError(null), 1500);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "שגיאה לא צפויה");
+      } finally {
+        setPrefSaving(false);
+      }
+    },
+    [user]
+  );
 
   if (!user) {
     return (
@@ -269,6 +325,79 @@ export default function ProfilePage() {
           <div className="rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm">
             <div className="text-sm font-semibold">ניהול התראות</div>
 
+            <div className="mt-1 text-xs text-zinc-500">
+              ההתראות קופצות במכשיר ובדפדפן שבו הפעלת אותן (למשל: המחשב בבית ב-Chrome, או הטלפון ב-Chrome).
+            </div>
+
+            <div className="mt-3 rounded-xl border border-zinc-100 bg-zinc-50 p-4">
+              <div className="text-xs font-medium text-zinc-600">אופן קבלת בקשות</div>
+
+              <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <label className="flex items-center justify-between gap-3 text-sm">
+                  <span>התראות קופצות בטלפון/מחשב</span>
+                  <input
+                    type="checkbox"
+                    checked={prefPush}
+                    disabled={prefSaving}
+                    onChange={(e) =>
+                      void saveNotificationPreferences({
+                        pushEnabled: e.target.checked,
+                        emailEnabled: prefEmail,
+                      })
+                    }
+                  />
+                </label>
+
+                <label className="flex items-center justify-between gap-3 text-sm">
+                  <span>קבלת דוא"ל</span>
+                  <input
+                    type="checkbox"
+                    checked={prefEmail}
+                    disabled={prefSaving}
+                    onChange={(e) =>
+                      void saveNotificationPreferences({
+                        pushEnabled: prefPush,
+                        emailEnabled: e.target.checked,
+                      })
+                    }
+                  />
+                </label>
+              </div>
+
+              <div className="mt-3 flex justify-end gap-2">
+                <button
+                  type="button"
+                  className="rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={prefSaving}
+                  onClick={() =>
+                    void saveNotificationPreferences({
+                      pushEnabled: true,
+                      emailEnabled: true,
+                    })
+                  }
+                >
+                  הכל
+                </button>
+                <button
+                  type="button"
+                  className="rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={prefSaving}
+                  onClick={() =>
+                    void saveNotificationPreferences({
+                      pushEnabled: false,
+                      emailEnabled: false,
+                    })
+                  }
+                >
+                  כלום
+                </button>
+              </div>
+
+              <div className="mt-2 text-xs text-zinc-500">
+                בקרוב: וואטסאפ/מסרון.
+              </div>
+            </div>
+
             {typeof window !== "undefined" && !("Notification" in window) ? (
               <div className="mt-2 text-sm text-zinc-700">הדפדפן לא תומך בהתראות.</div>
             ) : pushStatus === "denied" ? (
@@ -286,6 +415,9 @@ export default function ProfilePage() {
             ) : pushStatus === "granted" ? (
               <div className="mt-2 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
                 <div className="font-semibold">הכל תקין — התראות פעילות</div>
+                <div className="mt-1 text-xs">
+                  מכשיר נוכחי: {typeof navigator !== "undefined" ? navigator.platform : ""}
+                </div>
                 <div className="mt-2 flex justify-end">
                   <button
                     type="button"

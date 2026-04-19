@@ -107,29 +107,39 @@ export async function POST(req: Request) {
       updatedAt: now,
     });
 
-    const tokensSnap = await adminDb
-      .collection("users")
-      .doc(ownerUid)
-      .collection("pushTokens")
-      .get();
+    const ownerSnap = await adminDb.collection("users").doc(ownerUid).get();
+    const ownerData = ownerSnap.exists
+      ? (ownerSnap.data() as {
+          notificationPreferences?: { pushEnabled?: boolean; emailEnabled?: boolean };
+        })
+      : null;
+    const pushEnabled = ownerData?.notificationPreferences?.pushEnabled ?? true;
 
-    const tokens = tokensSnap.docs
-      .map((d) => (d.data() as { token?: string }).token)
-      .filter((t): t is string => typeof t === "string" && t.trim().length > 0);
+    if (pushEnabled) {
+      const tokensSnap = await adminDb
+        .collection("users")
+        .doc(ownerUid)
+        .collection("pushTokens")
+        .get();
 
-    if (tokens.length > 0) {
-      const messaging = getAdminMessaging();
-      await messaging.sendEachForMulticast({
-        tokens,
-        data: {
-          type: "INTEREST_REQUEST",
-          requestId: requestRef.id,
-          stationId,
-          title: "יש מתעניין מ-SharePlus!",
-          body: `לתאריך ${date} בין השעות ${timeFrom}-${timeTo}. האם פנוי אצלך?`,
-          deepLink: `/?requestId=${encodeURIComponent(requestRef.id)}`,
-        },
-      });
+      const tokens = tokensSnap.docs
+        .map((d) => (d.data() as { token?: string }).token)
+        .filter((t): t is string => typeof t === "string" && t.trim().length > 0);
+
+      if (tokens.length > 0) {
+        const messaging = getAdminMessaging();
+        await messaging.sendEachForMulticast({
+          tokens,
+          data: {
+            type: "INTEREST_REQUEST",
+            requestId: requestRef.id,
+            stationId,
+            title: "יש מתעניין מ-SharePlus!",
+            body: `לתאריך ${date} בין השעות ${timeFrom}-${timeTo}. האם פנוי אצלך?`,
+            deepLink: `/?requestId=${encodeURIComponent(requestRef.id)}`,
+          },
+        });
+      }
     }
 
     return NextResponse.json({ ok: true, requestId: requestRef.id, stationTitle: st.title ?? "עמדה" });
