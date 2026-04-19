@@ -2,6 +2,15 @@ import { NextResponse } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
 
 import { getAdminAuth, getAdminDb, getAdminMessaging } from "@/lib/firebaseAdmin";
+import { sendEmailSendGrid } from "@/lib/sendgrid";
+
+function isIndexBuildingError(e: unknown) {
+  const msg =
+    e && typeof e === "object" && "message" in e && typeof (e as { message?: unknown }).message === "string"
+      ? String((e as { message: string }).message)
+      : "";
+  return msg.includes("FAILED_PRECONDITION") && msg.includes("index") && msg.includes("building");
+}
 
 function parseHHMM(v: string) {
   const m = /^([0-1]\d|2[0-3]):([0-5]\d)$/.exec(v);
@@ -336,6 +345,9 @@ export async function POST(req: Request) {
         })
       : null;
     const pushEnabled = ownerData?.notificationPreferences?.pushEnabled ?? true;
+    const emailEnabled = ownerData?.notificationPreferences?.emailEnabled ?? false;
+
+    let emailSendError: string | null = null;
 
     if (pushEnabled) {
       const tokensSnap = await adminDb
@@ -364,8 +376,35 @@ export async function POST(req: Request) {
       }
     }
 
-    return NextResponse.json({ ok: true, requestId: requestRef.id, stationTitle: st.title ?? "עמדה" });
+    if (emailEnabled) {
+      try {
+        const adminAuth = getAdminAuth();
+        const ownerUser = await adminAuth.getUser(ownerUid);
+        const ownerEmail = (ownerUser.email ?? "").trim();
+        if (ownerEmail) {
+          const subject = "SharePlus – בקשת התעניינות חדשה";
+          const text = `יש בקשת התעניינות חדשה לעמדה שלך (${st.title ?? "עמדה"}).\nתאריך: ${date}\nשעה: ${timeFrom}-${timeTo}\n`;
+          await sendEmailSendGrid({ to: ownerEmail, subject, text });
+        }
+      } catch (e) {
+        emailSendError = e instanceof Error ? e.message : "Unexpected email error";
+      }
+    }
+
+    return NextResponse.json({
+      ok: true,
+      requestId: requestRef.id,
+      stationTitle: st.title ?? "עמדה",
+      emailSent: emailEnabled && !emailSendError,
+      emailError: emailSendError,
+    });
   } catch (e) {
+    if (isIndexBuildingError(e)) {
+      return NextResponse.json(
+        { error: "האינדקס בבסיס הנתונים עדיין נבנה. נסה שוב בעוד כמה דקות." },
+        { status: 503 }
+      );
+    }
     return NextResponse.json(
       { error: e instanceof Error ? e.message : "Unexpected error" },
       { status: 500 }

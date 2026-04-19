@@ -59,6 +59,7 @@ export default function Home() {
   const [filterConnector, setFilterConnector] = useState<string>("");
   const [filterMinPower, setFilterMinPower] = useState<number | "">("");
   const [filterMaxPrice, setFilterMaxPrice] = useState<number | "">("");
+  const [filterPricingType, setFilterPricingType] = useState<string>("");
   const [filterDate, setFilterDate] = useState<string>("");
   const [filterTimeFrom, setFilterTimeFrom] = useState<string>("");
   const [filterTimeTo, setFilterTimeTo] = useState<string>("");
@@ -93,11 +94,22 @@ export default function Home() {
     return Array.from(set).sort((a, b) => a.localeCompare(b, "he"));
   }, [stations]);
 
+  const pricingTypeSuggestions = useMemo(() => {
+    const set = new Set(
+      stations
+        .map((s) => (s as { pricingType?: string }).pricingType ?? "")
+        .map((v) => String(v).trim())
+        .filter(Boolean)
+    );
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "he"));
+  }, [stations]);
+
   const filteredStations = useMemo(() => {
     const cityNeedle = filterCity.trim();
     const connectorNeedle = filterConnector.trim();
     const minPower = filterMinPower === "" ? null : Number(filterMinPower);
     const maxPrice = filterMaxPrice === "" ? null : Number(filterMaxPrice);
+    const pricingNeedle = filterPricingType.trim();
     const dateStr = filterDate.trim();
     const tFrom = filterTimeFrom.trim();
     const tTo = filterTimeTo.trim();
@@ -129,6 +141,11 @@ export default function Home() {
       if (minPower != null && Number.isFinite(minPower) && (s.powerKw ?? 0) < minPower)
         return false;
 
+      if (pricingNeedle) {
+        const stPricing = ((s as { pricingType?: string }).pricingType ?? "").trim();
+        if (stPricing !== pricingNeedle) return false;
+      }
+
       if (maxPrice != null && Number.isFinite(maxPrice)) {
         if (typeof s.priceIls !== "number") return false;
         if (s.priceIls > maxPrice) return false;
@@ -159,6 +176,7 @@ export default function Home() {
     filterConnector,
     filterMinPower,
     filterMaxPrice,
+    filterPricingType,
     filterDate,
     filterTimeFrom,
     filterTimeTo,
@@ -526,9 +544,6 @@ export default function Home() {
           התנתק
         </button>
         <span className="text-sm text-zinc-600">{user.email ?? user.displayName}</span>
-        <a className="text-sm font-medium text-zinc-900 hover:underline" href="/profile">
-          הפרופיל שלי
-        </a>
       </div>
     );
   }, [startSignIn, user]);
@@ -655,6 +670,26 @@ export default function Home() {
                 href="/reports"
               >
                 📊 דוחות
+              </a>
+              <a
+                className="flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-4 py-2 text-center text-sm font-medium text-zinc-900 hover:bg-zinc-50"
+                href="/profile"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-4 w-4"
+                  aria-hidden="true"
+                >
+                  <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" />
+                  <path d="M19.4 15a1.8 1.8 0 0 0 .35 1.98l.06.06a2.2 2.2 0 0 1-1.56 3.76 2.2 2.2 0 0 1-1.56-.64l-.06-.06a1.8 1.8 0 0 0-1.98-.35 1.8 1.8 0 0 0-1.09 1.65V22a2.2 2.2 0 0 1-4.4 0v-.09a1.8 1.8 0 0 0-1.09-1.65 1.8 1.8 0 0 0-1.98.35l-.06.06A2.2 2.2 0 0 1 2.2 19a2.2 2.2 0 0 1 .64-1.56l.06-.06A1.8 1.8 0 0 0 3.25 15a1.8 1.8 0 0 0-1.65-1.09H1.5a2.2 2.2 0 0 1 0-4.4h.09a1.8 1.8 0 0 0 1.65-1.09 1.8 1.8 0 0 0-.35-1.98l-.06-.06A2.2 2.2 0 0 1 4.44 2.6l.06.06a1.8 1.8 0 0 0 1.98.35 1.8 1.8 0 0 0 1.09-1.65V1.5a2.2 2.2 0 0 1 4.4 0v.09a1.8 1.8 0 0 0 1.09 1.65 1.8 1.8 0 0 0 1.98-.35l.06-.06A2.2 2.2 0 0 1 21.8 5a2.2 2.2 0 0 1-.64 1.56l-.06.06a1.8 1.8 0 0 0-.35 1.98 1.8 1.8 0 0 0 1.65 1.09h.09a2.2 2.2 0 0 1 0 4.4h-.09A1.8 1.8 0 0 0 19.4 15Z" />
+                </svg>
+                הגדרות
               </a>
             </div>
           </div>
@@ -951,7 +986,7 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
               <div>
                 <label className="text-xs font-medium text-zinc-600">הספק מינימלי (kW)</label>
                 <input
@@ -980,6 +1015,22 @@ export default function Home() {
                   סינון מחיר עובד רק על עמדות שמילאו "מחיר מבוקש".
                 </div>
               </div>
+
+              <div>
+                <label className="text-xs font-medium text-zinc-600">סוג תמחור</label>
+                <select
+                  className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-right text-sm text-zinc-900"
+                  value={filterPricingType}
+                  onChange={(e) => setFilterPricingType(e.target.value)}
+                >
+                  <option value="">הכל</option>
+                  {pricingTypeSuggestions.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             <div className="mt-3 flex justify-between gap-3">
@@ -992,6 +1043,7 @@ export default function Home() {
                   setFilterConnector("");
                   setFilterMinPower("");
                   setFilterMaxPrice("");
+                  setFilterPricingType("");
                   setFilterDate("");
                   setFilterTimeFrom("");
                   setFilterTimeTo("");
