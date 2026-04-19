@@ -23,6 +23,7 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [pushSaving, setPushSaving] = useState(false);
+  const [pushTesting, setPushTesting] = useState(false);
   const [prefSaving, setPrefSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pushStatus, setPushStatus] = useState<NotificationPermission | null>(null);
@@ -120,6 +121,43 @@ export default function ProfilePage() {
       setError(e instanceof Error ? e.message : "שגיאה לא צפויה");
     } finally {
       setPushSaving(false);
+    }
+  }, [user]);
+
+  const testPushNotification = useCallback(async () => {
+    try {
+      setError(null);
+      if (!user) {
+        setError("נדרשת התחברות");
+        return;
+      }
+      setPushTesting(true);
+      const idToken = await getIdToken(user);
+      const res = await fetch("/api/push/test", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${idToken}`,
+        },
+      });
+      const json = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+        tokenCount?: number;
+        successCount?: number;
+        failureCount?: number;
+      };
+      if (!res.ok) {
+        throw new Error(json.error ?? "שגיאה בבדיקת התראה");
+      }
+
+      setError(
+        `נשלחה התראת בדיקה. טוקנים: ${json.tokenCount ?? 0}, הצלחות: ${json.successCount ?? 0}, כשלונות: ${json.failureCount ?? 0}`
+      );
+      setTimeout(() => setError(null), 3500);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "שגיאה לא צפויה");
+    } finally {
+      setPushTesting(false);
     }
   }, [user]);
 
@@ -469,6 +507,14 @@ export default function ProfilePage() {
                     onClick={() => void disablePushOnThisDevice()}
                   >
                     בטל התראות
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={pushSaving || pushTesting}
+                    onClick={() => void testPushNotification()}
+                  >
+                    {pushTesting ? "שולח..." : "בדיקת התראה"}
                   </button>
                   <button
                     type="button"
