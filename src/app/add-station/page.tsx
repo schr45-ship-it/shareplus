@@ -5,6 +5,7 @@ import { onAuthStateChanged, type User } from "firebase/auth";
 
 import { getClientAuth } from "@/lib/firebaseClient";
 import { createStation } from "@/lib/firestoreClient";
+import { isValidPhone, normalizePhoneE164 } from "@/lib/phone";
 
 declare global {
   interface Window {
@@ -68,6 +69,7 @@ export default function AddStationPage() {
     if (!street.trim()) misses.push("רחוב");
     if (!hostName.trim()) misses.push("שם מארח");
     if (!hostPhone.trim()) misses.push("טלפון מארח");
+    else if (!isValidPhone(hostPhone)) misses.push("טלפון מארח (לא תקין)");
     if (!pricingType.trim()) misses.push("סוג תמחור");
     if (!Number.isFinite(priceIls) || priceIls <= 0) misses.push("מחיר מבוקש (₪)");
 
@@ -276,6 +278,11 @@ export default function AddStationPage() {
       return;
     }
 
+    if (!isValidPhone(hostPhone)) {
+      setError("אנא הזן מספר טלפון מארח תקין");
+      return;
+    }
+
     try {
       setSaving(true);
       const firstEnabled = availability.find((d) => d.enabled);
@@ -291,7 +298,7 @@ export default function AddStationPage() {
         street: street.trim(),
         location: location ?? undefined,
         hostName: hostName.trim(),
-        hostPhone: hostPhone.trim(),
+        hostPhone: normalizePhoneE164(hostPhone),
         notes: notes.trim(),
         hoursStart: firstEnabled.start,
         hoursEnd: firstEnabled.end,

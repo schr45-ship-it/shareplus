@@ -6,6 +6,7 @@ import { onAuthStateChanged, type User } from "firebase/auth";
 import { getClientAuth } from "@/lib/firebaseClient";
 import { getStation, updateStation, type StationDoc } from "@/lib/firestoreClient";
 import { getIdToken } from "@/lib/auth";
+import { isValidPhone, normalizePhoneE164 } from "@/lib/phone";
 
 declare global {
   interface Window {
@@ -324,9 +325,9 @@ export default function EditStationPage({
   }
 
   const canSubmit = useMemo(() => {
-    return (
-      !!user &&
-      !!stationId &&
+    return Boolean(
+      user &&
+      stationId &&
       city.trim().length > 0 &&
       region.trim().length > 0 &&
       connectorType.trim().length > 0 &&
@@ -335,6 +336,7 @@ export default function EditStationPage({
       street.trim().length > 0 &&
       hostName.trim().length > 0 &&
       hostPhone.trim().length > 0 &&
+      isValidPhone(hostPhone) &&
       availability.some(
         (d) =>
           d.enabled &&
@@ -381,6 +383,10 @@ export default function EditStationPage({
     }
 
     if (!canSubmit) {
+      if (!hostPhone.trim() || !isValidPhone(hostPhone)) {
+        setError("אנא הזן מספר טלפון מארח תקין");
+        return;
+      }
       setError("אנא מלא את כל השדות");
       return;
     }
@@ -401,7 +407,7 @@ export default function EditStationPage({
         street: street.trim(),
         location: location ?? undefined,
         hostName: hostName.trim(),
-        hostPhone: hostPhone.trim(),
+        hostPhone: normalizePhoneE164(hostPhone),
         notes: notes.trim(),
         hoursStart: firstEnabled.start.trim(),
         hoursEnd: firstEnabled.end.trim(),

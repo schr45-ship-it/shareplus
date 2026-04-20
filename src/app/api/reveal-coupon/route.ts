@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getAdminDb } from "@/lib/firebaseAdmin";
+import { isValidPhone, normalizePhoneE164 } from "@/lib/phone";
 
 export async function POST(req: Request) {
   try {
@@ -41,6 +42,9 @@ export async function POST(req: Request) {
     if (!phone) {
       return NextResponse.json({ error: "חסר לך טלפון" }, { status: 400 });
     }
+    if (!isValidPhone(phone)) {
+      return NextResponse.json({ error: "טלפון לא תקין" }, { status: 400 });
+    }
     if (!address) {
       return NextResponse.json({ error: "חסרה לך כתובת" }, { status: 400 });
     }
@@ -68,7 +72,7 @@ export async function POST(req: Request) {
       firstName,
       lastName,
       email: email || null,
-      phone,
+      phone: normalizePhoneE164(phone),
       address,
       carType,
       createdAt: new Date(),

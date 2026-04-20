@@ -7,6 +7,7 @@ import { doc, getDoc, setDoc } from "firebase/firestore";
 import { getClientAuth, getWebPushToken } from "@/lib/firebaseClient";
 import { getClientDb } from "@/lib/firestoreClient";
 import { getIdToken } from "@/lib/auth";
+import { isValidPhone, normalizePhoneE164 } from "@/lib/phone";
 
 type ProfileDoc = {
   displayName?: string;
@@ -167,8 +168,8 @@ export default function ProfilePage() {
   }, [user]);
 
   const canSave = useMemo(() => {
-    return Boolean(user) && displayName.trim().length > 0;
-  }, [displayName, user]);
+    return Boolean(user) && displayName.trim().length > 0 && isValidPhone(phone);
+  }, [displayName, phone, user]);
 
   const save = useCallback(async () => {
     try {
@@ -178,7 +179,15 @@ export default function ProfilePage() {
         return;
       }
       if (!canSave) {
-        setError("אנא מלא שם");
+        if (!displayName.trim()) {
+          setError("אנא מלא שם");
+          return;
+        }
+        if (!isValidPhone(phone)) {
+          setError("אנא הזן מספר טלפון תקין");
+          return;
+        }
+        setError("אנא מלא את כל השדות");
         return;
       }
 
@@ -189,7 +198,7 @@ export default function ProfilePage() {
         ref,
         {
           displayName: displayName.trim(),
-          phone: phone.trim() || null,
+          phone: normalizePhoneE164(phone),
           updatedAt: new Date(),
         },
         { merge: true }
@@ -393,12 +402,13 @@ export default function ProfilePage() {
                 />
               </div>
               <div>
-                <label className="text-xs font-medium text-zinc-600">טלפון (אופציונלי)</label>
+                <label className="text-xs font-medium text-zinc-600">טלפון</label>
                 <input
                   className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-right text-sm"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   inputMode="tel"
+                  placeholder="+972..."
                 />
               </div>
             </div>

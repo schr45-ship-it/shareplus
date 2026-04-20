@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
-import { getAdminAuth } from "@/lib/firebaseAdmin";
+import { getAdminAuth, getAdminDb } from "@/lib/firebaseAdmin";
+import { isValidPhone } from "@/lib/phone";
 import { getStripe } from "@/lib/stripe";
 
 export async function POST(req: Request) {
@@ -12,7 +13,17 @@ export async function POST(req: Request) {
     }
 
     const adminAuth = getAdminAuth();
+    const adminDb = getAdminDb();
     const decoded = await adminAuth.verifyIdToken(token);
+
+    const userSnap = await adminDb.collection("users").doc(decoded.uid).get();
+    const phone = userSnap.exists ? String((userSnap.data() as { phone?: string }).phone ?? "") : "";
+    if (!isValidPhone(phone)) {
+      return NextResponse.json(
+        { error: "כדי לבצע תשלום חובה לשמור מספר טלפון תקין בפרופיל" },
+        { status: 400 }
+      );
+    }
 
     const body = (await req.json().catch(() => null)) as null | {
       stationId?: string;
