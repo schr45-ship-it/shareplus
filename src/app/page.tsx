@@ -630,7 +630,7 @@ export default function Home() {
       <main className="mx-auto w-full max-w-5xl px-6 pb-12 text-center">
         {user ? (
           <div className="mx-auto mb-4 flex w-full max-w-5xl justify-start" dir="rtl">
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 onClick={() => {
@@ -644,7 +644,7 @@ export default function Home() {
                     });
                   }, 0);
                 }}
-                className="inline-flex min-w-[140px] items-center justify-center gap-2 rounded-full border border-zinc-200 bg-white px-4 py-2 text-center text-sm font-medium text-zinc-900 hover:bg-zinc-50"
+                className="inline-flex min-w-[110px] items-center justify-center gap-2 rounded-full border border-zinc-200 bg-white px-3 py-2 text-center text-sm font-medium text-zinc-900 hover:bg-zinc-50"
               >
                 📍 העמדות שלי
               </button>
@@ -661,18 +661,18 @@ export default function Home() {
                     });
                   }, 0);
                 }}
-                className="inline-flex min-w-[140px] items-center justify-center gap-2 rounded-full border border-zinc-200 bg-white px-4 py-2 text-center text-sm font-medium text-zinc-900 hover:bg-zinc-50"
+                className="inline-flex min-w-[110px] items-center justify-center gap-2 rounded-full border border-zinc-200 bg-white px-3 py-2 text-center text-sm font-medium text-zinc-900 hover:bg-zinc-50"
               >
                 ♡ מעודפים
               </button>
               <a
-                className="inline-flex min-w-[140px] items-center justify-center gap-2 rounded-full border border-zinc-200 bg-white px-4 py-2 text-center text-sm font-medium text-zinc-900 hover:bg-zinc-50"
+                className="inline-flex min-w-[110px] items-center justify-center gap-2 rounded-full border border-zinc-200 bg-white px-3 py-2 text-center text-sm font-medium text-zinc-900 hover:bg-zinc-50"
                 href="/reports"
               >
                 📊 דוחות
               </a>
               <a
-                className="inline-flex min-w-[140px] items-center justify-center gap-2 rounded-full border border-zinc-200 bg-white px-4 py-2 text-center text-sm font-medium text-zinc-900 hover:bg-zinc-50"
+                className="inline-flex min-w-[110px] items-center justify-center gap-2 rounded-full border border-zinc-200 bg-white px-3 py-2 text-center text-sm font-medium text-zinc-900 hover:bg-zinc-50"
                 href="/profile"
               >
                 <svg
