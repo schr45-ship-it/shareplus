@@ -31,6 +31,25 @@ function formatNis(v: number | null) {
   return new Intl.NumberFormat("he-IL", { style: "currency", currency: "ILS" }).format(v);
 }
 
+function formatDateIL(dateIso: string) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateIso);
+  if (!m) return dateIso;
+  return `${m[3]}/${m[2]}/${m[1]}`;
+}
+
+function formatDateTimeIL(iso: string | null) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) return iso;
+  return d.toLocaleString("he-IL", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 export default function ReportsPage() {
   const [user, setUser] = useState<User | null>(null);
   const [tab, setTab] = useState<"received" | "sent">("received");
@@ -78,6 +97,16 @@ export default function ReportsPage() {
   useEffect(() => {
     void reload();
   }, [reload]);
+
+  const sortedItems = useMemo(() => {
+    const list = Array.isArray(items) ? [...items] : [];
+    list.sort((a, b) => {
+      const av = a.createdAt ?? "";
+      const bv = b.createdAt ?? "";
+      return bv.localeCompare(av);
+    });
+    return list;
+  }, [items]);
 
   const canManage = tab === "received";
   const canCancel = tab === "sent";
@@ -205,14 +234,17 @@ export default function ReportsPage() {
           </div>
         ) : (
           <div className="mt-6 grid grid-cols-1 gap-4">
-            {items.map((item) => (
+            {sortedItems.map((item) => (
               <div key={item.id} className="rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <div className="text-base font-semibold">{item.stationTitle}</div>
                     <div className="mt-1 text-sm text-zinc-600">
                       {item.stationCity ? `${item.stationCity} · ` : ""}
-                      {item.date} {item.timeFrom}-{item.timeTo}
+                      התקבל בתאריך: {formatDateTimeIL(item.createdAt)}
+                    </div>
+                    <div className="mt-1 text-sm text-zinc-600">
+                      בקשת העמדה היא לתאריך: {formatDateIL(item.date)} שעה {item.timeFrom}-{item.timeTo}
                     </div>
                     <div className="mt-1 text-xs text-zinc-500">
                       {tab === "received" ? "הנהג" : "בעל העמדה"}: {item.otherDisplayName ?? item.otherUid}
