@@ -357,7 +357,7 @@ export async function POST(req: Request) {
       return s !== "rejected" && s !== "cancelled";
     }).length;
 
-    const baseDailyLimit = 3;
+    const baseDailyLimit = 10;
     const couponBonus = coupon === "שרפלוס" ? 3 : 0;
     const dailyLimit = baseDailyLimit + couponBonus;
 
@@ -365,7 +365,7 @@ export async function POST(req: Request) {
       return NextResponse.json(
         {
           error:
-            "הגעת למגבלת הבקשות היומית. ניתן לשלוח עד 3 בקשות ביום. עם קופון שרפלוס ניתן לפתוח עוד 3.",
+            "הגעת למגבלת הבקשות היומית. נסה שוב מחר. אם יש לך קופון, ניתן להזין אותו ולנסות שוב.",
         },
         { status: 429 }
       );

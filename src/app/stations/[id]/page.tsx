@@ -61,6 +61,7 @@ export default function StationPage() {
   const [revealTimeFrom, setRevealTimeFrom] = useState<string>("");
   const [revealTimeTo, setRevealTimeTo] = useState<string>("");
   const [revealCoupon, setRevealCoupon] = useState<string>("");
+  const [showCouponField, setShowCouponField] = useState(false);
 
   function timeToMinutes(v: string) {
     const m = /^([0-1]\d|2[0-3]):([0-5]\d)$/.exec(v);
@@ -138,6 +139,7 @@ export default function StationPage() {
       return;
     }
     setRevealCoupon("");
+    setShowCouponField(false);
     setRevealOpen(true);
   }, [user]);
 
@@ -189,9 +191,10 @@ export default function StationPage() {
       const json = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
       if (!res.ok) {
         if (res.status === 429) {
+          setShowCouponField(true);
           throw new Error(
             json.error ??
-              "הגעת למגבלת הבקשות היומית. ניתן לשלוח עד 3 בקשות ביום. עם קופון שרפלוס ניתן לפתוח עוד 3."
+              "הגעת למגבלת הבקשות היומית. נסה שוב מחר. אם יש לך קופון, ניתן להזין אותו ולנסות שוב."
           );
         }
         throw new Error(json.error ?? "שגיאה בשליחת בקשה");
@@ -205,7 +208,7 @@ export default function StationPage() {
     } finally {
       setRevealSaving(false);
     }
-  }, [revealDate, revealTimeFrom, revealTimeTo, station, user]);
+  }, [revealCoupon, revealDate, revealTimeFrom, revealTimeTo, station, user]);
 
   return (
     <div className="min-h-dvh bg-white text-zinc-900" dir="rtl">
@@ -373,16 +376,17 @@ export default function StationPage() {
                 </div>
               </div>
 
-              <div className="mt-3">
-                <label className="text-xs font-medium text-zinc-600">קופון (אופציונלי)</label>
-                <input
-                  className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-right text-sm"
-                  value={revealCoupon}
-                  onChange={(e) => setRevealCoupon(e.target.value)}
-                  placeholder="שרפלוס"
-                />
-                <div className="mt-1 text-xs text-zinc-500">קופון שרפלוס פותח עוד 3 בקשות היום.</div>
-              </div>
+              {showCouponField ? (
+                <div className="mt-3">
+                  <label className="text-xs font-medium text-zinc-600">קופון (אופציונלי)</label>
+                  <input
+                    className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-right text-sm"
+                    value={revealCoupon}
+                    onChange={(e) => setRevealCoupon(e.target.value)}
+                    placeholder="הזן קופון"
+                  />
+                </div>
+              ) : null}
 
               <div className="mt-4 flex justify-end gap-3">
                 <button
