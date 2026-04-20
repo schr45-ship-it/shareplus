@@ -114,6 +114,8 @@ export async function GET(req: Request) {
           resolvedScope === "received" ? String(r.driverUid ?? "") : String(r.ownerUid ?? "");
         const other = userByUid.get(otherUid) ?? null;
 
+        const ownerPaidFee = Boolean(r.ownerPaidFee);
+
         const createdAt = r.createdAt as unknown;
         const createdAtIso =
           createdAt && typeof createdAt === "object" && "toDate" in (createdAt as Record<string, unknown>)
@@ -136,6 +138,10 @@ export async function GET(req: Request) {
           stationTitle: (st?.title as string | undefined) ?? "עמדה",
           stationCity: (st?.city as string | undefined) ?? null,
           stationPriceIls: (st?.priceIls as number | undefined) ?? null,
+          stationHostPhone:
+            resolvedScope === "sent" && ownerPaidFee
+              ? String((st?.hostPhone as string | undefined) ?? "")
+              : null,
           ownerUid: String(r.ownerUid ?? ""),
           driverUid: String(r.driverUid ?? ""),
           otherUid,
@@ -144,6 +150,7 @@ export async function GET(req: Request) {
           timeFrom: String(r.timeFrom ?? ""),
           timeTo: String(r.timeTo ?? ""),
           status: String(r.status ?? "pending"),
+          ownerPaidFee,
           finalCostNis: typeof r.finalCostNis === "number" ? r.finalCostNis : null,
           estimatedProfitNis: typeof r.estimatedProfitNis === "number" ? r.estimatedProfitNis : null,
           createdAt: createdAtIso,
@@ -171,6 +178,7 @@ export async function PATCH(req: Request) {
       status?: "pending" | "approved" | "rejected" | "closed" | "cancelled";
       finalCostNis?: number;
       estimatedProfitNis?: number;
+      ownerPaidFee?: boolean;
     };
 
     const requestId = (body?.requestId ?? "").trim();
@@ -240,6 +248,16 @@ export async function PATCH(req: Request) {
     }
     if (typeof body?.estimatedProfitNis === "number") {
       patch.estimatedProfitNis = body.estimatedProfitNis;
+    }
+
+    if (typeof body?.ownerPaidFee === "boolean") {
+      if (!isOwner) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+      if (nextStatus !== "approved") {
+        return NextResponse.json({ error: "ownerPaidFee can only be set on approval" }, { status: 400 });
+      }
+      patch.ownerPaidFee = body.ownerPaidFee;
     }
 
     await ref.set(patch, { merge: true });

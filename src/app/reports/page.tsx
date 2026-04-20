@@ -12,6 +12,7 @@ type RequestItem = {
   stationTitle: string;
   stationCity: string | null;
   stationPriceIls: number | null;
+  stationHostPhone?: string | null;
   ownerUid: string;
   driverUid: string;
   otherUid: string;
@@ -20,6 +21,7 @@ type RequestItem = {
   timeFrom: string;
   timeTo: string;
   status: string;
+  ownerPaidFee?: boolean;
   finalCostNis: number | null;
   estimatedProfitNis: number | null;
   createdAt: string | null;
@@ -246,6 +248,21 @@ export default function ReportsPage() {
                     <div className="mt-1 text-sm text-zinc-600">
                       בקשת העמדה היא לתאריך: {formatDateIL(item.date)} שעה {item.timeFrom}-{item.timeTo}
                     </div>
+
+                    {tab === "sent" && item.status === "approved" && item.ownerPaidFee && item.stationHostPhone ? (
+                      <div className="mt-3 rounded-xl border border-green-100 bg-green-50 p-3 text-sm text-zinc-800">
+                        <div className="font-medium">מספר הטלפון של בעל העמדה הוא: {item.stationHostPhone}</div>
+                        <a
+                          className="mt-2 inline-block font-semibold text-zinc-900 underline"
+                          href={`https://wa.me/${String(item.stationHostPhone).replace(/[^0-9]/g, "")}`}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          לחץ כאן לשלוח WhatsApp
+                        </a>
+                      </div>
+                    ) : null}
+
                     <div className="mt-1 text-xs text-zinc-500">
                       {tab === "received" ? "הנהג" : "בעל העמדה"}: {item.otherDisplayName ?? item.otherUid}
                     </div>

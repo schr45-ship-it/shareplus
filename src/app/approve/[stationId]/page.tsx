@@ -35,7 +35,7 @@ export default function ApproveStationPage() {
     setStep("payment");
   }
 
-  async function patchStatus(nextStatus: "approved" | "rejected") {
+  async function patchStatus(nextStatus: "approved" | "rejected", opts?: { ownerPaidFee?: boolean }) {
     try {
       setError(null);
       if (!requestId) {
@@ -55,7 +55,7 @@ export default function ApproveStationPage() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ requestId, status: nextStatus }),
+        body: JSON.stringify({ requestId, status: nextStatus, ...(opts ?? {}) }),
       });
 
       const json = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
@@ -89,7 +89,7 @@ export default function ApproveStationPage() {
 
       setSaving(true);
 
-      await patchStatus("approved");
+      await patchStatus("approved", { ownerPaidFee: true });
 
       const token = await getIdToken(user);
       const res = await fetch("/api/checkout", {
