@@ -48,6 +48,8 @@ export default function Home() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [showMyStations, setShowMyStations] = useState(false);
   const [showFavorites, setShowFavorites] = useState(false);
+  const [addStationLoginOpen, setAddStationLoginOpen] = useState(false);
+  const [pendingAddStationRedirect, setPendingAddStationRedirect] = useState(false);
   const [activeSection, setActiveSection] = useState<"stations" | "myStations" | "favorites">(
     "stations"
   );
@@ -192,8 +194,15 @@ export default function Home() {
 
   useEffect(() => {
     const auth = getClientAuth();
-    return onAuthStateChanged(auth, (u) => setUser(u));
-  }, []);
+    return onAuthStateChanged(auth, (u) => {
+      setUser(u);
+      if (u && pendingAddStationRedirect) {
+        setAddStationLoginOpen(false);
+        setPendingAddStationRedirect(false);
+        window.location.href = "/add-station";
+      }
+    });
+  }, [pendingAddStationRedirect]);
 
   const deleteStationAsAdmin = useCallback(
     async (stationId: string) => {
@@ -878,7 +887,23 @@ export default function Home() {
             </div>
           ) : (
             <div>
-              <h1 className="text-xl font-semibold">חיפוש עמדות בסביבה</h1>
+              <div className="flex items-center justify-between gap-3">
+                <h1 className="text-xl font-semibold">חיפוש עמדות בסביבה</h1>
+                <button
+                  type="button"
+                  className="shrink-0 rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-900 hover:bg-zinc-50"
+                  onClick={() => {
+                    if (user) {
+                      window.location.href = "/add-station";
+                      return;
+                    }
+                    setPendingAddStationRedirect(true);
+                    setAddStationLoginOpen(true);
+                  }}
+                >
+                  הוסף עמדה
+                </button>
+              </div>
               <p className="mt-1 text-sm text-zinc-600">
                 ניתן לצפות בעמדות ללא התחברות. כדי לחשוף פרטי קשר תתבקש להתחבר.
               </p>
@@ -1177,6 +1202,40 @@ export default function Home() {
           v{version}{buildStamp ? ` · ${buildStamp}` : ""}
         </div>
       </main>
+
+      {addStationLoginOpen ? (
+        <div
+          className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 p-4"
+          dir="rtl"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setAddStationLoginOpen(false);
+          }}
+        >
+          <div className="w-full max-w-md rounded-2xl bg-white p-5 text-right shadow-xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="text-base font-semibold">נדרשת התחברות</div>
+                <div className="mt-1 text-sm text-zinc-600">כדי להוסיף עמדה צריך להתחבר.</div>
+              </div>
+              <button
+                type="button"
+                className="rounded-full px-3 py-1 text-sm font-medium text-zinc-600 hover:bg-zinc-50"
+                onClick={() => setAddStationLoginOpen(false)}
+              >
+                סגור
+              </button>
+            </div>
+
+            <button
+              type="button"
+              className="mt-5 w-full rounded-xl bg-black px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800"
+              onClick={() => void startSignIn()}
+            >
+              התחבר עם Google
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {revealOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" dir="rtl">
