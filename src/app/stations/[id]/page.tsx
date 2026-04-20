@@ -61,6 +61,12 @@ export default function StationPage() {
   const [revealTimeFrom, setRevealTimeFrom] = useState<string>("");
   const [revealTimeTo, setRevealTimeTo] = useState<string>("");
 
+  function timeToMinutes(v: string) {
+    const m = /^([0-1]\d|2[0-3]):([0-5]\d)$/.exec(v);
+    if (!m) return null;
+    return Number(m[1]) * 60 + Number(m[2]);
+  }
+
   const [carKey, setCarKey] = useState<CarPreset["key"]>("byd_atto_3");
   const [batteryPercent, setBatteryPercent] = useState<number>(20);
 
@@ -151,6 +157,13 @@ export default function StationPage() {
       }
       if (!revealTimeTo.trim()) {
         setError("בחר שעה סיום");
+        return;
+      }
+
+      const fromMin = timeToMinutes(revealTimeFrom.trim());
+      const toMin = timeToMinutes(revealTimeTo.trim());
+      if (fromMin == null || toMin == null || toMin <= fromMin) {
+        setError("שעת סיום חייבת להיות אחרי שעת ההתחלה");
         return;
       }
 
@@ -329,7 +342,15 @@ export default function StationPage() {
                     type="time"
                     className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-right text-sm"
                     value={revealTimeFrom}
-                    onChange={(e) => setRevealTimeFrom(e.target.value)}
+                    onChange={(e) => {
+                      const next = e.target.value;
+                      setRevealTimeFrom(next);
+                      const fromMin = timeToMinutes(next);
+                      const toMin = timeToMinutes(revealTimeTo);
+                      if (fromMin != null && toMin != null && toMin <= fromMin) {
+                        setRevealTimeTo("");
+                      }
+                    }}
                     step={300}
                   />
                 </div>
@@ -341,6 +362,7 @@ export default function StationPage() {
                     value={revealTimeTo}
                     onChange={(e) => setRevealTimeTo(e.target.value)}
                     step={300}
+                    min={revealTimeFrom || undefined}
                   />
                 </div>
               </div>

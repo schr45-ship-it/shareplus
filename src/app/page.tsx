@@ -584,6 +584,13 @@ export default function Home() {
         return;
       }
 
+      const fromMin = timeToMinutes(revealTimeFrom.trim());
+      const toMin = timeToMinutes(revealTimeTo.trim());
+      if (fromMin == null || toMin == null || toMin <= fromMin) {
+        setError("שעת סיום חייבת להיות אחרי שעת ההתחלה");
+        return;
+      }
+
       setRevealSaving(true);
       const token = await getIdToken(user);
       const res = await fetch("/api/interest-requests", {
@@ -1193,7 +1200,15 @@ export default function Home() {
                   type="time"
                   className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-right text-sm"
                   value={revealTimeFrom}
-                  onChange={(e) => setRevealTimeFrom(e.target.value)}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    setRevealTimeFrom(next);
+                    const fromMin = timeToMinutes(next);
+                    const toMin = timeToMinutes(revealTimeTo);
+                    if (fromMin != null && toMin != null && toMin <= fromMin) {
+                      setRevealTimeTo("");
+                    }
+                  }}
                   step={300}
                 />
               </div>
@@ -1205,6 +1220,7 @@ export default function Home() {
                   value={revealTimeTo}
                   onChange={(e) => setRevealTimeTo(e.target.value)}
                   step={300}
+                  min={revealTimeFrom || undefined}
                 />
               </div>
             </div>
