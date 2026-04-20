@@ -1,13 +1,44 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { onMessage } from "firebase/messaging";
+
+import { getClientMessaging } from "@/lib/firebaseClient";
 
 export default function Footer() {
   const [contactOpen, setContactOpen] = useState(false);
+  const [responseOpen, setResponseOpen] = useState(false);
+  const [responseTitle, setResponseTitle] = useState<string>("");
+  const [responseBody, setResponseBody] = useState<string>("");
   const whatsappUrl = useMemo(() => {
     const phoneE164Digits = "972527710258";
     return `https://wa.me/${phoneE164Digits}`;
+  }, []);
+
+  useEffect(() => {
+    let unsub: null | (() => void) = null;
+    let cancelled = false;
+
+    async function setup() {
+      const messaging = await getClientMessaging();
+      if (!messaging || cancelled) return;
+      unsub = onMessage(messaging, (payload) => {
+        const data = (payload as unknown as { data?: Record<string, string> }).data ?? {};
+        const type = String(data.type ?? "").trim();
+        if (type !== "INTEREST_REQUEST_APPROVED" && type !== "INTEREST_REQUEST_REJECTED") return;
+
+        setResponseTitle(data.title ? String(data.title) : "עדכון בבקשה");
+        setResponseBody(data.body ? String(data.body) : "יש עדכון חדש בבקשה שלך.");
+        setResponseOpen(true);
+      });
+    }
+
+    void setup();
+    return () => {
+      cancelled = true;
+      if (unsub) unsub();
+    };
   }, []);
 
   return (
@@ -76,6 +107,43 @@ export default function Footer() {
                 שלח הודעה ב-WhatsApp
               </a>
             </div>
+          </div>
+        </div>
+      ) : null}
+
+      {responseOpen ? (
+        <div
+          className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 p-4"
+          dir="rtl"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setResponseOpen(false);
+          }}
+        >
+          <div className="w-full max-w-md rounded-2xl bg-white p-5 text-right shadow-xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="text-base font-semibold">{responseTitle}</div>
+                <div className="mt-1 text-sm text-zinc-700">{responseBody}</div>
+              </div>
+              <button
+                type="button"
+                className="rounded-full px-3 py-1 text-sm font-medium text-zinc-600 hover:bg-zinc-50"
+                onClick={() => setResponseOpen(false)}
+              >
+                סגור
+              </button>
+            </div>
+
+            <button
+              type="button"
+              className="mt-5 w-full rounded-xl bg-black px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800"
+              onClick={() => {
+                setResponseOpen(false);
+                window.location.href = "/reports";
+              }}
+            >
+              לדוחות
+            </button>
           </div>
         </div>
       ) : null}

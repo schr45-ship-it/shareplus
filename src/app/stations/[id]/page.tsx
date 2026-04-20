@@ -56,6 +56,7 @@ export default function StationPage() {
   const [error, setError] = useState<string | null>(null);
 
   const [loginModalOpen, setLoginModalOpen] = useState(false);
+  const [requestSentOpen, setRequestSentOpen] = useState(false);
 
   const [revealOpen, setRevealOpen] = useState(false);
   const [revealSaving, setRevealSaving] = useState(false);
@@ -206,8 +207,10 @@ export default function StationPage() {
       }
 
       setRevealOpen(false);
-      setError("הבקשה נשלחה לבעל העמדה");
-      setTimeout(() => setError(null), 2500);
+      setRequestSentOpen(true);
+      setTimeout(() => {
+        window.location.href = "/";
+      }, 1500);
     } catch (e) {
       setError(e instanceof Error ? e.message : "שגיאה לא צפויה");
     } finally {
@@ -444,6 +447,28 @@ export default function StationPage() {
               onClick={() => void signInWithGoogle()}
             >
               התחבר עם Google
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {requestSentOpen ? (
+        <div
+          className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 p-4"
+          dir="rtl"
+        >
+          <div className="w-full max-w-md rounded-2xl bg-white p-5 text-right shadow-xl">
+            <div className="text-base font-semibold">ההודעה נשלחה לבעל העמדה</div>
+            <div className="mt-1 text-sm text-zinc-600">מעבירים אותך לדף הבית...</div>
+            <button
+              type="button"
+              className="mt-5 w-full rounded-xl bg-black px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800"
+              onClick={() => {
+                setRequestSentOpen(false);
+                window.location.href = "/";
+              }}
+            >
+              חזרה לדף הבית
             </button>
           </div>
         </div>
