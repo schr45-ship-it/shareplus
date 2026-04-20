@@ -304,12 +304,14 @@ export async function POST(req: Request) {
       date?: string;
       timeFrom?: string;
       timeTo?: string;
+      coupon?: string;
     };
 
     const stationId = (body?.stationId ?? "").trim();
     const date = (body?.date ?? "").trim();
     const timeFrom = (body?.timeFrom ?? "").trim();
     const timeTo = (body?.timeTo ?? "").trim();
+    const coupon = (body?.coupon ?? "").trim();
 
     if (!stationId) return NextResponse.json({ error: "Missing stationId" }, { status: 400 });
     if (!date) return NextResponse.json({ error: "Missing date" }, { status: 400 });
@@ -354,9 +356,17 @@ export async function POST(req: Request) {
       const s = (data.status ?? "pending").toLowerCase();
       return s !== "rejected" && s !== "cancelled";
     }).length;
-    if (todayNonRejectedCount >= 3) {
+
+    const baseDailyLimit = 3;
+    const couponBonus = coupon === "שרפלוס" ? 3 : 0;
+    const dailyLimit = baseDailyLimit + couponBonus;
+
+    if (todayNonRejectedCount >= dailyLimit) {
       return NextResponse.json(
-        { error: "ניתן לשלוח עד 3 בקשות ביום. נסה שוב מחר." },
+        {
+          error:
+            "הגעת למגבלת הבקשות היומית. ניתן לשלוח עד 3 בקשות ביום. עם קופון שרפלוס ניתן לפתוח עוד 3.",
+        },
         { status: 429 }
       );
     }

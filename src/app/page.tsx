@@ -71,6 +71,7 @@ export default function Home() {
   const [revealDate, setRevealDate] = useState<string>("");
   const [revealTimeFrom, setRevealTimeFrom] = useState<string>("");
   const [revealTimeTo, setRevealTimeTo] = useState<string>("");
+  const [revealCoupon, setRevealCoupon] = useState<string>("");
 
   function timeToMinutes(v: string) {
     const m = /^([0-1]\d|2[0-3]):([0-5]\d)$/.exec(v);
@@ -564,6 +565,7 @@ export default function Home() {
     setRevealDate(filterDate);
     setRevealTimeFrom(filterTimeFrom);
     setRevealTimeTo(filterTimeTo);
+    setRevealCoupon("");
     setRevealOpen(true);
   }, [filterDate, filterTimeFrom, filterTimeTo, user]);
 
@@ -610,11 +612,20 @@ export default function Home() {
           date: revealDate,
           timeFrom: revealTimeFrom,
           timeTo: revealTimeTo,
+          coupon: revealCoupon,
         }),
       });
 
       const json = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
-      if (!res.ok) throw new Error(json.error ?? "שגיאה בשליחת בקשה");
+      if (!res.ok) {
+        if (res.status === 429) {
+          throw new Error(
+            json.error ??
+              "הגעת למגבלת הבקשות היומית. ניתן לשלוח עד 3 בקשות ביום. עם קופון שרפלוס ניתן לפתוח עוד 3."
+          );
+        }
+        throw new Error(json.error ?? "שגיאה בשליחת בקשה");
+      }
 
       setError("הבקשה נשלחה לבעל העמדה");
       setTimeout(() => setError(null), 2500);
@@ -1229,6 +1240,17 @@ export default function Home() {
                   min={revealTimeFrom || undefined}
                 />
               </div>
+            </div>
+
+            <div className="mt-3">
+              <label className="text-xs font-medium text-zinc-600">קופון (אופציונלי)</label>
+              <input
+                className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-right text-sm"
+                value={revealCoupon}
+                onChange={(e) => setRevealCoupon(e.target.value)}
+                placeholder="שרפלוס"
+              />
+              <div className="mt-1 text-xs text-zinc-500">קופון שרפלוס פותח עוד 3 בקשות היום.</div>
             </div>
 
             <div className="mt-4 flex justify-end gap-3">
