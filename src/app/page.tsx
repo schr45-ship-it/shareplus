@@ -72,6 +72,12 @@ export default function Home() {
   const [revealTimeFrom, setRevealTimeFrom] = useState<string>("");
   const [revealTimeTo, setRevealTimeTo] = useState<string>("");
 
+  function timeToMinutes(v: string) {
+    const m = /^([0-1]\d|2[0-3]):([0-5]\d)$/.exec(v);
+    if (!m) return null;
+    return Number(m[1]) * 60 + Number(m[2]);
+  }
+
   const isAdmin = useMemo(() => isAdminEmail(user?.email), [user?.email]);
 
   const citySuggestions = useMemo(() => {
