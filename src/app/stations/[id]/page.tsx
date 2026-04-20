@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { onAuthStateChanged, type User } from "firebase/auth";
 
-import { getClientAuth } from "@/lib/firebaseClient";
+import { getClientAuth, signInWithGoogle } from "@/lib/firebaseClient";
 import { getIdToken } from "@/lib/auth";
 
 type StationPublic = {
@@ -55,6 +55,8 @@ export default function StationPage() {
   const [station, setStation] = useState<StationPublic | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const [loginModalOpen, setLoginModalOpen] = useState(false);
+
   const [revealOpen, setRevealOpen] = useState(false);
   const [revealSaving, setRevealSaving] = useState(false);
   const [revealDate, setRevealDate] = useState<string>("");
@@ -94,7 +96,10 @@ export default function StationPage() {
 
   useEffect(() => {
     const auth = getClientAuth();
-    return onAuthStateChanged(auth, (u) => setUser(u));
+    return onAuthStateChanged(auth, (u) => {
+      setUser(u);
+      if (u) setLoginModalOpen(false);
+    });
   }, []);
 
   useEffect(() => {
@@ -135,7 +140,7 @@ export default function StationPage() {
   const openRequest = useCallback(() => {
     setError(null);
     if (!user) {
-      setError("נדרשת התחברות כדי לשלוח בקשה");
+      setLoginModalOpen(true);
       return;
     }
     setRevealCoupon("");
@@ -409,6 +414,40 @@ export default function StationPage() {
           </div>
         ) : null}
       </main>
+
+      {loginModalOpen ? (
+        <div
+          className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 p-4"
+          dir="rtl"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setLoginModalOpen(false);
+          }}
+        >
+          <div className="w-full max-w-md rounded-2xl bg-white p-5 text-right shadow-xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="text-base font-semibold">נדרשת התחברות</div>
+                <div className="mt-1 text-sm text-zinc-600">כדי לשלוח בקשת טעינה צריך להתחבר.</div>
+              </div>
+              <button
+                type="button"
+                className="rounded-full px-3 py-1 text-sm font-medium text-zinc-600 hover:bg-zinc-50"
+                onClick={() => setLoginModalOpen(false)}
+              >
+                סגור
+              </button>
+            </div>
+
+            <button
+              type="button"
+              className="mt-5 w-full rounded-xl bg-black px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800"
+              onClick={() => void signInWithGoogle()}
+            >
+              התחבר עם Google
+            </button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
