@@ -555,6 +555,14 @@ export default function Home() {
     return (
       <div className="flex flex-col items-end gap-2 sm:flex-row-reverse sm:items-center sm:gap-3">
         <span className="text-sm text-zinc-600">{user.email ?? user.displayName}</span>
+        {isAdmin ? (
+          <a
+            className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-50"
+            href="/admin"
+          >
+            ניהול
+          </a>
+        ) : null}
         <button
           className="rounded-full border border-zinc-200 px-4 py-2 text-sm font-medium hover:bg-zinc-50"
           onClick={() => void signOut(getClientAuth())}
@@ -563,7 +571,7 @@ export default function Home() {
         </button>
       </div>
     );
-  }, [startSignIn, user]);
+  }, [isAdmin, startSignIn, user]);
 
   const openReveal = useCallback((station: StationPublic) => {
     setError(null);
