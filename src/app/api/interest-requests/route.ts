@@ -457,18 +457,13 @@ export async function POST(req: Request) {
 
         const macroBase =
           "https://trigger.macrodroid.com/ce572bd5-5c2b-45c0-9dcd-2b33e5c33aba/send_sms";
-        const params = new URLSearchParams({
-          phone: ownerPhoneForMacro,
-          to: ownerPhoneForMacro,
-          number: ownerPhoneForMacro,
-          message,
-          text: message,
-          msg: message,
-          body: message,
-        });
-        const macroDroidUrl = `${macroBase}?${params.toString()}`;
+        const macroDroidUrl = `${macroBase}?msg=${encodeURIComponent(message)}`;
         try {
-          await fetch(macroDroidUrl, { method: "GET" });
+          await fetch(macroDroidUrl, {
+            method: "POST",
+            headers: { "Content-Type": "text/plain; charset=utf-8" },
+            body: ownerPhoneForMacro,
+          });
         } catch {
           // ignore
         }
