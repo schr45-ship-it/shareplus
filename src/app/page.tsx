@@ -745,14 +745,14 @@ export default function Home() {
             </div>
           </div>
         </div>
-        <div className="rounded-2xl border border-zinc-100 bg-zinc-50 p-6">
+        <div className="rounded-2xl border border-zinc-100 bg-zinc-50 px-6 py-4">
           {user ? (
             <div>
               <h1 className="text-xl font-semibold">ברוך הבא ל-SharePlus</h1>
               <p className="mt-1 text-sm text-zinc-600">
                 בחר פעולה:
               </p>
-              <div className="sticky top-0 z-10 mt-4 rounded-2xl bg-zinc-50/80 pb-2 pt-2 backdrop-blur">
+              <div className="sticky top-0 z-10 mt-3 rounded-2xl bg-zinc-50/80 pb-2 pt-2 backdrop-blur">
                 <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
                   <button
                     type="button"
