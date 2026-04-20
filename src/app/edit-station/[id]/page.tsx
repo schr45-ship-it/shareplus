@@ -762,7 +762,7 @@ export default function EditStationPage({
 
       {showConnectorHelp ? (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 p-4"
           dir="rtl"
           onMouseDown={(e) => {
             if (e.target === e.currentTarget) setShowConnectorHelp(false);
@@ -798,6 +798,7 @@ export default function EditStationPage({
                   alt="Type 2 Charger"
                   width={100}
                   height={80}
+                  unoptimized
                   className="h-auto w-[100px] rounded-md"
                 />
               </div>
@@ -814,6 +815,7 @@ export default function EditStationPage({
                   alt="Type 1 Charger"
                   width={100}
                   height={80}
+                  unoptimized
                   className="h-auto w-[100px] rounded-md"
                 />
               </div>
