@@ -36,6 +36,12 @@ function dayKeyFromDate(dateIso: string):
   return (["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const)[idx] ?? null;
 }
 
+function formatDateIL(dateIso: string) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateIso);
+  if (!m) return dateIso;
+  return `${m[3]}/${m[2]}/${m[1]}`;
+}
+
 async function requireUser(req: Request) {
   const authHeader = req.headers.get("authorization");
   const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
@@ -361,6 +367,7 @@ export async function POST(req: Request) {
     const st = stSnap.data() as {
       title?: string;
       ownerUid?: string;
+      city?: string;
       availability?: Array<{ dayKey: string; enabled: boolean; start: string; end: string }>;
     };
 
@@ -423,7 +430,19 @@ export async function POST(req: Request) {
 
       if (tokens.length > 0) {
         const messaging = getAdminMessaging();
-        const smsText = `יש בקשת התעניינות חדשה לתאריך ${date} בין ${timeFrom}-${timeTo}. אנא היכנס לאתר לאישור.`;
+        const stationTitle = (st.title ?? "עמדה").trim() || "עמדה";
+        const stationCity = String(st.city ?? "").trim();
+        const stationLabel = stationCity ? `${stationTitle} (${stationCity})` : stationTitle;
+
+        const origin = req.headers.get("origin") ?? process.env.NEXT_PUBLIC_APP_ORIGIN ?? "";
+        const requestUrl = origin
+          ? `${origin}/?requestId=${encodeURIComponent(requestRef.id)}`
+          : `/?requestId=${encodeURIComponent(requestRef.id)}`;
+        const shortUrl = requestUrl.replace(/^https?:\/\//, "");
+
+        const dateLabel = formatDateIL(date);
+        const timeLabel = `${timeFrom}-${timeTo}`;
+        const smsText = `בקשת התעניינות חדשה\nעמדה: ${stationLabel}\nמתי: ${dateLabel} ${timeLabel}\nכנס לאתר: ${shortUrl}`;
         await messaging.sendEachForMulticast({
           tokens,
           data: {
