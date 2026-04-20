@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
+import Image from "next/image";
 
 import { getClientAuth } from "@/lib/firebaseClient";
 import { getStation, updateStation, type StationDoc } from "@/lib/firestoreClient";
@@ -523,7 +524,7 @@ export default function EditStationPage({
                 <button
                   type="button"
                   className="text-xs font-medium text-zinc-500 hover:text-zinc-700"
-                  onClick={() => setShowConnectorHelp((s) => !s)}
+                  onClick={() => setShowConnectorHelp(true)}
                 >
                   ?
                 </button>
@@ -539,12 +540,6 @@ export default function EditStationPage({
                 </option>
                 <option value="אחר (Type 1 וכו')">אחר (Type 1 וכו')</option>
               </select>
-              {showConnectorHelp ? (
-                <div className="mt-2 text-xs text-zinc-500">
-                  חיבור הוא סוג התקע הפיזי שמתחבר לרכב. Type 2 הוא הסטנדרט הנפוץ בישראל.
-                  אם מדובר בשקע בלבד, הנהג צריך להביא כבל מהבגאז'.
-                </div>
-              ) : null}
             </div>
             <div>
               <label className="text-sm font-medium">הספק (kW)</label>
@@ -764,6 +759,76 @@ export default function EditStationPage({
           v{version}{buildStamp ? ` · ${buildStamp}` : ""}
         </div>
       </main>
+
+      {showConnectorHelp ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          dir="rtl"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setShowConnectorHelp(false);
+          }}
+        >
+          <div className="w-full max-w-lg rounded-2xl bg-white p-5 text-right shadow-xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="text-base font-semibold">לא בטוח איזה חיבור יש לך?</div>
+              </div>
+              <button
+                type="button"
+                className="rounded-full px-3 py-1 text-sm font-medium text-zinc-600 hover:bg-zinc-50"
+                onClick={() => setShowConnectorHelp(false)}
+              >
+                סגור
+              </button>
+            </div>
+
+            <div className="mt-3 border-t border-zinc-100" />
+
+            <div className="mt-4 space-y-3">
+              <div className="flex items-center gap-3 rounded-xl border border-zinc-100 bg-white p-3">
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-semibold">חיבור Type 2 (הנפוץ בישראל)</div>
+                  <div className="mt-1 text-sm text-zinc-700">
+                    מתאים לרוב הרכבים החדשים: BYD, Tesla, Geely, Ioniq, MG, Kia, Kona ועוד.
+                  </div>
+                  <div className="mt-1 text-xs text-zinc-500">* רוב העמדות הביתיות בישראל הן Type 2.</div>
+                </div>
+                <Image
+                  src="https://upload.wikimedia.org/wikipedia/commons/thumb/a/a2/Type_2_connector_IEC_62196_Mennekes.jpg/300px-Type_2_connector_IEC_62196_Mennekes.jpg"
+                  alt="Type 2 Charger"
+                  width={100}
+                  height={80}
+                  className="h-auto w-[100px] rounded-md"
+                />
+              </div>
+
+              <div className="flex items-center gap-3 rounded-xl border border-zinc-100 bg-white p-3">
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-semibold">חיבור Type 1</div>
+                  <div className="mt-1 text-sm text-zinc-700">
+                    נפוץ ברכבים ישנים יותר (כמו ניסאן ליף דור 1) או רכבים בייבוא אישי מארה"ב.
+                  </div>
+                </div>
+                <Image
+                  src="https://upload.wikimedia.org/wikipedia/commons/thumb/8/89/SAE_J1772_Connector_2011_01_21.jpg/300px-SAE_J1772_Connector_2011_01_21.jpg"
+                  alt="Type 1 Charger"
+                  width={100}
+                  height={80}
+                  className="h-auto w-[100px] rounded-md"
+                />
+              </div>
+            </div>
+
+            <button
+              type="button"
+              className="mt-5 w-full rounded-xl bg-black px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800"
+              onClick={() => setShowConnectorHelp(false)}
+            >
+              הבנתי, תודה
+            </button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
