@@ -461,7 +461,7 @@ export async function POST(req: Request) {
     const ownerPhoneFromUser = String(ownerData?.phone ?? "").trim();
     const ownerPhoneFromStation = String(st.hostPhone ?? "").trim();
 
-    const ownerPhoneForForwardRaw = ownerPhoneFromStation || ownerPhoneFromUser;
+    const ownerPhoneForForwardRaw = ownerPhoneFromUser || ownerPhoneFromStation;
     const ownerPhoneForForward = ownerPhoneForForwardRaw ? digitsOnlyPhone(ownerPhoneForForwardRaw) : "";
 
     const ownerPhoneRaw = ownerPhoneFromUser || ownerPhoneFromStation;
