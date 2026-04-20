@@ -745,15 +745,15 @@ export default function Home() {
             </div>
           </div>
         </div>
-        <div className="rounded-2xl border border-zinc-100 bg-zinc-50 px-6 py-3">
+        <div className="rounded-2xl border border-zinc-100 bg-zinc-50 px-6 py-2">
           {user ? (
             <div>
-              <h1 className="text-xl font-semibold">ברוך הבא ל-SharePlus</h1>
-              <p className="mt-1 text-sm text-zinc-600">
+              <h1 className="text-lg font-semibold">ברוך הבא ל-SharePlus</h1>
+              <p className="mt-0.5 text-sm text-zinc-600">
                 בחר פעולה:
               </p>
-              <div className="sticky top-0 z-10 mt-2 rounded-2xl bg-zinc-50/80 pb-1 pt-1 backdrop-blur">
-                <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
+              <div className="sticky top-0 z-10 mt-1 rounded-2xl bg-zinc-50/80 pb-1 pt-1 backdrop-blur">
+                <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
                   <button
                     type="button"
                     onClick={() => {
@@ -767,7 +767,7 @@ export default function Home() {
                         });
                       }, 0);
                     }}
-                    className={`rounded-full px-4 py-2 text-center text-sm font-medium transition-colors ${
+                    className={`rounded-full px-4 py-1.5 text-center text-sm font-medium transition-colors ${
                       activeSection === "stations"
                         ? "bg-black text-white"
                         : "border border-zinc-200 bg-white text-zinc-900 hover:bg-zinc-50"
@@ -777,7 +777,7 @@ export default function Home() {
                   </button>
 
                   <a
-                    className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-center text-sm font-medium text-zinc-900 hover:bg-zinc-50"
+                    className="rounded-full border border-zinc-200 bg-white px-4 py-1.5 text-center text-sm font-medium text-zinc-900 hover:bg-zinc-50"
                     href="/add-station"
                   >
                     + הוסף עמדה
