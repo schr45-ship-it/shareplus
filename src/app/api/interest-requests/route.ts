@@ -461,9 +461,12 @@ export async function POST(req: Request) {
     if (ownerPhoneRaw) {
       const ownerPhoneForMacro = digitsOnlyPhone(ownerPhoneRaw);
       if (ownerPhoneForMacro) {
-        const approveUrl = `https://shareplus.co.il/approve/${encodeURIComponent(
-          stationId
-        )}?requestId=${encodeURIComponent(requestRef.id)}`;
+        const appOrigin =
+          (process.env.NEXT_PUBLIC_APP_ORIGIN ?? "").trim() ||
+          "https://shareplus-backend--shareplus1.europe-west4.hosted.app";
+        const approveUrl = `${appOrigin}/approve/${encodeURIComponent(stationId)}?requestId=${encodeURIComponent(
+          requestRef.id
+        )}`;
         const stationLabel = `${st.title ?? "עמדה"}${st.city ? ` (${st.city})` : ""}`;
         const message = `${approveUrl} מישהו רוצה להטעין אצלך בעמדה: ${stationLabel}. בקשה לתאריך ${date} שעה ${timeFrom}-${timeTo}. לעדכון זמינות ואישור/אי אישור לחץ על הקישור הבא: ${approveUrl}`;
 
