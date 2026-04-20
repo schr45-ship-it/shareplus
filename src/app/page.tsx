@@ -553,14 +553,14 @@ export default function Home() {
     }
 
     return (
-      <div className="flex flex-row-reverse items-center gap-3">
+      <div className="flex flex-col items-end gap-2 sm:flex-row-reverse sm:items-center sm:gap-3">
+        <span className="text-sm text-zinc-600">{user.email ?? user.displayName}</span>
         <button
           className="rounded-full border border-zinc-200 px-4 py-2 text-sm font-medium hover:bg-zinc-50"
           onClick={() => void signOut(getClientAuth())}
         >
           התנתק
         </button>
-        <span className="text-sm text-zinc-600">{user.email ?? user.displayName}</span>
       </div>
     );
   }, [startSignIn, user]);
