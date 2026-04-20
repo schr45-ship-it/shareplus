@@ -523,7 +523,7 @@ export default function EditStationPage({
                 <label className="text-sm font-medium">חיבור</label>
                 <button
                   type="button"
-                  className="text-xs font-medium text-zinc-500 hover:text-zinc-700"
+                  className="flex h-7 w-7 items-center justify-center rounded-full border border-zinc-200 bg-white text-base font-bold text-zinc-700 hover:bg-zinc-50"
                   onClick={() => setShowConnectorHelp(true)}
                 >
                   ?
@@ -629,7 +629,7 @@ export default function EditStationPage({
               <label className="text-sm font-medium">תמחור</label>
               <button
                 type="button"
-                className="text-xs font-medium text-zinc-500 hover:text-zinc-700"
+                className="flex h-7 w-7 items-center justify-center rounded-full border border-zinc-200 bg-white text-base font-bold text-zinc-700 hover:bg-zinc-50"
                 onClick={() => setShowPricingHelp((s) => !s)}
               >
                 ?
