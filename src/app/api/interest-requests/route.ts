@@ -378,6 +378,7 @@ export async function POST(req: Request) {
       title?: string;
       ownerUid?: string;
       city?: string;
+      hostPhone?: string;
       availability?: Array<{ dayKey: string; enabled: boolean; start: string; end: string }>;
     };
 
@@ -422,48 +423,22 @@ export async function POST(req: Request) {
           notificationPreferences?: { pushEnabled?: boolean; emailEnabled?: boolean };
         })
       : null;
-    const pushEnabled = ownerData?.notificationPreferences?.pushEnabled ?? true;
     const emailEnabled = ownerData?.notificationPreferences?.emailEnabled ?? false;
 
     let emailSendError: string | null = null;
 
-    if (pushEnabled) {
-      const tokensSnap = await adminDb
-        .collection("users")
-        .doc(ownerUid)
-        .collection("pushTokens")
-        .get();
-
-      const tokens = tokensSnap.docs
-        .map((d) => (d.data() as { token?: string }).token)
-        .filter((t): t is string => typeof t === "string" && t.trim().length > 0);
-
-      if (tokens.length > 0) {
-        const messaging = getAdminMessaging();
-        const stationTitle = (st.title ?? "עמדה").trim() || "עמדה";
-        const stationCity = String(st.city ?? "").trim();
-        const stationLabel = stationCity ? `${stationTitle} (${stationCity})` : stationTitle;
-
-        const origin = req.headers.get("origin") ?? process.env.NEXT_PUBLIC_APP_ORIGIN ?? "";
-        const requestUrl = origin
-          ? `${origin}/?requestId=${encodeURIComponent(requestRef.id)}`
-          : `/?requestId=${encodeURIComponent(requestRef.id)}`;
-        const shortUrl = requestUrl.replace(/^https?:\/\//, "");
-
-        const dateLabel = formatDateIL(date);
-        const timeLabel = `${timeFrom}-${timeTo}`;
-        const smsText = `בקשת התעניינות חדשה\nעמדה: ${stationLabel}\nמתי: ${dateLabel} ${timeLabel}\nכנס לאתר: ${shortUrl}`;
-        await messaging.sendEachForMulticast({
-          tokens,
-          data: {
-            type: "INTEREST_REQUEST",
-            requestId: requestRef.id,
-            stationId,
-            title: "יש מתעניין מ-SharePlus!",
-            body: `שרפלוס1234:${driverPhoneDigits}:${smsText}`,
-            deepLink: `/?requestId=${encodeURIComponent(requestRef.id)}`,
-          },
-        });
+    const ownerPhoneRaw = String(st.hostPhone ?? "").trim();
+    if (ownerPhoneRaw) {
+      const ownerPhoneForMacro = digitsOnlyPhone(ownerPhoneRaw);
+      if (ownerPhoneForMacro) {
+        const macroDroidUrl = `https://trigger.macrodroid.com/ce572bd5-5c2b-45c0-9dcd-2b33e5c33aba/send_sms?phone=${encodeURIComponent(
+          ownerPhoneForMacro
+        )}`;
+        try {
+          await fetch(macroDroidUrl, { method: "GET" });
+        } catch {
+          // ignore
+        }
       }
     }
 
