@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
 
 import { getAdminAuth, getAdminDb, getAdminMessaging } from "@/lib/firebaseAdmin";
+import { digitsOnlyPhone, isValidPhone } from "@/lib/phone";
 import { sendEmailSendGrid } from "@/lib/sendgrid";
 
 function isIndexBuildingError(e: unknown) {
@@ -188,9 +189,15 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: "Request not found" }, { status: 404 });
     }
 
-    const data = snap.data() as { ownerUid?: string; driverUid?: string; status?: string };
+    const data = snap.data() as {
+      ownerUid?: string;
+      driverUid?: string;
+      stationId?: string;
+      status?: string;
+    };
     const ownerUid = data.ownerUid ?? "";
     const driverUid = data.driverUid ?? "";
+    const stationId = String(data.stationId ?? "");
     const currentStatus = data.status ?? "pending";
 
     const isOwner = ownerUid === auth.uid;
@@ -230,6 +237,48 @@ export async function PATCH(req: Request) {
     }
 
     await ref.set(patch, { merge: true });
+
+    if (nextStatus === "approved" && currentStatus === "pending" && driverUid) {
+      try {
+        const adminDb = getAdminDb();
+        const driverSnap = await adminDb.collection("users").doc(driverUid).get();
+        const driverData = driverSnap.exists
+          ? (driverSnap.data() as {
+              notificationPreferences?: { pushEnabled?: boolean };
+            })
+          : null;
+        const pushEnabled = driverData?.notificationPreferences?.pushEnabled ?? true;
+
+        if (pushEnabled) {
+          const tokensSnap = await adminDb
+            .collection("users")
+            .doc(driverUid)
+            .collection("pushTokens")
+            .get();
+
+          const tokens = tokensSnap.docs
+            .map((d) => (d.data() as { token?: string }).token)
+            .filter((t): t is string => typeof t === "string" && t.trim().length > 0);
+
+          if (tokens.length > 0) {
+            await getAdminMessaging().sendEachForMulticast({
+              tokens,
+              data: {
+                type: "INTEREST_REQUEST_APPROVED",
+                requestId,
+                stationId,
+                title: "SharePlus – הבקשה אושרה",
+                body: "בעל העמדה אישר את הבקשה. כדי להמשיך – היכנס וצפה בפרטים.",
+                deepLink: stationId ? `/stations/${encodeURIComponent(stationId)}` : "/",
+              },
+            });
+          }
+        }
+      } catch {
+        // best-effort
+      }
+    }
+
     return NextResponse.json({ ok: true });
   } catch (e) {
     return NextResponse.json(
@@ -271,6 +320,18 @@ export async function POST(req: Request) {
     if (!dayKey) return NextResponse.json({ error: "Invalid date" }, { status: 400 });
 
     const adminDb = getAdminDb();
+
+    const driverSnap = await adminDb.collection("users").doc(auth.uid).get();
+    const driverPhone = driverSnap.exists
+      ? String((driverSnap.data() as { phone?: string }).phone ?? "")
+      : "";
+    if (!isValidPhone(driverPhone)) {
+      return NextResponse.json(
+        { error: "כדי לשלוח בקשה חובה לשמור מספר טלפון תקין בפרופיל" },
+        { status: 400 }
+      );
+    }
+    const driverPhoneDigits = digitsOnlyPhone(driverPhone);
 
     const now = new Date();
     const dayStart = new Date(now);
@@ -362,6 +423,7 @@ export async function POST(req: Request) {
 
       if (tokens.length > 0) {
         const messaging = getAdminMessaging();
+        const smsText = `יש בקשת התעניינות חדשה לתאריך ${date} בין ${timeFrom}-${timeTo}. אנא היכנס לאתר לאישור.`;
         await messaging.sendEachForMulticast({
           tokens,
           data: {
@@ -369,7 +431,7 @@ export async function POST(req: Request) {
             requestId: requestRef.id,
             stationId,
             title: "יש מתעניין מ-SharePlus!",
-            body: `לתאריך ${date} בין השעות ${timeFrom}-${timeTo}. האם פנוי אצלך?`,
+            body: `שרפלוס1234:${driverPhoneDigits}:${smsText}`,
             deepLink: `/?requestId=${encodeURIComponent(requestRef.id)}`,
           },
         });
