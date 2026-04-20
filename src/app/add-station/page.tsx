@@ -665,7 +665,7 @@ export default function AddStationPage() {
                   <div className="mt-1 text-xs text-zinc-500">* רוב העמדות הביתיות בישראל הן Type 2.</div>
                 </div>
                 <Image
-                  src="https://upload.wikimedia.org/wikipedia/commons/thumb/a/a2/Type_2_connector_IEC_62196_Mennekes.jpg/300px-Type_2_connector_IEC_62196_Mennekes.jpg"
+                  src="/type2-common.jpg"
                   alt="Type 2 Charger"
                   width={100}
                   height={80}

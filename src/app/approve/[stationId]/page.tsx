@@ -1,25 +1,79 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { onAuthStateChanged, type User } from "firebase/auth";
+
+import { getIdToken } from "firebase/auth";
+
+import { getClientAuth } from "@/lib/firebaseClient";
 
 export default function ApproveStationPage() {
   const params = useParams<{ stationId: string }>();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const stationId = useMemo(() => String(params?.stationId ?? "").trim(), [params]);
+  const requestId = useMemo(() => String(searchParams?.get("requestId") ?? "").trim(), [searchParams]);
+
+  const [user, setUser] = useState<User | null>(null);
+  const [authReady, setAuthReady] = useState(false);
 
   const [step, setStep] = useState<"initial" | "payment">("initial");
   const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const auth = getClientAuth();
+    return onAuthStateChanged(auth, (u) => {
+      setUser(u);
+      setAuthReady(true);
+    });
+  }, []);
 
   function showPaymentOption() {
     setError(null);
     setStep("payment");
   }
 
-  function rejectRequest() {
-    setError(null);
-    alert("הודעה נשלחה ללקוח שהעמדה לא פנויה.");
+  async function patchStatus(nextStatus: "approved" | "rejected") {
+    try {
+      setError(null);
+      if (!requestId) {
+        setError("חסר requestId בקישור");
+        return;
+      }
+      if (!user) {
+        setError("נדרשת התחברות כדי לאשר/לדחות בקשה");
+        return;
+      }
+
+      setSaving(true);
+      const token = await getIdToken(user);
+      const res = await fetch("/api/interest-requests", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ requestId, status: nextStatus }),
+      });
+
+      const json = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+      if (!res.ok) {
+        throw new Error(json.error ?? "שגיאה בעדכון הבקשה");
+      }
+
+      if (nextStatus === "approved") {
+        alert("האישור נשלח ללקוח.");
+      } else {
+        alert("הודעה נשלחה ללקוח שהעמדה לא פנויה.");
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "שגיאה לא צפויה");
+    } finally {
+      setSaving(false);
+    }
   }
 
   function redirectToCoupon() {
@@ -47,6 +101,12 @@ export default function ApproveStationPage() {
           <div className="text-lg font-semibold text-zinc-800">בקשת טעינה חדשה</div>
           <div className="mt-2 text-sm text-zinc-700">האם העמדה פנויה כרגע?</div>
 
+          {authReady && !user ? (
+            <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+              כדי לאשר/לדחות בקשה צריך להתחבר לחשבון של בעל העמדה.
+            </div>
+          ) : null}
+
           {error ? (
             <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
               {error}
@@ -58,15 +118,15 @@ export default function ApproveStationPage() {
               type="button"
               className="rounded-xl bg-green-600 px-6 py-2 text-sm font-semibold text-white hover:bg-green-700"
               onClick={showPaymentOption}
-              disabled={!stationId}
+              disabled={!stationId || !requestId || saving}
             >
               אישור (פנוי)
             </button>
             <button
               type="button"
               className="rounded-xl bg-red-600 px-6 py-2 text-sm font-semibold text-white hover:bg-red-700"
-              onClick={rejectRequest}
-              disabled={!stationId}
+              onClick={() => void patchStatus("rejected")}
+              disabled={!stationId || !requestId || saving}
             >
               לא פנוי
             </button>
@@ -82,13 +142,17 @@ export default function ApproveStationPage() {
                   type="button"
                   className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
                   onClick={redirectToCoupon}
+                  disabled={saving}
                 >
                   כן
                 </button>
                 <button
                   type="button"
                   className="rounded-lg bg-zinc-500 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-600"
-                  onClick={finishProcess}
+                  onClick={() => {
+                    void patchStatus("approved").then(() => finishProcess());
+                  }}
+                  disabled={saving}
                 >
                   לא
                 </button>
@@ -96,8 +160,8 @@ export default function ApproveStationPage() {
             </div>
           ) : null}
 
-          {!stationId ? (
-            <div className="mt-4 text-sm text-red-700">חסר מזהה עמדה בקישור</div>
+          {!stationId || !requestId ? (
+            <div className="mt-4 text-sm text-red-700">חסר מזהה עמדה או requestId בקישור</div>
           ) : (
             <div className="mt-4 text-xs text-zinc-500">מזהה עמדה: {stationId}</div>
           )}
