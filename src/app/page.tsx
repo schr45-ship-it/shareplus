@@ -928,7 +928,7 @@ export default function Home() {
                   value={filterCity}
                   onChange={(e) => setFilterCity(e.target.value)}
                   list="cities"
-                  placeholder="הקלד יישוב..."
+                  placeholder="לדוגמה: דולב"
                 />
                 <datalist id="cities">
                   {citySuggestions.map((c) => (
