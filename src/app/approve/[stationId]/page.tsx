@@ -18,9 +18,13 @@ export default function ApproveStationPage() {
   const [user, setUser] = useState<User | null>(null);
   const [authReady, setAuthReady] = useState(false);
 
-  const [step, setStep] = useState<"initial" | "payment">("initial");
+  const [step, setStep] = useState<"initial" | "coupon">("initial");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  const [coupon, setCoupon] = useState("");
+  const [driverPhone, setDriverPhone] = useState<string | null>(null);
+  const [whatsappDigits, setWhatsappDigits] = useState<string | null>(null);
 
   useEffect(() => {
     const auth = getClientAuth();
@@ -30,21 +34,16 @@ export default function ApproveStationPage() {
     });
   }, []);
 
-  function showPaymentOption() {
-    setError(null);
-    setStep("payment");
-  }
-
   async function patchStatus(nextStatus: "approved" | "rejected", opts?: { ownerPaidFee?: boolean }) {
     try {
       setError(null);
       if (!requestId) {
         setError("חסר requestId בקישור");
-        return;
+        return false;
       }
       if (!user) {
         setError("נדרשת התחברות כדי לאשר/לדחות בקשה");
-        return;
+        return false;
       }
 
       setSaving(true);
@@ -63,59 +62,53 @@ export default function ApproveStationPage() {
         throw new Error(json.error ?? "שגיאה בעדכון הבקשה");
       }
 
-      if (nextStatus === "approved") {
-        alert("האישור נשלח ללקוח.");
-      } else {
-        alert("הודעה נשלחה ללקוח שהעמדה לא פנויה.");
-      }
+      return true;
     } catch (e) {
       setError(e instanceof Error ? e.message : "שגיאה לא צפויה");
+      return false;
     } finally {
       setSaving(false);
     }
   }
 
-  async function redirectToCheckout() {
+  async function revealDriverPhone() {
     try {
       setError(null);
-      if (!stationId || !requestId) {
-        setError("חסר מזהה עמדה או requestId בקישור");
+      if (!requestId) {
+        setError("חסר requestId בקישור");
         return;
       }
       if (!user) {
-        setError("נדרשת התחברות כדי לבצע תשלום");
+        setError("נדרשת התחברות כדי לצפות בפרטי הלקוח");
         return;
       }
 
       setSaving(true);
-
-      await patchStatus("approved", { ownerPaidFee: true });
-
       const token = await getIdToken(user);
-      const res = await fetch("/api/checkout", {
+      const res = await fetch("/api/interest-requests/reveal-driver-phone", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ stationId }),
+        body: JSON.stringify({ requestId, coupon }),
       });
 
-      const json = (await res.json().catch(() => ({}))) as { url?: string; error?: string };
-      if (!res.ok) throw new Error(json.error ?? "שגיאה ביצירת תשלום");
-      if (!json.url) throw new Error("לא התקבל קישור לתשלום");
+      const json = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+        phone?: string;
+        whatsappDigits?: string;
+      };
 
-      window.location.href = json.url;
+      if (!res.ok) throw new Error(json.error ?? "שגיאה בחשיפת פרטי הלקוח");
+      setDriverPhone(String(json.phone ?? ""));
+      setWhatsappDigits(String(json.whatsappDigits ?? ""));
     } catch (e) {
       setError(e instanceof Error ? e.message : "שגיאה לא צפויה");
     } finally {
       setSaving(false);
     }
-  }
-
-  function finishProcess() {
-    setError(null);
-    alert("האישור נשלח ללקוח. הלקוח ישלם את העמלה.");
   }
 
   return (
@@ -148,7 +141,13 @@ export default function ApproveStationPage() {
             <button
               type="button"
               className="rounded-xl bg-green-600 px-6 py-2 text-sm font-semibold text-white hover:bg-green-700"
-              onClick={showPaymentOption}
+              onClick={() => {
+                setDriverPhone(null);
+                setWhatsappDigits(null);
+                void patchStatus("approved").then((ok) => {
+                  if (ok) setStep("coupon");
+                });
+              }}
               disabled={!stationId || !requestId || saving}
             >
               אישור
@@ -163,33 +162,45 @@ export default function ApproveStationPage() {
             </button>
           </div>
 
-          {step === "payment" ? (
+          {step === "coupon" ? (
             <div className="mt-5 border-t border-zinc-200 pt-4">
               <div className="text-sm text-zinc-700">
-                באפשרותך לשלם את העמלה במקום הלקוח (1 ש"ח). תרצה לעשות זאת?
+                כדי לקבל את טלפון הלקוח, הזן קופון: <span className="font-semibold">עם ישראל</span>
               </div>
-              <div className="mt-4 flex justify-center gap-3">
+
+              <div className="mt-4">
+                <input
+                  value={coupon}
+                  onChange={(e) => setCoupon(e.target.value)}
+                  className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-right text-sm"
+                  placeholder="הכנס קופון"
+                  disabled={saving}
+                />
                 <button
                   type="button"
-                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
-                  onClick={() => void redirectToCheckout()}
-                  disabled={saving}
+                  className="mt-3 w-full rounded-xl bg-black px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800 disabled:opacity-50"
+                  onClick={() => void revealDriverPhone()}
+                  disabled={saving || !coupon.trim()}
                 >
-                  כן
-                </button>
-                <button
-                  type="button"
-                  className="rounded-lg bg-zinc-500 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-600"
-                  onClick={() => {
-                    void patchStatus("approved").then(() => finishProcess());
-                  }}
-                  disabled={saving}
-                >
-                  לא
+                  קבל טלפון
                 </button>
               </div>
 
-              <div className="mt-3 text-xs text-zinc-500">קופון שיוזן כרגע: עם ישראל</div>
+              {driverPhone ? (
+                <div className="mt-4 rounded-xl border border-green-100 bg-green-50 p-3 text-right text-sm text-zinc-800">
+                  <div className="font-medium">מספר הטלפון של הלקוח הוא: {driverPhone}</div>
+                  {whatsappDigits ? (
+                    <a
+                      className="mt-2 inline-block font-semibold text-zinc-900 underline"
+                      href={`https://wa.me/${whatsappDigits.replace(/[^0-9]/g, "")}`}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      לחץ כאן לשלוח WhatsApp
+                    </a>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
           ) : null}
 
