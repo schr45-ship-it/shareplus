@@ -35,7 +35,8 @@ export async function POST(req: Request) {
     }
 
     const adminDb = getAdminDb();
-    const reqSnap = await adminDb.collection("interestRequests").doc(requestId).get();
+    const reqRef = adminDb.collection("interestRequests").doc(requestId);
+    const reqSnap = await reqRef.get();
     if (!reqSnap.exists) {
       return NextResponse.json({ error: "Request not found" }, { status: 404 });
     }
@@ -68,6 +69,18 @@ export async function POST(req: Request) {
 
     const e164 = normalizePhoneE164(driverPhoneRaw);
     const whatsappDigits = digitsOnlyPhone(e164);
+
+    try {
+      await reqRef.set(
+        {
+          ownerCouponUsed: coupon,
+          ownerCouponRevealedAt: new Date(),
+        },
+        { merge: true }
+      );
+    } catch {
+      // best-effort
+    }
 
     return NextResponse.json({
       ok: true,
