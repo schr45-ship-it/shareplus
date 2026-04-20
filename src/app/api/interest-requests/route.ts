@@ -317,6 +317,18 @@ export async function POST(req: Request) {
     const auth = await requireUser(req);
     if ("error" in auth) return auth.error;
 
+    let bypassDailyLimit = false;
+    try {
+      const adminAuth = getAdminAuth();
+      const u = await adminAuth.getUser(auth.uid);
+      const email = String(u.email ?? "")
+        .trim()
+        .toLowerCase();
+      bypassDailyLimit = email === "mulhahar1@gmail.com";
+    } catch {
+      bypassDailyLimit = false;
+    }
+
     const body = (await req.json().catch(() => null)) as null | {
       stationId?: string;
       date?: string;
@@ -379,7 +391,7 @@ export async function POST(req: Request) {
     const couponBonus = coupon === "שרפלוס" ? 3 : 0;
     const dailyLimit = baseDailyLimit + couponBonus;
 
-    if (todayNonRejectedCount >= dailyLimit) {
+    if (!bypassDailyLimit && todayNonRejectedCount >= dailyLimit) {
       return NextResponse.json(
         {
           error:
