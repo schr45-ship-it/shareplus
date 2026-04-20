@@ -451,13 +451,16 @@ export async function POST(req: Request) {
     const ownerData = ownerSnap.exists
       ? (ownerSnap.data() as {
           notificationPreferences?: { pushEnabled?: boolean; emailEnabled?: boolean };
+          phone?: string;
         })
       : null;
     const emailEnabled = ownerData?.notificationPreferences?.emailEnabled ?? false;
 
     let emailSendError: string | null = null;
 
-    const ownerPhoneRaw = String(st.hostPhone ?? "").trim();
+    const ownerPhoneFromUser = String(ownerData?.phone ?? "").trim();
+    const ownerPhoneFromStation = String(st.hostPhone ?? "").trim();
+    const ownerPhoneRaw = ownerPhoneFromUser || ownerPhoneFromStation;
     if (ownerPhoneRaw) {
       const ownerPhoneForMacro = digitsOnlyPhone(ownerPhoneRaw);
       if (ownerPhoneForMacro) {
@@ -468,7 +471,7 @@ export async function POST(req: Request) {
           requestRef.id
         )}`;
         const stationLabel = `${st.title ?? "עמדה"}${st.city ? ` (${st.city})` : ""}`;
-        const message = `${approveUrl} מישהו רוצה להטעין אצלך בעמדה: ${stationLabel}. בקשה לתאריך ${date} שעה ${timeFrom}-${timeTo}. לעדכון זמינות ואישור/אי אישור לחץ על הקישור הבא: ${approveUrl}`;
+        const message = `מישהו רוצה להטעין אצלך בעמדה: ${stationLabel}. בקשה לתאריך ${date} שעה ${timeFrom}-${timeTo}. לעדכון זמינות ואישור/אי אישור לחץ על הקישור הבא: ${approveUrl}`;
 
         const macroBase =
           "https://trigger.macrodroid.com/ce572bd5-5c2b-45c0-9dcd-2b33e5c33aba/send_sms";
