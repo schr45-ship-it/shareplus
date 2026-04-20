@@ -434,7 +434,8 @@ export async function POST(req: Request) {
         const approveUrl = `https://shareplus.co.il/approve/${encodeURIComponent(
           stationId
         )}?requestId=${encodeURIComponent(requestRef.id)}`;
-        const message = `${approveUrl} מישהו רוצה להטעין אצלך לפרטים ואישור`;
+        const stationLabel = `${st.title ?? "עמדה"}${st.city ? ` (${st.city})` : ""}`;
+        const message = `${approveUrl} מישהו רוצה להטעין אצלך בעמדה: ${stationLabel}. בקשה לתאריך ${date} שעה ${timeFrom}-${timeTo}. לעדכון זמינות ואישור/אי אישור לחץ על הקישור הבא: ${approveUrl}`;
 
         const macroBase =
           "https://trigger.macrodroid.com/ce572bd5-5c2b-45c0-9dcd-2b33e5c33aba/send_sms";

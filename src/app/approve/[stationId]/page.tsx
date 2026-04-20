@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { onAuthStateChanged, type User } from "firebase/auth";
 
 import { getIdToken } from "firebase/auth";
@@ -10,7 +10,6 @@ import { getClientAuth } from "@/lib/firebaseClient";
 
 export default function ApproveStationPage() {
   const params = useParams<{ stationId: string }>();
-  const router = useRouter();
   const searchParams = useSearchParams();
 
   const stationId = useMemo(() => String(params?.stationId ?? "").trim(), [params]);
@@ -76,10 +75,42 @@ export default function ApproveStationPage() {
     }
   }
 
-  function redirectToCoupon() {
-    setError(null);
-    alert("מעבירים אותך לתשלום עם קופון: עם ישראל חי");
-    router.push(`/payment?coupon=am_israel_chai&stationId=${encodeURIComponent(stationId)}`);
+  async function redirectToCheckout() {
+    try {
+      setError(null);
+      if (!stationId || !requestId) {
+        setError("חסר מזהה עמדה או requestId בקישור");
+        return;
+      }
+      if (!user) {
+        setError("נדרשת התחברות כדי לבצע תשלום");
+        return;
+      }
+
+      setSaving(true);
+
+      await patchStatus("approved");
+
+      const token = await getIdToken(user);
+      const res = await fetch("/api/checkout", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ stationId }),
+      });
+
+      const json = (await res.json().catch(() => ({}))) as { url?: string; error?: string };
+      if (!res.ok) throw new Error(json.error ?? "שגיאה ביצירת תשלום");
+      if (!json.url) throw new Error("לא התקבל קישור לתשלום");
+
+      window.location.href = json.url;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "שגיאה לא צפויה");
+    } finally {
+      setSaving(false);
+    }
   }
 
   function finishProcess() {
@@ -97,9 +128,9 @@ export default function ApproveStationPage() {
           </a>
         </div>
 
-        <div className="mx-auto mt-8 w-full max-w-md rounded-2xl border-2 border-blue-500 bg-white p-5 text-center shadow-sm">
+        <div className="mx-auto mt-8 w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-5 text-center shadow-sm">
           <div className="text-lg font-semibold text-zinc-800">בקשת טעינה חדשה</div>
-          <div className="mt-2 text-sm text-zinc-700">האם העמדה פנויה כרגע?</div>
+          <div className="mt-2 text-sm text-zinc-700">האם העמדה פנויה?</div>
 
           {authReady && !user ? (
             <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
@@ -120,7 +151,7 @@ export default function ApproveStationPage() {
               onClick={showPaymentOption}
               disabled={!stationId || !requestId || saving}
             >
-              אישור (פנוי)
+              אישור
             </button>
             <button
               type="button"
@@ -141,7 +172,7 @@ export default function ApproveStationPage() {
                 <button
                   type="button"
                   className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
-                  onClick={redirectToCoupon}
+                  onClick={() => void redirectToCheckout()}
                   disabled={saving}
                 >
                   כן
@@ -157,6 +188,8 @@ export default function ApproveStationPage() {
                   לא
                 </button>
               </div>
+
+              <div className="mt-3 text-xs text-zinc-500">קופון שיוזן כרגע: עם ישראל</div>
             </div>
           ) : null}
 

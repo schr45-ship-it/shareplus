@@ -281,14 +281,16 @@ export default function ReportsPage() {
                     >
                       דחה
                     </button>
-                    <button
-                      type="button"
-                      disabled={savingId === item.id}
-                      className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-50 disabled:opacity-50"
-                      onClick={() => startCloseEditor(item)}
-                    >
-                      סגור + סכום
-                    </button>
+                    {item.status === "approved" ? (
+                      <button
+                        type="button"
+                        disabled={savingId === item.id}
+                        className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-50 disabled:opacity-50"
+                        onClick={() => startCloseEditor(item)}
+                      >
+                        סגור + סכום
+                      </button>
+                    ) : null}
                   </div>
                 ) : null}
 
