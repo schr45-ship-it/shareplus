@@ -282,22 +282,29 @@ export default function ReportsPage() {
 
                 {canManage ? (
                   <div className="mt-4 flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      disabled={savingId === item.id}
-                      className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-50 disabled:opacity-50"
-                      onClick={() => updateStatus(item.id, "approved")}
-                    >
-                      אשר
-                    </button>
-                    <button
-                      type="button"
-                      disabled={savingId === item.id}
-                      className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-50 disabled:opacity-50"
-                      onClick={() => updateStatus(item.id, "rejected")}
-                    >
-                      דחה
-                    </button>
+                    {item.status === "pending" ? (
+                      <>
+                        <button
+                          type="button"
+                          disabled={savingId === item.id}
+                          className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-50 disabled:opacity-50"
+                          onClick={() => {
+                            const url = `/approve/${encodeURIComponent(item.stationId)}?requestId=${encodeURIComponent(item.id)}`;
+                            window.location.href = url;
+                          }}
+                        >
+                          אשר
+                        </button>
+                        <button
+                          type="button"
+                          disabled={savingId === item.id}
+                          className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-50 disabled:opacity-50"
+                          onClick={() => updateStatus(item.id, "rejected")}
+                        >
+                          דחה
+                        </button>
+                      </>
+                    ) : null}
                     {item.status === "approved" ? (
                       <button
                         type="button"
