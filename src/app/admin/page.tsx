@@ -14,6 +14,7 @@ type Stats = {
   closedRequests: number;
   completedProcess: number;
   couponReveals: number;
+  paidLeads?: number;
   paid: number;
 };
 
@@ -41,7 +42,8 @@ export default function AdminPage() {
       { label: "בקשות שנסגרו", value: stats.closedRequests },
       { label: "עברו את כל התהליך", value: stats.completedProcess },
       { label: "נחשפו עם קופון", value: stats.couponReveals },
-      { label: "שילמו (לידים)", value: stats.paid },
+      { label: "שילמו (לידים)", value: stats.paidLeads ?? 0 },
+      { label: "שילמו (סה\"כ)", value: stats.paid },
     ];
   }, [stats]);
 

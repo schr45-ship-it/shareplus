@@ -43,6 +43,9 @@ export async function GET(req: Request) {
 
     const paidCountSnap = await adminDb.collection("revealLeads").count().get();
 
+    const couponReveals = couponRevealCountSnap.data().count;
+    const paidLeads = paidCountSnap.data().count;
+
     return NextResponse.json({
       ok: true,
       users: usersCountSnap.data().count,
@@ -50,8 +53,9 @@ export async function GET(req: Request) {
       approvedRequests: approvedCountSnap.data().count,
       closedRequests: closedCountSnap.data().count,
       completedProcess: closedCountSnap.data().count,
-      couponReveals: couponRevealCountSnap.data().count,
-      paid: paidCountSnap.data().count,
+      couponReveals,
+      paidLeads,
+      paid: couponReveals + paidLeads,
     });
   } catch (e) {
     return NextResponse.json(
