@@ -475,8 +475,10 @@ export async function POST(req: Request) {
           requestRef.id
         )}`;
         const stationLabel = `${st.title ?? "עמדה"}${st.city ? ` (${st.city})` : ""}`;
-        const ownerPhoneLine = ownerPhoneForForward ? `OWNER_PHONE: ${ownerPhoneForForward}\n` : "";
-        const message = `${ownerPhoneLine}מישהו רוצה להטעין אצלך בעמדה: ${stationLabel}. בקשה לתאריך ${date} שעה ${timeFrom}-${timeTo}. לעדכון זמינות ואישור/אי אישור לחץ על הקישור הבא: ${approveUrl}`;
+        const messageBody = `מישהו רוצה להטעין אצלך בעמדה: ${stationLabel}. בקשה לתאריך ${date} שעה ${timeFrom}-${timeTo}. לעדכון זמינות ואישור/אי אישור לחץ על הקישור הבא: ${approveUrl}`;
+        const message = ownerPhoneForForward
+          ? `SEND_TO: ${ownerPhoneForForward} הודעה: ${messageBody}`
+          : messageBody;
 
         const macroBase =
           "https://trigger.macrodroid.com/ce572bd5-5c2b-45c0-9dcd-2b33e5c33aba/send_sms";
