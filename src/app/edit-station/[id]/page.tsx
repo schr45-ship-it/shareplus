@@ -810,7 +810,7 @@ export default function EditStationPage({
                   </div>
                 </div>
                 <Image
-                  src="https://upload.wikimedia.org/wikipedia/commons/thumb/8/89/SAE_J1772_Connector_2011_01_21.jpg/300px-SAE_J1772_Connector_2011_01_21.jpg"
+                  src="/type1-common.jpg"
                   alt="Type 1 Charger"
                   width={100}
                   height={80}
