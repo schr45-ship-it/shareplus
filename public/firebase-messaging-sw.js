@@ -14,7 +14,11 @@ self.addEventListener("push", (event) => {
   const deepLink = payload?.data?.deepLink ?? (requestId ? `/?requestId=${encodeURIComponent(requestId)}` : "/");
   const actionType = payload?.data?.type ?? "";
 
-  if (actionType === "INTEREST_REQUEST_APPROVED" || actionType === "INTEREST_REQUEST_REJECTED") {
+  if (
+    actionType === "INTEREST_REQUEST_APPROVED" ||
+    actionType === "INTEREST_REQUEST_REJECTED" ||
+    actionType === "INTEREST_REQUEST_CREATED"
+  ) {
     event.waitUntil(
       (async () => {
         const allClients = await clients.matchAll({ type: "window", includeUncontrolled: true });

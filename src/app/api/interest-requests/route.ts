@@ -455,6 +455,7 @@ export async function POST(req: Request) {
         })
       : null;
     const emailEnabled = ownerData?.notificationPreferences?.emailEnabled ?? false;
+    const pushEnabled = ownerData?.notificationPreferences?.pushEnabled ?? true;
 
     let emailSendError: string | null = null;
 

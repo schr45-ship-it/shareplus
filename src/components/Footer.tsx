@@ -26,7 +26,12 @@ export default function Footer() {
       unsub = onMessage(messaging, (payload) => {
         const data = (payload as unknown as { data?: Record<string, string> }).data ?? {};
         const type = String(data.type ?? "").trim();
-        if (type !== "INTEREST_REQUEST_APPROVED" && type !== "INTEREST_REQUEST_REJECTED") return;
+        if (
+          type !== "INTEREST_REQUEST_APPROVED" &&
+          type !== "INTEREST_REQUEST_REJECTED" &&
+          type !== "INTEREST_REQUEST_CREATED"
+        )
+          return;
 
         try {
           localStorage.setItem("shareplus:newMessage", "1");
@@ -35,8 +40,8 @@ export default function Footer() {
           // ignore
         }
 
-        setResponseTitle(data.title ? String(data.title) : "עדכון בבקשה");
-        setResponseBody(data.body ? String(data.body) : "יש עדכון חדש בבקשה שלך.");
+        setResponseTitle(data.title ? String(data.title) : "עדכון");
+        setResponseBody(data.body ? String(data.body) : "יש עדכון חדש.");
         setResponseOpen(true);
       });
     }
