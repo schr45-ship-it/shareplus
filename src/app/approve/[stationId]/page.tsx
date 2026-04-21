@@ -22,6 +22,9 @@ export default function ApproveStationPage() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
+  const [showPostApprovePrompt, setShowPostApprovePrompt] = useState(false);
+  const [postApproveInfo, setPostApproveInfo] = useState<string | null>(null);
+
   const [coupon, setCoupon] = useState("");
   const [driverPhone, setDriverPhone] = useState<string | null>(null);
   const [whatsappDigits, setWhatsappDigits] = useState<string | null>(null);
@@ -131,9 +134,56 @@ export default function ApproveStationPage() {
             </div>
           ) : null}
 
+          {showPostApprovePrompt ? (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+              <div className="w-full max-w-md rounded-2xl bg-white p-5 text-right shadow-xl">
+                <div className="text-base font-semibold text-zinc-900">ההודעה נשלחה בהצלחה ללקוח.</div>
+                <div className="mt-2 text-sm text-zinc-700">
+                  באפשרותך לשלם את העמלת שירות בסך 1 ש"ח במקום הלקוח ובכך להגדיל את הסיכוי לעסקה
+                </div>
+
+                <div className="mt-5 flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    className="rounded-xl border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-900 hover:bg-zinc-50 disabled:opacity-50"
+                    disabled={saving}
+                    onClick={() => {
+                      setShowPostApprovePrompt(false);
+                      setPostApproveInfo(
+                        "בשלב הבא הלקוח יצור איתך קשר במקרה שהעסקה עדיין רלוונטית."
+                      );
+                    }}
+                  >
+                    לא תודה
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded-xl bg-black px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800 disabled:opacity-50"
+                    disabled={saving}
+                    onClick={() => {
+                      void patchStatus("approved", { ownerPaidFee: true }).then((ok) => {
+                        if (!ok) return;
+                        setShowPostApprovePrompt(false);
+                        setStep("coupon");
+                      });
+                    }}
+                  >
+                    מאשר
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
           {error ? (
             <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
               {error}
+            </div>
+          ) : null}
+
+          {postApproveInfo ? (
+            <div className="mt-4 rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-800">
+              {postApproveInfo}
             </div>
           ) : null}
 
@@ -144,8 +194,9 @@ export default function ApproveStationPage() {
               onClick={() => {
                 setDriverPhone(null);
                 setWhatsappDigits(null);
+                setPostApproveInfo(null);
                 void patchStatus("approved").then((ok) => {
-                  if (ok) setStep("coupon");
+                  if (ok) setShowPostApprovePrompt(true);
                 });
               }}
               disabled={!stationId || !requestId || saving}
