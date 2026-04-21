@@ -40,11 +40,24 @@ export default function AdminPage() {
   const [view, setView] = useState<"stats" | "users">("stats");
   const [usersLoading, setUsersLoading] = useState(false);
   const [usersError, setUsersError] = useState<string | null>(null);
-  const [users, setUsers] = useState<AdminUserListItem[]>([]);
+  const [usersQuery, setUsersQuery] = useState<string>("");
+  const [allUsers, setAllUsers] = useState<AdminUserListItem[]>([]);
   const [selectedUid, setSelectedUid] = useState<string>("");
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [detailsError, setDetailsError] = useState<string | null>(null);
   const [details, setDetails] = useState<AdminUserDetails | null>(null);
+
+  const filteredUsers = useMemo(() => {
+    const q = usersQuery.trim().toLowerCase();
+    if (!q) return allUsers;
+    return allUsers.filter((u) => {
+      return (
+        u.uid.toLowerCase().includes(q) ||
+        u.email.toLowerCase().includes(q) ||
+        u.phone.toLowerCase().includes(q)
+      );
+    });
+  }, [allUsers, usersQuery]);
 
   useEffect(() => {
     const auth = getClientAuth();
@@ -87,7 +100,7 @@ export default function AdminPage() {
         error?: string;
       };
       if (!res.ok) throw new Error(json.error ?? "שגיאה בטעינת משתמשים");
-      setUsers(Array.isArray(json.users) ? json.users : []);
+      setAllUsers(Array.isArray(json.users) ? json.users : []);
     } catch (e) {
       setUsersError(e instanceof Error ? e.message : "שגיאה לא צפויה");
     } finally {
@@ -260,21 +273,9 @@ export default function AdminPage() {
                   <input
                     className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm"
                     placeholder="חיפוש לפי מייל / טלפון / UID"
+                    value={usersQuery}
                     onChange={(e) => {
-                      const q = e.target.value.trim().toLowerCase();
-                      if (!q) {
-                        void loadUsers();
-                        return;
-                      }
-                      setUsers((prev) =>
-                        prev.filter((u) => {
-                          return (
-                            u.uid.toLowerCase().includes(q) ||
-                            u.email.toLowerCase().includes(q) ||
-                            u.phone.toLowerCase().includes(q)
-                          );
-                        })
-                      );
+                      setUsersQuery(e.target.value);
                     }}
                   />
                 </div>
@@ -282,11 +283,11 @@ export default function AdminPage() {
                 <div className="mt-3 max-h-[520px] overflow-auto rounded-xl border border-zinc-100">
                   {usersLoading ? (
                     <div className="p-3 text-sm text-zinc-600">טוען...</div>
-                  ) : users.length === 0 ? (
+                  ) : filteredUsers.length === 0 ? (
                     <div className="p-3 text-sm text-zinc-600">אין משתמשים להצגה</div>
                   ) : (
                     <div className="divide-y divide-zinc-100">
-                      {users.map((u) => (
+                      {filteredUsers.map((u) => (
                         <button
                           key={u.uid}
                           type="button"
