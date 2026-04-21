@@ -20,44 +20,27 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    let snap;
-    try {
-      snap = await adminDb
-        .collection("users")
-        .orderBy("createdAt", "desc")
-        .limit(200)
-        .get();
-    } catch {
-      snap = await adminDb.collection("users").limit(200).get();
-    }
+    const list = await adminAuth.listUsers(200);
+    const authUsers = list.users.map((u) => ({
+      uid: u.uid,
+      email: (u.email ?? "").trim(),
+    }));
 
-    const users = snap.docs.map((d) => {
-      const data = d.data() as {
-        phone?: string;
-        createdAt?: unknown;
-      };
-      return {
-        uid: d.id,
-        phone: typeof data.phone === "string" ? data.phone : "",
-        createdAt: data.createdAt ?? null,
-      };
-    });
+    const refs = authUsers.map((u) => adminDb.collection("users").doc(u.uid));
+    const snaps = refs.length > 0 ? await adminDb.getAll(...refs) : [];
+    const phoneByUid = new Map(
+      snaps
+        .filter((s) => s.exists)
+        .map((s) => {
+          const data = s.data() as { phone?: string };
+          return [s.id, typeof data.phone === "string" ? data.phone : ""] as const;
+        })
+    );
 
-    let authUsers: Array<{ uid: string; email: string }>; 
-    try {
-      const list = await adminAuth.listUsers(200);
-      authUsers = list.users
-        .map((u) => ({ uid: u.uid, email: (u.email ?? "").trim() }))
-        .filter((u) => u.email);
-    } catch {
-      authUsers = [];
-    }
-
-    const emailByUid = new Map(authUsers.map((u) => [u.uid, u.email]));
-
-    const result = users.map((u) => ({
-      ...u,
-      email: emailByUid.get(u.uid) ?? "",
+    const result = authUsers.map((u) => ({
+      uid: u.uid,
+      email: u.email,
+      phone: phoneByUid.get(u.uid) ?? "",
     }));
 
     return NextResponse.json({ ok: true, users: result });

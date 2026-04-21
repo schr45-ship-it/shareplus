@@ -284,7 +284,11 @@ export default function AdminPage() {
                   {usersLoading ? (
                     <div className="p-3 text-sm text-zinc-600">טוען...</div>
                   ) : filteredUsers.length === 0 ? (
-                    <div className="p-3 text-sm text-zinc-600">אין משתמשים להצגה</div>
+                    <div className="p-3 text-sm text-zinc-600">
+                      {usersQuery.trim()
+                        ? "אין תוצאות לחיפוש"
+                        : "אין משתמשים להצגה (אם זה לא הגיוני, לחץ רענן)"}
+                    </div>
                   ) : (
                     <div className="divide-y divide-zinc-100">
                       {filteredUsers.map((u) => (
