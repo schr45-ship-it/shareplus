@@ -38,6 +38,8 @@ export default function ApproveStationPage() {
   const [driverPhone, setDriverPhone] = useState<string | null>(null);
   const [whatsappDigits, setWhatsappDigits] = useState<string | null>(null);
 
+  const [decision, setDecision] = useState<null | "approved" | "rejected">(null);
+
   useEffect(() => {
     const auth = getClientAuth();
     return onAuthStateChanged(auth, (u) => {
@@ -262,31 +264,43 @@ export default function ApproveStationPage() {
             </div>
           ) : null}
 
-          <div className="mt-5 flex items-center justify-around gap-3">
-            <button
-              type="button"
-              className="rounded-xl bg-green-600 px-6 py-2 text-sm font-semibold text-white hover:bg-green-700"
-              onClick={() => {
-                setDriverPhone(null);
-                setWhatsappDigits(null);
-                setPostApproveInfo(null);
-                void patchStatus("approved").then((ok) => {
-                  if (ok) setShowPostApprovePrompt(true);
-                });
-              }}
-              disabled={!stationId || !requestId || saving}
-            >
-              אישור
-            </button>
-            <button
-              type="button"
-              className="rounded-xl bg-red-600 px-6 py-2 text-sm font-semibold text-white hover:bg-red-700"
-              onClick={() => void patchStatus("rejected")}
-              disabled={!stationId || !requestId || saving}
-            >
-              לא פנוי
-            </button>
-          </div>
+          {decision ? (
+            <div className="mt-5 rounded-xl border border-zinc-200 bg-white p-3 text-sm text-zinc-800">
+              {decision === "approved" ? "אישרת את הבקשה." : "דחית את הבקשה."}
+            </div>
+          ) : (
+            <div className="mt-5 flex items-center justify-around gap-3">
+              <button
+                type="button"
+                className="rounded-xl bg-green-600 px-6 py-2 text-sm font-semibold text-white hover:bg-green-700"
+                onClick={() => {
+                  setDriverPhone(null);
+                  setWhatsappDigits(null);
+                  setPostApproveInfo(null);
+                  void patchStatus("approved").then((ok) => {
+                    if (!ok) return;
+                    setDecision("approved");
+                    setShowPostApprovePrompt(true);
+                  });
+                }}
+                disabled={!stationId || !requestId || saving}
+              >
+                אישור
+              </button>
+              <button
+                type="button"
+                className="rounded-xl bg-red-600 px-6 py-2 text-sm font-semibold text-white hover:bg-red-700"
+                onClick={() =>
+                  void patchStatus("rejected").then((ok) => {
+                    if (ok) setDecision("rejected");
+                  })
+                }
+                disabled={!stationId || !requestId || saving}
+              >
+                לא פנוי
+              </button>
+            </div>
+          )}
 
           {step === "coupon" ? (
             <div className="mt-5 border-t border-zinc-200 pt-4">
