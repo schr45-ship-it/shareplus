@@ -25,6 +25,15 @@ export default function ApproveStationPage() {
   const [showPostApprovePrompt, setShowPostApprovePrompt] = useState(false);
   const [postApproveInfo, setPostApproveInfo] = useState<string | null>(null);
 
+  const [reqDetails, setReqDetails] = useState<null | {
+    stationTitle: string;
+    stationCity: string | null;
+    date: string;
+    timeFrom: string;
+    timeTo: string;
+    createdAt: string | null;
+  }>(null);
+
   const [coupon, setCoupon] = useState("");
   const [driverPhone, setDriverPhone] = useState<string | null>(null);
   const [whatsappDigits, setWhatsappDigits] = useState<string | null>(null);
@@ -36,6 +45,52 @@ export default function ApproveStationPage() {
       setAuthReady(true);
     });
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        if (!user || !requestId) return;
+        const token = await getIdToken(user);
+        const res = await fetch(`/api/interest-requests/details?requestId=${encodeURIComponent(requestId)}`, {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        const json = (await res.json().catch(() => ({}))) as {
+          ok?: boolean;
+          error?: string;
+          request?: {
+            stationTitle?: string;
+            stationCity?: string | null;
+            date?: string;
+            timeFrom?: string;
+            timeTo?: string;
+            createdAt?: string | null;
+          };
+        };
+        if (!res.ok) return;
+        if (cancelled) return;
+        const r = json.request;
+        if (!r) return;
+        setReqDetails({
+          stationTitle: String(r.stationTitle ?? "עמדה"),
+          stationCity: r.stationCity ? String(r.stationCity) : null,
+          date: String(r.date ?? ""),
+          timeFrom: String(r.timeFrom ?? ""),
+          timeTo: String(r.timeTo ?? ""),
+          createdAt: r.createdAt ? String(r.createdAt) : null,
+        });
+      } catch {
+        // ignore
+      }
+    }
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [requestId, user]);
 
   async function patchStatus(nextStatus: "approved" | "rejected", opts?: { ownerPaidFee?: boolean }) {
     try {
@@ -127,6 +182,26 @@ export default function ApproveStationPage() {
         <div className="mx-auto mt-8 w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-5 text-center shadow-sm">
           <div className="text-lg font-semibold text-zinc-800">בקשת טעינה חדשה</div>
           <div className="mt-2 text-sm text-zinc-700">האם העמדה פנויה?</div>
+
+          {reqDetails ? (
+            <div className="mt-4 rounded-xl border border-zinc-100 bg-zinc-50 p-3 text-right text-sm text-zinc-800">
+              <div className="font-semibold">
+                {reqDetails.stationTitle}
+                {reqDetails.stationCity ? ` (${reqDetails.stationCity})` : ""}
+              </div>
+              <div className="mt-1">
+                תאריך: <span className="font-medium">{reqDetails.date || "—"}</span>
+              </div>
+              <div className="mt-1">
+                שעות: <span className="font-medium">{reqDetails.timeFrom || "—"}-{reqDetails.timeTo || "—"}</span>
+              </div>
+              {reqDetails.createdAt ? (
+                <div className="mt-1 text-xs text-zinc-600">
+                  נשלח: {new Date(reqDetails.createdAt).toLocaleString("he-IL")}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
 
           {authReady && !user ? (
             <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
