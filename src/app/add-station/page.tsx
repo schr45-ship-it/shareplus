@@ -289,7 +289,7 @@ export default function AddStationPage() {
       const firstEnabled = availability.find((d) => d.enabled);
       if (!firstEnabled) throw new Error("בחר לפחות יום אחד בזמינות");
 
-      const generatedTitle = `עמדה ב${city.trim()}`;
+      const generatedTitle = `עמדה ${city.trim()}`;
       const id = await createStation({
         title: generatedTitle,
         city: city.trim(),
