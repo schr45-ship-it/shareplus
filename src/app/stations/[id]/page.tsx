@@ -14,6 +14,9 @@ type StationPublic = {
   powerKw: number;
   city: string;
   region?: string;
+  street?: string;
+  exactAddress?: string;
+  hostName?: string;
   notes?: string;
   hoursStart?: string;
   hoursEnd?: string;
@@ -241,6 +244,49 @@ export default function StationPage() {
             <div className="mt-1 text-sm text-zinc-600">
               {station.city} · {station.connectorType}
             </div>
+
+            <div className="mt-3 rounded-2xl border border-zinc-100 bg-zinc-50 p-4 text-sm text-zinc-800">
+              {station.hostName ? (
+                <div>
+                  <span className="text-zinc-600">מארח:</span> <span className="font-medium">{station.hostName}</span>
+                </div>
+              ) : null}
+
+              {station.exactAddress || station.street ? (
+                <div className={station.hostName ? "mt-2" : ""}>
+                  <span className="text-zinc-600">כתובת:</span>{" "}
+                  <span className="font-medium">{station.exactAddress || station.street}</span>
+                </div>
+              ) : null}
+
+              {station.hoursStart && station.hoursEnd ? (
+                <div className={station.exactAddress || station.street || station.hostName ? "mt-2" : ""}>
+                  <span className="text-zinc-600">שעות פעילות:</span>{" "}
+                  <span className="font-medium">
+                    {station.hoursStart}-{station.hoursEnd}
+                  </span>
+                </div>
+              ) : null}
+
+              {station.pricingType ? (
+                <div className="mt-2">
+                  <span className="text-zinc-600">סוג תמחור:</span> <span className="font-medium">{station.pricingType}</span>
+                </div>
+              ) : null}
+
+              {station.priceNote ? (
+                <div className="mt-2">
+                  <span className="text-zinc-600">הערת מחיר:</span> <span className="font-medium">{station.priceNote}</span>
+                </div>
+              ) : null}
+
+              {station.notes ? (
+                <div className="mt-2">
+                  <span className="text-zinc-600">הערות:</span> <span className="font-medium">{station.notes}</span>
+                </div>
+              ) : null}
+            </div>
+
             <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="rounded-xl border border-zinc-100 bg-zinc-50 p-3">
                 <div className="text-xs text-zinc-500">הספק</div>

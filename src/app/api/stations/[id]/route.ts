@@ -26,6 +26,9 @@ export async function GET(
       powerKw?: number;
       city?: string;
       region?: string;
+      street?: string;
+      exactAddress?: string;
+      hostName?: string;
       notes?: string;
       hoursStart?: string;
       hoursEnd?: string;
@@ -44,6 +47,9 @@ export async function GET(
         powerKw: data.powerKw ?? 0,
         city: data.city ?? "",
         region: data.region,
+        street: data.street,
+        exactAddress: data.exactAddress,
+        hostName: data.hostName,
         notes: data.notes,
         hoursStart: data.hoursStart,
         hoursEnd: data.hoursEnd,
