@@ -69,6 +69,7 @@ export default function Home() {
 
   const [headerScrolled, setHeaderScrolled] = useState(false);
   const [hasNewMessage, setHasNewMessage] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [revealStation, setRevealStation] = useState<StationPublic | null>(null);
   const [revealSaving, setRevealSaving] = useState(false);
   const [revealDate, setRevealDate] = useState<string>("");
@@ -302,6 +303,63 @@ export default function Home() {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
+    function getLastSeenMs() {
+      try {
+        const raw = localStorage.getItem("shareplus:lastSeenReceived") ?? "";
+        const n = Number(raw);
+        return Number.isFinite(n) ? n : 0;
+      } catch {
+        return 0;
+      }
+    }
+
+    let cancelled = false;
+    let inflight = false;
+
+    async function refreshUnread() {
+      if (!user) return;
+      if (inflight) return;
+      inflight = true;
+      try {
+        const token = await getIdToken(user);
+        const res = await fetch("/api/interest-requests?scope=received", {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        const json = (await res.json().catch(() => ({}))) as {
+          items?: Array<{ status?: string; createdAt?: string | null }>;
+        };
+        if (!res.ok) return;
+        if (cancelled) return;
+
+        const lastSeen = getLastSeenMs();
+        const items = Array.isArray(json.items) ? json.items : [];
+        const count = items.filter((it) => {
+          const status = String(it.status ?? "").toLowerCase();
+          if (status !== "pending") return false;
+          const createdAt = typeof it.createdAt === "string" ? Date.parse(it.createdAt) : NaN;
+          if (!Number.isFinite(createdAt)) return true;
+          return createdAt > lastSeen;
+        }).length;
+        setUnreadCount(count);
+        if (count > 0) {
+          setHasNewMessage(true);
+          try {
+            localStorage.setItem("shareplus:newMessage", "1");
+            window.dispatchEvent(new Event("shareplus:newMessage"));
+          } catch {
+            // ignore
+          }
+        } else {
+          setHasNewMessage(false);
+        }
+      } finally {
+        inflight = false;
+      }
+    }
+
     function readFlag() {
       try {
         setHasNewMessage(localStorage.getItem("shareplus:newMessage") === "1");
@@ -311,8 +369,12 @@ export default function Home() {
     }
 
     readFlag();
+    void refreshUnread();
     window.addEventListener("shareplus:newMessage", readFlag);
     window.addEventListener("storage", readFlag);
+
+    const onFocus = () => void refreshUnread();
+    window.addEventListener("focus", onFocus);
 
     if ("serviceWorker" in navigator) {
       const onSwMessage = (event: MessageEvent) => {
@@ -324,19 +386,25 @@ export default function Home() {
         } catch {
           // ignore
         }
+
+        void refreshUnread();
       };
       navigator.serviceWorker.addEventListener("message", onSwMessage);
       return () => {
+        cancelled = true;
         window.removeEventListener("shareplus:newMessage", readFlag);
         window.removeEventListener("storage", readFlag);
+        window.removeEventListener("focus", onFocus);
         navigator.serviceWorker.removeEventListener("message", onSwMessage);
       };
     }
     return () => {
+      cancelled = true;
       window.removeEventListener("shareplus:newMessage", readFlag);
       window.removeEventListener("storage", readFlag);
+      window.removeEventListener("focus", onFocus);
     };
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -601,19 +669,21 @@ export default function Home() {
           <button
             type="button"
             className={`mt-1 text-xs font-semibold underline underline-offset-2 ${
-              hasNewMessage ? "text-red-600 animate-pulse" : "text-zinc-500"
+              unreadCount > 0 || hasNewMessage ? "text-red-600 animate-pulse" : "text-zinc-500"
             }`}
             onClick={() => {
               try {
                 localStorage.removeItem("shareplus:newMessage");
+                localStorage.setItem("shareplus:lastSeenReceived", String(Date.now()));
                 window.dispatchEvent(new Event("shareplus:newMessage"));
               } catch {
                 // ignore
               }
+              setUnreadCount(0);
               window.location.href = "/reports";
             }}
           >
-            הודעות חדשות: {hasNewMessage ? 1 : 0}
+            הודעות חדשות: {unreadCount}
           </button>
         </div>
         {isAdmin ? (
