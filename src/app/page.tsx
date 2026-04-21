@@ -668,8 +668,10 @@ export default function Home() {
           <span className="text-sm text-zinc-600">{user.email ?? user.displayName}</span>
           <button
             type="button"
-            className={`mt-1 text-xs font-semibold underline underline-offset-2 ${
-              unreadCount > 0 || hasNewMessage ? "text-red-600 animate-pulse" : "text-zinc-500"
+            className={`mt-1 rounded-full px-2 py-0.5 text-xs font-semibold transition-colors hover:bg-zinc-200 ${
+              unreadCount > 0 || hasNewMessage
+                ? "bg-zinc-100 text-red-600 animate-pulse"
+                : "bg-zinc-100 text-zinc-600"
             }`}
             onClick={() => {
               try {
