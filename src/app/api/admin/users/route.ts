@@ -20,11 +20,16 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const snap = await adminDb
-      .collection("users")
-      .orderBy("createdAt", "desc")
-      .limit(200)
-      .get();
+    let snap;
+    try {
+      snap = await adminDb
+        .collection("users")
+        .orderBy("createdAt", "desc")
+        .limit(200)
+        .get();
+    } catch {
+      snap = await adminDb.collection("users").limit(200).get();
+    }
 
     const users = snap.docs.map((d) => {
       const data = d.data() as {
