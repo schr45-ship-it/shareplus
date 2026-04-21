@@ -12,6 +12,18 @@ self.addEventListener("push", (event) => {
 
   const requestId = payload?.data?.requestId ?? "";
   const deepLink = payload?.data?.deepLink ?? (requestId ? `/?requestId=${encodeURIComponent(requestId)}` : "/");
+  const actionType = payload?.data?.type ?? "";
+
+  if (actionType === "INTEREST_REQUEST_APPROVED" || actionType === "INTEREST_REQUEST_REJECTED") {
+    event.waitUntil(
+      (async () => {
+        const allClients = await clients.matchAll({ type: "window", includeUncontrolled: true });
+        for (const client of allClients) {
+          client.postMessage({ type: "SHAREPLUS_NEW_MESSAGE" });
+        }
+      })()
+    );
+  }
 
   event.waitUntil(
     self.registration.showNotification(title, {
@@ -19,7 +31,7 @@ self.addEventListener("push", (event) => {
       data: {
         deepLink,
         requestId,
-        actionType: payload?.data?.type ?? "",
+        actionType,
       },
       actions: requestId
         ? [

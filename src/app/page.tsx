@@ -313,6 +313,25 @@ export default function Home() {
     readFlag();
     window.addEventListener("shareplus:newMessage", readFlag);
     window.addEventListener("storage", readFlag);
+
+    if ("serviceWorker" in navigator) {
+      const onSwMessage = (event: MessageEvent) => {
+        const data = event.data as { type?: string } | null;
+        if (!data || data.type !== "SHAREPLUS_NEW_MESSAGE") return;
+        try {
+          localStorage.setItem("shareplus:newMessage", "1");
+          window.dispatchEvent(new Event("shareplus:newMessage"));
+        } catch {
+          // ignore
+        }
+      };
+      navigator.serviceWorker.addEventListener("message", onSwMessage);
+      return () => {
+        window.removeEventListener("shareplus:newMessage", readFlag);
+        window.removeEventListener("storage", readFlag);
+        navigator.serviceWorker.removeEventListener("message", onSwMessage);
+      };
+    }
     return () => {
       window.removeEventListener("shareplus:newMessage", readFlag);
       window.removeEventListener("storage", readFlag);
