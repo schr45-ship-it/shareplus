@@ -598,23 +598,23 @@ export default function Home() {
       <div className="flex flex-col items-end gap-2 sm:flex-row-reverse sm:items-center sm:gap-3">
         <div className="flex flex-col items-end">
           <span className="text-sm text-zinc-600">{user.email ?? user.displayName}</span>
-          {hasNewMessage ? (
-            <button
-              type="button"
-              className="mt-1 text-xs font-semibold text-red-600 underline underline-offset-2 animate-pulse"
-              onClick={() => {
-                try {
-                  localStorage.removeItem("shareplus:newMessage");
-                  window.dispatchEvent(new Event("shareplus:newMessage"));
-                } catch {
-                  // ignore
-                }
-                window.location.href = "/reports";
-              }}
-            >
-              הודעה חדשה
-            </button>
-          ) : null}
+          <button
+            type="button"
+            className={`mt-1 text-xs font-semibold underline underline-offset-2 ${
+              hasNewMessage ? "text-red-600 animate-pulse" : "text-zinc-500"
+            }`}
+            onClick={() => {
+              try {
+                localStorage.removeItem("shareplus:newMessage");
+                window.dispatchEvent(new Event("shareplus:newMessage"));
+              } catch {
+                // ignore
+              }
+              window.location.href = "/reports";
+            }}
+          >
+            הודעות חדשות: {hasNewMessage ? 1 : 0}
+          </button>
         </div>
         {isAdmin ? (
           <a
