@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
 
 import { getClientAuth, getWebPushToken, signInWithGoogle } from "@/lib/firebaseClient";
@@ -67,12 +67,15 @@ export default function Home() {
   const [filterTimeTo, setFilterTimeTo] = useState<string>("");
   const [highlightStationId, setHighlightStationId] = useState<string | null>(null);
 
-  const [revealOpen, setRevealOpen] = useState(false);
+  const [headerScrolled, setHeaderScrolled] = useState(false);
+  const [hasNewMessage, setHasNewMessage] = useState(false);
   const [revealStation, setRevealStation] = useState<StationPublic | null>(null);
   const [revealSaving, setRevealSaving] = useState(false);
   const [revealDate, setRevealDate] = useState<string>("");
   const [revealTimeFrom, setRevealTimeFrom] = useState<string>("");
   const [revealTimeTo, setRevealTimeTo] = useState<string>("");
+
+  const [revealOpen, setRevealOpen] = useState(false);
   const [revealCoupon, setRevealCoupon] = useState<string>("");
   const [showCouponField, setShowCouponField] = useState(false);
 
@@ -294,6 +297,26 @@ export default function Home() {
     } catch {
       setError("לא ניתן לשתף כרגע");
     }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    function readFlag() {
+      try {
+        setHasNewMessage(localStorage.getItem("shareplus:newMessage") === "1");
+      } catch {
+        setHasNewMessage(false);
+      }
+    }
+
+    readFlag();
+    window.addEventListener("shareplus:newMessage", readFlag);
+    window.addEventListener("storage", readFlag);
+    return () => {
+      window.removeEventListener("shareplus:newMessage", readFlag);
+      window.removeEventListener("storage", readFlag);
+    };
   }, []);
 
   useEffect(() => {
@@ -554,7 +577,26 @@ export default function Home() {
 
     return (
       <div className="flex flex-col items-end gap-2 sm:flex-row-reverse sm:items-center sm:gap-3">
-        <span className="text-sm text-zinc-600">{user.email ?? user.displayName}</span>
+        <div className="flex flex-col items-end">
+          <span className="text-sm text-zinc-600">{user.email ?? user.displayName}</span>
+          {hasNewMessage ? (
+            <button
+              type="button"
+              className="mt-1 text-xs font-semibold text-red-600 underline underline-offset-2 animate-pulse"
+              onClick={() => {
+                try {
+                  localStorage.removeItem("shareplus:newMessage");
+                  window.dispatchEvent(new Event("shareplus:newMessage"));
+                } catch {
+                  // ignore
+                }
+                window.location.href = "/reports";
+              }}
+            >
+              הודעה חדשה
+            </button>
+          ) : null}
+        </div>
         {isAdmin ? (
           <a
             className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-50"
@@ -571,7 +613,7 @@ export default function Home() {
         </button>
       </div>
     );
-  }, [isAdmin, startSignIn, user]);
+  }, [hasNewMessage, isAdmin, startSignIn, user]);
 
   const openReveal = useCallback((station: StationPublic) => {
     setError(null);

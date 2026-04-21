@@ -28,6 +28,13 @@ export default function Footer() {
         const type = String(data.type ?? "").trim();
         if (type !== "INTEREST_REQUEST_APPROVED" && type !== "INTEREST_REQUEST_REJECTED") return;
 
+        try {
+          localStorage.setItem("shareplus:newMessage", "1");
+          window.dispatchEvent(new Event("shareplus:newMessage"));
+        } catch {
+          // ignore
+        }
+
         setResponseTitle(data.title ? String(data.title) : "עדכון בבקשה");
         setResponseBody(data.body ? String(data.body) : "יש עדכון חדש בבקשה שלך.");
         setResponseOpen(true);
@@ -139,6 +146,12 @@ export default function Footer() {
               className="mt-5 w-full rounded-xl bg-black px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800"
               onClick={() => {
                 setResponseOpen(false);
+                try {
+                  localStorage.removeItem("shareplus:newMessage");
+                  window.dispatchEvent(new Event("shareplus:newMessage"));
+                } catch {
+                  // ignore
+                }
                 window.location.href = "/reports";
               }}
             >
