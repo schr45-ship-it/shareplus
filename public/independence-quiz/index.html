@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>חידון יום העצמאות החכם</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Assistant', sans-serif;
+            background: linear-gradient(135deg, #f0f7ff 0%, #c2e0ff 100%);
+            min-height: 100vh;
+            overflow-x: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+        }
+        .blue-gradient { background: linear-gradient(to bottom, #00529B, #003366); }
+        .card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 10px 25px rgba(0, 82, 155, 0.2);
+            border: 2px solid #00529B;
+            border-radius: 1.5rem;
+        }
+        .timer-bar { transition: width 1s linear; }
+        .firework { position: absolute; width: 6px; height: 6px; border-radius: 50%; pointer-events: none; }
+        @keyframes explode { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(25); opacity: 0; } }
+        .srulik-popup { animation: bounceIn 0.5s ease-out forwards; }
+        @keyframes bounceIn { 0% { transform: translateY(100px); opacity: 0; } 100% { transform: translateY(0); opacity: 1; } }
+        .loading-spinner {
+            border: 4px solid rgba(0, 82, 155, 0.1);
+            width: 40px; height: 40px; border-radius: 50%;
+            border-left-color: #00529B; animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+    <div id="game-container" class="w-full max-w-2xl">
+        <div id="start-screen" class="card p-8 text-center">
+            <h1 class="text-5xl font-bold text-[#00529B] mb-4">חידון יום העצמאות! 🇮🇱</h1>
+            <p class="text-xl text-gray-700 mb-8">האם תצליחו לנצח את הבינה המלאכותית?</p>
+            <div class="flex flex-col gap-4 items-center">
+                <button onclick="startGame(false)" class="blue-gradient text-white px-10 py-4 rounded-full text-2xl font-bold hover:scale-105 transition-all w-72 shadow-lg">🚀 משחק רגיל</button>
+                <button onclick="startGame(true)" class="bg-purple-600 text-white px-10 py-4 rounded-full text-2xl font-bold hover:scale-105 transition-all border-4 border-purple-300 w-72 shadow-lg">✨ משחק AI חכם</button>
+            </div>
+        </div>
+
+        <div id="quiz-screen" class="hidden card p-6 relative">
+            <div class="flex justify-between items-center mb-6">
+                <div class="text-xl font-bold text-[#00529B] bg-blue-50 px-4 py-1 rounded-full">ניקוד: <span id="score">0</span></div>
+                <div id="lives" class="text-2xl">❤️❤️❤️</div>
+            </div>
+
+            <div class="w-full bg-gray-200 h-3 rounded-full mb-8 overflow-hidden">
+                <div id="timer-display" class="timer-bar bg-blue-500 h-full w-full"></div>
+            </div>
+
+            <div id="ai-loading" class="hidden flex flex-col items-center justify-center py-10">
+                <div class="loading-spinner mb-4"></div>
+                <p class="text-purple-600 font-bold animate-pulse">Gemini מייצר שאלה מקורית... ✨</p>
+            </div>
+
+            <div id="question-area">
+                <h2 id="question-text" class="text-2xl font-bold text-gray-800 mb-8 text-center min-h-[3.5rem]"></h2>
+                <div id="options-container" class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4"></div>
+            </div>
+            
+            <div id="explanation-box" class="hidden mt-4 p-4 bg-blue-50 border-r-4 border-blue-500 rounded-lg text-gray-800 shadow-inner">
+                <p id="explanation-text" class="font-bold"></p>
+                <button onclick="nextQuestionAfterExplanation()" class="mt-3 text-white bg-blue-600 px-4 py-1 rounded shadow hover:bg-blue-700">המשך לשאלה הבאה ←</button>
+            </div>
+
+            <div id="srulik" class="hidden absolute -bottom-4 -left-4 w-28 h-28 srulik-popup z-20">
+                <div class="bg-white rounded-2xl p-2 border-2 border-blue-600 shadow-xl relative">
+                     <span class="text-[10px] absolute -top-8 right-0 bg-blue-600 text-white p-1 rounded-lg font-bold">כל הכבוד! בונוס! 👨‍🌾</span>
+                     <span class="text-5xl block text-center">🇮🇱</span>
+                </div>
+            </div>
+        </div>
+
+        <div id="end-screen" class="hidden card p-10 text-center">
+            <h2 class="text-5xl font-bold text-[#00529B] mb-6">כל הכבוד! 🎉</h2>
+            <div id="final-stats" class="text-3xl mb-10 text-gray-700">
+                צברת <span id="final-score" class="font-extrabold text-blue-600">0</span> נקודות
+            </div>
+            <button onclick="location.reload()" class="blue-gradient text-white px-12 py-4 rounded-full text-2xl font-bold hover:scale-105 shadow-xl">נסה שוב 🔄</button>
+        </div>
+    </div>
+
+    <script>
+        // שים לב: כשמריצים מחוץ ל-Gemini, צריך להטמיע כאן מפתח API אם רוצים מצב AI.
+        const apiKey = "YOUR_API_KEY_HERE"; 
+
+        const staticQuestions = [
+            { q: "באיזו שנה הוקמה מדינת ישראל?", a: ["1948", "1947", "1949", "1950"], c: 0 },
+            { q: "מי היה ראש הממשלה הראשון?", a: ["לוי אשכול", "דוד בן גוריון", "מנחם בגין", "גולדה מאיר"], c: 1 },
+            { q: "מהו הפרח הלאומי?", a: ["כלנית מצויה", "רקפת", "צבעוני", "נרקיס"], c: 0 },
+            { q: "מהו הציפור הלאומית?", a: ["יונה", "נשר", "דוכיפת", "דרור"], c: 2 },
+            { q: "כמה חברי כנסת יש בישראל?", a: ["100", "110", "120", "130"], c: 2 }
+        ];
+
+        let currentQuestionIndex = 0;
+        let score = 0;
+        let lives = 3;
+        let timeLeft = 15;
+        let timerInterval;
+        let streak = 0;
+        let isAiMode = false;
+
+        async function startGame(ai) {
+            isAiMode = ai;
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('quiz-screen').classList.remove('hidden');
+            loadQuestion();
+        }
+
+        async function loadQuestion() {
+            document.getElementById('explanation-box').classList.add('hidden');
+            document.getElementById('question-area').classList.remove('hidden');
+            
+            if (!isAiMode && currentQuestionIndex >= staticQuestions.length) {
+                endGame();
+                return;
+            }
+
+            let q;
+            if (isAiMode) {
+                document.getElementById('question-area').classList.add('hidden');
+                document.getElementById('ai-loading').classList.remove('hidden');
+                // כאן תבוא הפנייה ל-API. ללא מפתח, נשתמש בשאלות הרגילות.
+                q = staticQuestions[Math.floor(Math.random() * staticQuestions.length)];
+                await new Promise(r => setTimeout(r, 1000));
+                document.getElementById('ai-loading').classList.add('hidden');
+                document.getElementById('question-area').classList.remove('hidden');
+            } else {
+                q = staticQuestions[currentQuestionIndex];
+            }
+
+            document.getElementById('question-text').innerText = q.q;
+            const container = document.getElementById('options-container');
+            container.innerHTML = '';
+
+            q.a.forEach((option, index) => {
+                const btn = document.createElement('button');
+                btn.className = "bg-white border-2 border-blue-100 p-4 rounded-xl text-lg font-bold hover:bg-blue-50 hover:border-blue-500 transition-all text-gray-700 shadow-sm";
+                btn.innerText = option;
+                btn.onclick = () => checkAnswer(index, q);
+                container.appendChild(btn);
+            });
+            resetTimer();
+        }
+
+        function checkAnswer(index, q) {
+            clearInterval(timerInterval);
+            if (index === q.c) {
+                score += 10;
+                streak++;
+                document.getElementById('score').innerText = score;
+                showFirework();
+                if (streak >= 3) showSrulik();
+                currentQuestionIndex++;
+                setTimeout(loadQuestion, 800);
+            } else {
+                lives--;
+                streak = 0;
+                updateLives();
+                document.getElementById('question-area').classList.add('hidden');
+                document.getElementById('explanation-box').classList.remove('hidden');
+                document.getElementById('explanation-text').innerText = `לא נכון! התשובה הנכונה היא: ${q.a[q.c]}.`;
+                if (lives <= 0) setTimeout(endGame, 2000);
+            }
+        }
+
+        function nextQuestionAfterExplanation() {
+            if (lives > 0) {
+                currentQuestionIndex++;
+                loadQuestion();
+            } else endGame();
+        }
+
+        function updateLives() {
+            document.getElementById('lives').innerText = "❤️".repeat(Math.max(0, lives)) || "💔";
+        }
+
+        function resetTimer() {
+            clearInterval(timerInterval);
+            timeLeft = 15;
+            const bar = document.getElementById('timer-display');
+            bar.style.width = '100%';
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                bar.style.width = (timeLeft / 15 * 100) + '%';
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    lives--;
+                    updateLives();
+                    if (lives <= 0) endGame(); else { currentQuestionIndex++; loadQuestion(); }
+                }
+            }, 1000);
+        }
+
+        function showFirework() {
+            for (let i = 0; i < 6; i++) {
+                const fw = document.createElement('div');
+                fw.className = 'firework';
+                fw.style.left = (Math.random() * 80 + 10) + '%';
+                fw.style.top = (Math.random() * 50 + 10) + '%';
+                fw.style.backgroundColor = ['#00529B', '#ffffff', '#FFD700'][Math.floor(Math.random()*3)];
+                fw.style.animation = 'explode 0.6s ease-out forwards';
+                document.body.appendChild(fw);
+                setTimeout(() => fw.remove(), 600);
+            }
+        }
+
+        function showSrulik() {
+            const s = document.getElementById('srulik');
+            s.classList.remove('hidden');
+            score += 20;
+            document.getElementById('score').innerText = score;
+            setTimeout(() => s.classList.add('hidden'), 3000);
+        }
+
+        function endGame() {
+            clearInterval(timerInterval);
+            document.getElementById('quiz-screen').classList.add('hidden');
+            document.getElementById('end-screen').classList.remove('hidden');
+            document.getElementById('final-score').innerText = score;
+        }
+    </script>
+</body>
+</html>
