@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>חידון יום העצמאות החכם</title>
+    <title>חידון יום העצמאות - 20 שאלות ו-AI</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;700&display=swap" rel="stylesheet">
     <style>
@@ -11,11 +11,11 @@
             font-family: 'Assistant', sans-serif;
             background: linear-gradient(135deg, #f0f7ff 0%, #c2e0ff 100%);
             min-height: 100vh;
-            overflow-x: hidden;
             display: flex;
             align-items: center;
             justify-content: center;
             padding: 1rem;
+            overflow-x: hidden;
         }
         .blue-gradient { background: linear-gradient(to bottom, #00529B, #003366); }
         .card {
@@ -26,171 +26,185 @@
             border-radius: 1.5rem;
         }
         .timer-bar { transition: width 1s linear; }
-        .firework { position: absolute; width: 6px; height: 6px; border-radius: 50%; pointer-events: none; }
+        .firework { position: absolute; width: 6px; height: 6px; border-radius: 50%; pointer-events: none; z-index: 50; }
         @keyframes explode { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(25); opacity: 0; } }
         .srulik-popup { animation: bounceIn 0.5s ease-out forwards; }
         @keyframes bounceIn { 0% { transform: translateY(100px); opacity: 0; } 100% { transform: translateY(0); opacity: 1; } }
-        .loading-spinner {
-            border: 4px solid rgba(0, 82, 155, 0.1);
-            width: 40px; height: 40px; border-radius: 50%;
-            border-left-color: #00529B; animation: spin 1s linear infinite;
-        }
-        @keyframes spin { 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
 
     <div id="game-container" class="w-full max-w-2xl">
+        <!-- מסך פתיחה -->
         <div id="start-screen" class="card p-8 text-center">
-            <h1 class="text-5xl font-bold text-[#00529B] mb-4">חידון יום העצמאות! 🇮🇱</h1>
-            <p class="text-xl text-gray-700 mb-8">האם תצליחו לנצח את הבינה המלאכותית?</p>
+            <h1 class="text-5xl font-bold text-[#00529B] mb-4">חידון העצמאות הגדול 🇮🇱</h1>
+            <p class="text-xl text-gray-700 mb-8">20 שאלות מאתגרות, זיקוקים ובונוסים!<br>האם תצליחו להגיע לשיא הניקוד?</p>
             <div class="flex flex-col gap-4 items-center">
-                <button onclick="startGame(false)" class="blue-gradient text-white px-10 py-4 rounded-full text-2xl font-bold hover:scale-105 transition-all w-72 shadow-lg">🚀 משחק רגיל</button>
-                <button onclick="startGame(true)" class="bg-purple-600 text-white px-10 py-4 rounded-full text-2xl font-bold hover:scale-105 transition-all border-4 border-purple-300 w-72 shadow-lg">✨ משחק AI חכם</button>
+                <button onclick="startGame(false)" class="blue-gradient text-white px-12 py-4 rounded-full text-2xl font-bold hover:scale-105 transition-all shadow-lg">🚀 מתחילים!</button>
+                <button onclick="startGame(true)" class="bg-purple-600 text-white px-12 py-4 rounded-full text-2xl font-bold hover:scale-105 transition-all border-4 border-purple-300 shadow-lg">✨ מצב AI</button>
             </div>
         </div>
 
+        <!-- מסך משחק -->
         <div id="quiz-screen" class="hidden card p-6 relative">
             <div class="flex justify-between items-center mb-6">
                 <div class="text-xl font-bold text-[#00529B] bg-blue-50 px-4 py-1 rounded-full">ניקוד: <span id="score">0</span></div>
-                <div id="lives" class="text-2xl">❤️❤️❤️</div>
+                <div id="lives" class="text-2xl text-red-500 font-bold">❤️❤️❤️</div>
             </div>
 
             <div class="w-full bg-gray-200 h-3 rounded-full mb-8 overflow-hidden">
                 <div id="timer-display" class="timer-bar bg-blue-500 h-full w-full"></div>
             </div>
 
-            <div id="ai-loading" class="hidden flex flex-col items-center justify-center py-10">
-                <div class="loading-spinner mb-4"></div>
-                <p class="text-purple-600 font-bold animate-pulse">Gemini מייצר שאלה מקורית... ✨</p>
-            </div>
-
             <div id="question-area">
-                <h2 id="question-text" class="text-2xl font-bold text-gray-800 mb-8 text-center min-h-[3.5rem]"></h2>
-                <div id="options-container" class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4"></div>
-            </div>
-            
-            <div id="explanation-box" class="hidden mt-4 p-4 bg-blue-50 border-r-4 border-blue-500 rounded-lg text-gray-800 shadow-inner">
-                <p id="explanation-text" class="font-bold"></p>
-                <button onclick="nextQuestionAfterExplanation()" class="mt-3 text-white bg-blue-600 px-4 py-1 rounded shadow hover:bg-blue-700">המשך לשאלה הבאה ←</button>
+                <h2 id="question-text" class="text-2xl font-bold text-gray-800 mb-8 text-center leading-tight"></h2>
+                <div id="options-container" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
             </div>
 
-            <div id="srulik" class="hidden absolute -bottom-4 -left-4 w-28 h-28 srulik-popup z-20">
-                <div class="bg-white rounded-2xl p-2 border-2 border-blue-600 shadow-xl relative">
-                     <span class="text-[10px] absolute -top-8 right-0 bg-blue-600 text-white p-1 rounded-lg font-bold">כל הכבוד! בונוס! 👨‍🌾</span>
-                     <span class="text-5xl block text-center">🇮🇱</span>
+            <!-- משוב טעות -->
+            <div id="feedback-area" class="hidden mt-6 p-4 bg-red-50 border-r-4 border-red-500 rounded-lg text-center">
+                <p id="feedback-text" class="text-lg font-bold text-red-700 mb-4"></p>
+                <button onclick="loadNextQuestion()" class="blue-gradient text-white px-6 py-2 rounded-full font-bold">הבנתי, המשך לשאלה הבאה</button>
+            </div>
+
+            <!-- שרוליק -->
+            <div id="srulik" class="hidden absolute -bottom-6 -left-6 w-32 h-32 srulik-popup z-20">
+                <div class="bg-white rounded-2xl p-2 border-2 border-blue-600 shadow-2xl text-center">
+                     <span class="text-xs font-bold text-blue-700 block">בונוס שרוליק! 👨‍🌾</span>
+                     <span class="text-5xl">🇮🇱</span>
                 </div>
             </div>
         </div>
 
+        <!-- מסך סיום -->
         <div id="end-screen" class="hidden card p-10 text-center">
             <h2 class="text-5xl font-bold text-[#00529B] mb-6">כל הכבוד! 🎉</h2>
-            <div id="final-stats" class="text-3xl mb-10 text-gray-700">
+            <div class="text-3xl mb-10 text-gray-700">
                 צברת <span id="final-score" class="font-extrabold text-blue-600">0</span> נקודות
             </div>
-            <button onclick="location.reload()" class="blue-gradient text-white px-12 py-4 rounded-full text-2xl font-bold hover:scale-105 shadow-xl">נסה שוב 🔄</button>
+            <button onclick="location.reload()" class="blue-gradient text-white px-12 py-4 rounded-full text-2xl font-bold hover:scale-105 shadow-xl">שחק שוב 🔄</button>
+        </div>
+
+        <div class="mt-4 rounded-2xl bg-zinc-100/90 px-4 py-3 text-center text-sm text-zinc-800 shadow">
+            <div class="font-semibold">נבנה על ידי מול ההר יזמות</div>
+            <div class="mt-1">
+                בחסות מול ההר, בריכה וצימר למשפחות
+                <a class="font-semibold underline" href="tel:0527710258">0527710258</a>
+                ·
+                <a class="font-semibold underline" target="_blank" rel="noreferrer" href="https://wa.me/972527710258">וואטסאפ</a>
+            </div>
         </div>
     </div>
 
     <script>
-        const staticQuestions = [
+        const allQuestions = [
             { q: "באיזו שנה הוקמה מדינת ישראל?", a: ["1948", "1947", "1949", "1950"], c: 0 },
-            { q: "מי היה ראש הממשלה הראשון?", a: ["לוי אשכול", "דוד בן גוריון", "מנחם בגין", "גולדה מאיר"], c: 1 },
-            { q: "מהו הפרח הלאומי?", a: ["כלנית מצויה", "רקפת", "צבעוני", "נרקיס"], c: 0 },
-            { q: "מהו הציפור הלאומית?", a: ["יונה", "נשר", "דוכיפת", "דרור"], c: 2 },
-            { q: "כמה חברי כנסת יש בישראל?", a: ["100", "110", "120", "130"], c: 2 }
+            { q: "מי היה ראש הממשלה הראשון?", a: ["דוד בן גוריון", "משה שרת", "לוי אשכול", "גולדה מאיר"], c: 0 },
+            { q: "מהו הפרח הלאומי של ישראל?", a: ["רקפת", "צבעוני", "כלנית מצויה", "אירוס"], c: 2 },
+            { q: "באיזה חודש עברי חל יום העצמאות?", a: ["אדר", "ניסן", "אייר", "סיון"], c: 2 },
+            { q: "מהי הציפור הלאומית של ישראל?", a: ["דוכיפת", "יונה", "נשר", "דרור"], c: 0 },
+            { q: "מי כתב את המילים להמנון 'התקווה'?", a: ["נפתלי הרץ אימבר", "חיים נחמן ביאליק", "נעמי שמר", "אהוד מנור"], c: 0 },
+            { q: "איזו עיר היא בירת ישראל?", a: ["תל אביב", "חיפה", "ירושלים", "באר שבע"], c: 2 },
+            { q: "כמה חברי כנסת יש בישראל?", a: ["100", "120", "110", "130"], c: 1 },
+            { q: "מהו העץ הלאומי של ישראל?", a: ["ברוש", "אלון", "זית", "תמר"], c: 2 },
+            { q: "מי היה הנשיא הראשון של ישראל?", a: ["יצחק בן צבי", "חיים ויצמן", "זלמן שזר", "עזר ויצמן"], c: 1 },
+            { q: "איזה ים נמצא במזרח ישראל?", a: ["הים התיכון", "ים סוף", "ים המלח", "ים כנרת"], c: 2 },
+            { q: "מהו המקום הנמוך ביותר בעולם שנמצא בישראל?", a: ["ים המלח", "עמק החולה", "ים כנרת", "הערבה"], c: 0 },
+            { q: "איזו עיר מכונה 'העיר ללא הפסקה'?", a: ["ירושלים", "תל אביב", "אילת", "נתניה"], c: 1 },
+            { q: "מה שמו של המטס המסורתי של חיל האוויר?", a: ["מטס העצמאות", "מטס הגבורה", "מטס השלום", "מטס הניצחון"], c: 0 },
+            { q: "מי הייתה ראש הממשלה האישה היחידה בישראל?", a: ["ציפי לבני", "גולדה מאיר", "מרב מיכאלי", "שולמית אלוני"], c: 1 },
+            { q: "באיזו עיר הוכרזה המדינה?", a: ["ירושלים", "תל אביב", "באר שבע", "חיפה"], c: 1 },
+            { q: "מהו סמל המדינה?", a: ["מנורה וענפי זית", "מגן דוד", "אריה", "דגל"], c: 0 },
+            { q: "איזה הר הוא הגבוה ביותר בישראל?", a: ["הר מירון", "הר תבור", "הר חרמון", "הר הכרמל"], c: 2 },
+            { q: "איך קראו לאוניית המעפילים המפורסמת ביותר?", a: ["אלטלנה", "אקסודוס", "תילן", "מרמרה"], c: 1 },
+            { q: "מי נחשב לחוזה המדינה?", a: ["בן גוריון", "בנימין זאב הרצל", "ז'בוטינסקי", "טרומפלדור"], c: 1 }
         ];
 
-        let currentQuestionIndex = 0;
         let score = 0;
         let lives = 3;
         let timeLeft = 15;
         let timerInterval;
         let streak = 0;
+        let usedQuestions = [];
+        let currentQuestion;
         let isAiMode = false;
 
-        async function startGame(ai) {
-            isAiMode = ai;
+        function startGame(ai) {
+            isAiMode = Boolean(ai);
+            usedQuestions = JSON.parse(localStorage.getItem('ind_quiz_used') || '[]');
             document.getElementById('start-screen').classList.add('hidden');
             document.getElementById('quiz-screen').classList.remove('hidden');
-            loadQuestion();
+            loadNextQuestion();
         }
 
-        async function loadQuestion() {
-            document.getElementById('explanation-box').classList.add('hidden');
+        async function loadNextQuestion() {
+            document.getElementById('feedback-area').classList.add('hidden');
             document.getElementById('question-area').classList.remove('hidden');
             
-            if (!isAiMode && currentQuestionIndex >= staticQuestions.length) {
-                endGame();
-                return;
-            }
-
-            let q;
             if (isAiMode) {
-                document.getElementById('question-area').classList.add('hidden');
-                document.getElementById('ai-loading').classList.remove('hidden');
                 try {
                     const res = await fetch('/api/quiz/question', { method: 'GET' });
                     const json = await res.json();
                     if (!res.ok || !json || json.ok !== true || !json.question) throw new Error('bad response');
-                    q = json.question;
+                    currentQuestion = json.question;
                 } catch {
-                    q = staticQuestions[Math.floor(Math.random() * staticQuestions.length)];
-                    await new Promise(r => setTimeout(r, 800));
+                    currentQuestion = allQuestions[Math.floor(Math.random() * allQuestions.length)];
                 }
-                document.getElementById('ai-loading').classList.add('hidden');
-                document.getElementById('question-area').classList.remove('hidden');
             } else {
-                q = staticQuestions[currentQuestionIndex];
+                let available = allQuestions.filter(q => !usedQuestions.includes(q.q));
+                if (available.length === 0) {
+                    usedQuestions = []; // התחלה מחדש של המאגר
+                    available = allQuestions;
+                }
+                currentQuestion = available[Math.floor(Math.random() * available.length)];
+                usedQuestions.push(currentQuestion.q);
+                localStorage.setItem('ind_quiz_used', JSON.stringify(usedQuestions));
             }
 
-            document.getElementById('question-text').innerText = q.q;
+            document.getElementById('question-text').innerText = currentQuestion.q;
             const container = document.getElementById('options-container');
             container.innerHTML = '';
 
-            q.a.forEach((option, index) => {
+            currentQuestion.a.forEach((opt, i) => {
                 const btn = document.createElement('button');
                 btn.className = "bg-white border-2 border-blue-100 p-4 rounded-xl text-lg font-bold hover:bg-blue-50 hover:border-blue-500 transition-all text-gray-700 shadow-sm";
-                btn.innerText = option;
-                btn.onclick = () => checkAnswer(index, q);
+                btn.innerText = opt;
+                btn.onclick = () => checkAnswer(i);
                 container.appendChild(btn);
             });
-            resetTimer();
+
+            startTimer();
         }
 
-        function checkAnswer(index, q) {
+        function checkAnswer(i) {
             clearInterval(timerInterval);
-            if (index === q.c) {
+            if (i === currentQuestion.c) {
                 score += 10;
                 streak++;
                 document.getElementById('score').innerText = score;
                 showFirework();
-                if (streak >= 3) showSrulik();
-                currentQuestionIndex++;
-                setTimeout(loadQuestion, 800);
+                if (streak === 3) showSrulik();
+                setTimeout(loadNextQuestion, 800);
             } else {
                 lives--;
                 streak = 0;
                 updateLives();
-                document.getElementById('question-area').classList.add('hidden');
-                document.getElementById('explanation-box').classList.remove('hidden');
-                document.getElementById('explanation-text').innerText = `לא נכון! התשובה הנכונה היא: ${q.a[q.c]}.`;
+                showFeedback(`טעות! התשובה הנכונה היא: ${currentQuestion.a[currentQuestion.c]}`);
                 if (lives <= 0) setTimeout(endGame, 2000);
             }
         }
 
-        function nextQuestionAfterExplanation() {
-            if (lives > 0) {
-                currentQuestionIndex++;
-                loadQuestion();
-            } else endGame();
+        function showFeedback(text) {
+            document.getElementById('question-area').classList.add('hidden');
+            document.getElementById('feedback-area').classList.remove('hidden');
+            document.getElementById('feedback-text').innerText = text;
         }
 
         function updateLives() {
-            document.getElementById('lives').innerText = "❤️".repeat(Math.max(0, lives)) || "💔";
+            document.getElementById('lives').innerText = "❤️".repeat(lives) || "💔";
         }
 
-        function resetTimer() {
+        function startTimer() {
             clearInterval(timerInterval);
             timeLeft = 15;
             const bar = document.getElementById('timer-display');
@@ -202,7 +216,8 @@
                     clearInterval(timerInterval);
                     lives--;
                     updateLives();
-                    if (lives <= 0) endGame(); else { currentQuestionIndex++; loadQuestion(); }
+                    showFeedback(`נגמר הזמן! התשובה הייתה: ${currentQuestion.a[currentQuestion.c]}`);
+                    if (lives <= 0) setTimeout(endGame, 2000);
                 }
             }, 1000);
         }
@@ -211,8 +226,8 @@
             for (let i = 0; i < 6; i++) {
                 const fw = document.createElement('div');
                 fw.className = 'firework';
-                fw.style.left = (Math.random() * 80 + 10) + '%';
-                fw.style.top = (Math.random() * 50 + 10) + '%';
+                fw.style.left = Math.random() * 100 + '%';
+                fw.style.top = Math.random() * 60 + '%';
                 fw.style.backgroundColor = ['#00529B', '#ffffff', '#FFD700'][Math.floor(Math.random()*3)];
                 fw.style.animation = 'explode 0.6s ease-out forwards';
                 document.body.appendChild(fw);
@@ -223,9 +238,9 @@
         function showSrulik() {
             const s = document.getElementById('srulik');
             s.classList.remove('hidden');
-            score += 20;
+            score += 25;
             document.getElementById('score').innerText = score;
-            setTimeout(() => s.classList.add('hidden'), 3000);
+            setTimeout(() => { s.classList.add('hidden'); streak = 0; }, 3000);
         }
 
         function endGame() {
