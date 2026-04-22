@@ -93,9 +93,6 @@
     </div>
 
     <script>
-        // שים לב: כשמריצים מחוץ ל-Gemini, צריך להטמיע כאן מפתח API אם רוצים מצב AI.
-        const apiKey = "YOUR_API_KEY_HERE"; 
-
         const staticQuestions = [
             { q: "באיזו שנה הוקמה מדינת ישראל?", a: ["1948", "1947", "1949", "1950"], c: 0 },
             { q: "מי היה ראש הממשלה הראשון?", a: ["לוי אשכול", "דוד בן גוריון", "מנחם בגין", "גולדה מאיר"], c: 1 },
@@ -132,9 +129,15 @@
             if (isAiMode) {
                 document.getElementById('question-area').classList.add('hidden');
                 document.getElementById('ai-loading').classList.remove('hidden');
-                // כאן תבוא הפנייה ל-API. ללא מפתח, נשתמש בשאלות הרגילות.
-                q = staticQuestions[Math.floor(Math.random() * staticQuestions.length)];
-                await new Promise(r => setTimeout(r, 1000));
+                try {
+                    const res = await fetch('/api/quiz/question', { method: 'GET' });
+                    const json = await res.json();
+                    if (!res.ok || !json || json.ok !== true || !json.question) throw new Error('bad response');
+                    q = json.question;
+                } catch {
+                    q = staticQuestions[Math.floor(Math.random() * staticQuestions.length)];
+                    await new Promise(r => setTimeout(r, 800));
+                }
                 document.getElementById('ai-loading').classList.add('hidden');
                 document.getElementById('question-area').classList.remove('hidden');
             } else {
