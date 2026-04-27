@@ -25,7 +25,13 @@ type AdminUserListItem = {
 };
 
 type AdminUserDetails = {
-  user: { uid: string; email: string; phone: string };
+  user: {
+    uid: string;
+    email: string;
+    phone: string;
+    displayName?: string;
+    notificationPreferences?: { pushEnabled?: boolean; emailEnabled?: boolean };
+  };
   counts: { stations: number; requestsAsOwner: number; requestsAsDriver: number };
   stations: Array<{ id: string; title: string; city: string; address: string; active: boolean }>;
 };
@@ -46,6 +52,15 @@ export default function AdminPage() {
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [detailsError, setDetailsError] = useState<string | null>(null);
   const [details, setDetails] = useState<AdminUserDetails | null>(null);
+
+  const [editEmail, setEditEmail] = useState("");
+  const [editPhone, setEditPhone] = useState("");
+  const [editDisplayName, setEditDisplayName] = useState("");
+  const [editPrefPush, setEditPrefPush] = useState(true);
+  const [editPrefEmail, setEditPrefEmail] = useState(true);
+  const [saveLoading, setSaveLoading] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveOk, setSaveOk] = useState<string | null>(null);
 
   const filteredUsers = useMemo(() => {
     const q = usersQuery.trim().toLowerCase();
@@ -111,6 +126,8 @@ export default function AdminPage() {
   async function loadUserDetails(uid: string) {
     try {
       setDetailsError(null);
+      setSaveError(null);
+      setSaveOk(null);
       if (!user) {
         setDetailsError("נדרשת התחברות");
         return;
@@ -127,11 +144,71 @@ export default function AdminPage() {
       };
       if (!res.ok) throw new Error(json.error ?? "שגיאה בטעינת משתמש");
       setDetails(json);
+
+      setEditEmail(json.user?.email ?? "");
+      setEditPhone(json.user?.phone ?? "");
+      setEditDisplayName(json.user?.displayName ?? "");
+      setEditPrefPush(json.user?.notificationPreferences?.pushEnabled ?? true);
+      setEditPrefEmail(json.user?.notificationPreferences?.emailEnabled ?? true);
     } catch (e) {
       setDetailsError(e instanceof Error ? e.message : "שגיאה לא צפויה");
       setDetails(null);
     } finally {
       setDetailsLoading(false);
+    }
+  }
+
+  async function saveUserEdits() {
+    try {
+      setSaveError(null);
+      setSaveOk(null);
+      if (!user) {
+        setSaveError("נדרשת התחברות");
+        return;
+      }
+      if (!selectedUid) {
+        setSaveError("בחר משתמש");
+        return;
+      }
+
+      setSaveLoading(true);
+      const token = await getIdToken(user);
+      const res = await fetch(`/api/admin/users/${encodeURIComponent(selectedUid)}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          email: editEmail.trim(),
+          phone: editPhone.trim(),
+          displayName: editDisplayName.trim() ? editDisplayName.trim() : undefined,
+          notificationPreferences: {
+            pushEnabled: editPrefPush,
+            emailEnabled: editPrefEmail,
+          },
+        }),
+      });
+      const json = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+        user?: { uid: string; email: string; phone: string };
+      };
+      if (!res.ok) throw new Error(json.error ?? "שגיאה בשמירה");
+
+      if (json.user) {
+        setAllUsers((prev) =>
+          prev.map((u) => (u.uid === json.user!.uid ? { ...u, email: json.user!.email, phone: json.user!.phone } : u))
+        );
+      }
+
+      setSaveOk("נשמר");
+      setTimeout(() => setSaveOk(null), 1500);
+      await loadUserDetails(selectedUid);
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : "שגיאה לא צפויה");
+    } finally {
+      setSaveLoading(false);
     }
   }
 
@@ -328,12 +405,79 @@ export default function AdminPage() {
                 ) : details ? (
                   <div className="mt-3">
                     <div className="rounded-xl border border-zinc-100 bg-zinc-50 p-3">
-                      <div className="text-xs text-zinc-500">מייל</div>
-                      <div className="text-sm font-medium">{details.user.email || "—"}</div>
-                      <div className="mt-2 text-xs text-zinc-500">טלפון</div>
-                      <div className="text-sm font-medium">{details.user.phone || "—"}</div>
-                      <div className="mt-2 text-xs text-zinc-500">UID</div>
-                      <div className="break-all text-xs font-mono text-zinc-800">{details.user.uid}</div>
+                      <div className="text-xs font-medium text-zinc-500">עריכת משתמש</div>
+
+                      {saveError ? (
+                        <div className="mt-2 rounded-xl border border-red-200 bg-red-50 p-2 text-sm text-red-700">
+                          {saveError}
+                        </div>
+                      ) : null}
+                      {saveOk ? (
+                        <div className="mt-2 rounded-xl border border-emerald-200 bg-emerald-50 p-2 text-sm text-emerald-700">
+                          {saveOk}
+                        </div>
+                      ) : null}
+
+                      <div className="mt-3">
+                        <label className="text-xs text-zinc-500">מייל</label>
+                        <input
+                          className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm"
+                          value={editEmail}
+                          onChange={(e) => setEditEmail(e.target.value)}
+                        />
+                      </div>
+
+                      <div className="mt-3">
+                        <label className="text-xs text-zinc-500">טלפון</label>
+                        <input
+                          className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm"
+                          value={editPhone}
+                          onChange={(e) => setEditPhone(e.target.value)}
+                        />
+                      </div>
+
+                      <div className="mt-3">
+                        <label className="text-xs text-zinc-500">שם תצוגה</label>
+                        <input
+                          className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm"
+                          value={editDisplayName}
+                          onChange={(e) => setEditDisplayName(e.target.value)}
+                        />
+                      </div>
+
+                      <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        <label className="flex items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm">
+                          <span>התראות פוש</span>
+                          <input
+                            type="checkbox"
+                            checked={editPrefPush}
+                            onChange={(e) => setEditPrefPush(e.target.checked)}
+                          />
+                        </label>
+                        <label className="flex items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm">
+                          <span>התראות במייל</span>
+                          <input
+                            type="checkbox"
+                            checked={editPrefEmail}
+                            onChange={(e) => setEditPrefEmail(e.target.checked)}
+                          />
+                        </label>
+                      </div>
+
+                      <div className="mt-3 flex items-center justify-between gap-3">
+                        <div>
+                          <div className="text-xs text-zinc-500">UID</div>
+                          <div className="break-all text-xs font-mono text-zinc-800">{details.user.uid}</div>
+                        </div>
+                        <button
+                          type="button"
+                          className="rounded-xl bg-black px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
+                          disabled={saveLoading || detailsLoading}
+                          onClick={() => void saveUserEdits()}
+                        >
+                          שמור
+                        </button>
+                      </div>
                     </div>
 
                     <div className="mt-3 grid grid-cols-3 gap-2">
