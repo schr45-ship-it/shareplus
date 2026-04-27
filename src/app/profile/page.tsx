@@ -7,7 +7,7 @@ import { doc, getDoc, setDoc } from "firebase/firestore";
 import { getClientAuth, getWebPushToken } from "@/lib/firebaseClient";
 import { getClientDb } from "@/lib/firestoreClient";
 import { getIdToken } from "@/lib/auth";
-import { isValidPhone, normalizePhoneE164 } from "@/lib/phone";
+import { formatPhoneILLocal, isValidPhone, normalizePhoneE164 } from "@/lib/phone";
 
 type ProfileDoc = {
   displayName?: string;
@@ -65,7 +65,7 @@ export default function ProfilePage() {
 
         if (!cancelled) {
           setDisplayName(data?.displayName ?? user.displayName ?? "");
-          setPhone(data?.phone ?? "");
+          setPhone(formatPhoneILLocal(data?.phone ?? ""));
           setPrefPush(data?.notificationPreferences?.pushEnabled ?? true);
           setPrefEmail(data?.notificationPreferences?.emailEnabled ?? true);
         }
@@ -407,6 +407,7 @@ export default function ProfilePage() {
                   className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-right text-sm"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
+                  onBlur={() => setPhone((v) => formatPhoneILLocal(v))}
                   inputMode="tel"
                   placeholder="0587710258"
                 />

@@ -1,11 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { onAuthStateChanged, type User } from "firebase/auth";
 
 import { getClientAuth, signInWithGoogle } from "@/lib/firebaseClient";
 import { getIdToken } from "@/lib/auth";
+
+declare global {
+  interface Window {
+    L?: unknown;
+  }
+}
 
 type StationPublic = {
   id: string;
@@ -16,6 +22,7 @@ type StationPublic = {
   region?: string;
   street?: string;
   exactAddress?: string;
+  location?: { lat: number; lng: number };
   hostName?: string;
   notes?: string;
   hoursStart?: string;
@@ -52,6 +59,11 @@ function formatHours(hours: number) {
 export default function StationPage() {
   const params = useParams<{ id: string }>();
   const stationId = params?.id;
+
+  const [mapReady, setMapReady] = useState(false);
+  const mapRef = useRef<any>(null);
+  const markerRef = useRef<any>(null);
+  const mapElRef = useRef<HTMLDivElement | null>(null);
 
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -104,6 +116,77 @@ export default function StationPage() {
       setUser(u);
       if (u) setLoginModalOpen(false);
     });
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if ((window as { L?: unknown }).L) {
+      setMapReady(true);
+      return;
+    }
+
+    const existing = document.querySelector('link[data-leaflet="1"]');
+    if (!existing) {
+      const link = document.createElement("link");
+      link.rel = "stylesheet";
+      link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+      link.setAttribute("data-leaflet", "1");
+      document.head.appendChild(link);
+    }
+
+    const script = document.createElement("script");
+    script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+    script.async = true;
+    script.onload = () => setMapReady(true);
+    script.onerror = () => setError("שגיאה בטעינת מפה");
+    document.body.appendChild(script);
+  }, []);
+
+  useEffect(() => {
+    if (!mapReady) return;
+    if (!station?.location) return;
+    if (!mapElRef.current) return;
+
+    const L = (window as any).L;
+    if (!L) return;
+
+    const nextPos: [number, number] = [station.location.lat, station.location.lng];
+
+    if (!mapRef.current) {
+      mapRef.current = L.map(mapElRef.current, {
+        center: nextPos,
+        zoom: 15,
+        scrollWheelZoom: false,
+      });
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: "&copy; OpenStreetMap contributors",
+      }).addTo(mapRef.current);
+    } else {
+      mapRef.current.setView(nextPos, 15);
+    }
+
+    if (markerRef.current) {
+      markerRef.current.remove();
+      markerRef.current = null;
+    }
+
+    markerRef.current = L.marker(nextPos).addTo(mapRef.current);
+
+    return () => {
+      if (markerRef.current) {
+        markerRef.current.remove();
+        markerRef.current = null;
+      }
+    };
+  }, [mapReady, station?.location?.lat, station?.location?.lng]);
+
+  useEffect(() => {
+    return () => {
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+      }
+    };
   }, []);
 
   useEffect(() => {
@@ -369,6 +452,16 @@ export default function StationPage() {
                 כדי לשלוח בקשה לבעל העמדה תתבקש להתחבר.
               </div>
             </div>
+
+            {station.location ? (
+              <div className="mt-6">
+                <div className="text-sm font-semibold">מיקום על המפה</div>
+                <div
+                  ref={mapElRef}
+                  className="mt-2 h-64 w-full overflow-hidden rounded-2xl border border-zinc-100"
+                />
+              </div>
+            ) : null}
           </div>
         ) : null}
 

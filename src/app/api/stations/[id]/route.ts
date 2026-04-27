@@ -28,6 +28,7 @@ export async function GET(
       region?: string;
       street?: string;
       exactAddress?: string;
+      location?: { lat: number; lng: number };
       hostName?: string;
       notes?: string;
       hoursStart?: string;
@@ -49,6 +50,7 @@ export async function GET(
         region: data.region,
         street: data.street,
         exactAddress: data.exactAddress,
+        location: data.location,
         hostName: data.hostName,
         notes: data.notes,
         hoursStart: data.hoursStart,

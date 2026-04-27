@@ -6,7 +6,7 @@ import Image from "next/image";
 
 import { getClientAuth } from "@/lib/firebaseClient";
 import { createStation } from "@/lib/firestoreClient";
-import { isValidPhone, normalizePhoneE164 } from "@/lib/phone";
+import { formatPhoneILLocal, isValidPhone, normalizePhoneE164 } from "@/lib/phone";
 
 declare global {
   interface Window {
@@ -591,6 +591,7 @@ export default function AddStationPage() {
                 className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-right text-sm text-zinc-900 placeholder:text-zinc-400"
                 value={hostPhone}
                 onChange={(e) => setHostPhone(e.target.value)}
+                onBlur={() => setHostPhone((v) => formatPhoneILLocal(v))}
                 placeholder="0587710258"
               />
             </div>

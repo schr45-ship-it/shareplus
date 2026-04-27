@@ -7,7 +7,7 @@ import Image from "next/image";
 import { getClientAuth } from "@/lib/firebaseClient";
 import { getStation, updateStation, type StationDoc } from "@/lib/firestoreClient";
 import { getIdToken } from "@/lib/auth";
-import { isValidPhone, normalizePhoneE164 } from "@/lib/phone";
+import { formatPhoneILLocal, isValidPhone, normalizePhoneE164 } from "@/lib/phone";
 
 declare global {
   interface Window {
@@ -141,7 +141,7 @@ export default function EditStationPage({
         setStreet(st.data.street ?? st.data.exactAddress ?? "");
         setLocation(st.data.location ?? null);
         setHostName(st.data.hostName ?? "");
-        setHostPhone(st.data.hostPhone ?? "");
+        setHostPhone(formatPhoneILLocal(st.data.hostPhone ?? ""));
         setPricingType(st.data.pricingType ?? "לפי שעה");
         setPriceIls(st.data.priceIls ?? 20);
         setNotes(st.data.notes ?? "");
@@ -619,6 +619,7 @@ export default function EditStationPage({
                 className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-right text-sm text-zinc-900 placeholder:text-zinc-400"
                 value={hostPhone}
                 onChange={(e) => setHostPhone(e.target.value)}
+                onBlur={() => setHostPhone((v) => formatPhoneILLocal(v))}
                 placeholder="0587710258"
               />
             </div>
