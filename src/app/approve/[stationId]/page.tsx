@@ -7,6 +7,7 @@ import { onAuthStateChanged, type User } from "firebase/auth";
 import { getIdToken } from "firebase/auth";
 
 import { getClientAuth } from "@/lib/firebaseClient";
+import { formatPhoneILLocal } from "@/lib/phone";
 
 export default function ApproveStationPage() {
   const params = useParams<{ stationId: string }>();
@@ -328,7 +329,7 @@ export default function ApproveStationPage() {
 
               {driverPhone ? (
                 <div className="mt-4 rounded-xl border border-green-100 bg-green-50 p-3 text-right text-sm text-zinc-800">
-                  <div className="font-medium">מספר הטלפון של הלקוח הוא: {driverPhone}</div>
+                  <div className="font-medium">מספר הטלפון של הלקוח הוא: {formatPhoneILLocal(driverPhone)}</div>
                   {whatsappDigits ? (
                     <a
                       className="mt-2 inline-block font-semibold text-zinc-900 underline"

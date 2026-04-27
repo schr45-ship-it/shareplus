@@ -5,6 +5,7 @@ import { onAuthStateChanged, type User } from "firebase/auth";
 
 import { getClientAuth } from "@/lib/firebaseClient";
 import { getIdToken } from "@/lib/auth";
+import { formatPhoneILLocal } from "@/lib/phone";
 
 type RevealData = {
   title: string;
@@ -88,7 +89,7 @@ export default function RevealPage() {
             <div className="text-sm font-semibold">{data.title}</div>
             <div className="mt-2 text-sm text-zinc-700">רחוב: {data.exactAddress}</div>
             <div className="mt-2 text-sm text-zinc-700">
-              טלפון מארח: {data.contact.phone} {data.contact.name ? `(${data.contact.name})` : ""}
+              טלפון מארח: {formatPhoneILLocal(data.contact.phone)} {data.contact.name ? `(${data.contact.name})` : ""}
             </div>
             <div className="mt-4 flex gap-3">
               <a

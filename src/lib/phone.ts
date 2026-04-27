@@ -28,3 +28,18 @@ export function normalizePhoneE164(v: string) {
 
   return `+${digits}`;
 }
+
+export function formatPhoneILLocal(v: string) {
+  const digits = digitsOnlyPhone(v);
+  if (!digits) return "";
+
+  if (digits.startsWith("972")) {
+    const rest = digits.slice(3);
+    if (!rest) return "";
+    return `0${rest}`;
+  }
+
+  if (digits.startsWith("0")) return digits;
+
+  return digits;
+}

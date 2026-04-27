@@ -408,8 +408,9 @@ export default function ProfilePage() {
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   inputMode="tel"
-                  placeholder="+972..."
+                  placeholder="0587710258"
                 />
+                <div className="mt-1 text-[11px] text-zinc-500">נא להכניס מספר בפורמט: 0587710258</div>
               </div>
             </div>
 

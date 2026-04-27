@@ -40,6 +40,9 @@ export default function AddStationPage() {
   const [notes, setNotes] = useState("");
   const [showConnectorHelp, setShowConnectorHelp] = useState(false);
   const [showPricingHelp, setShowPricingHelp] = useState(false);
+  const [nearbyStations, setNearbyStations] = useState<
+    Array<{ id: string; title: string; city: string; connectorType: string; powerKw: number; location?: { lat: number; lng: number } }>
+  >([]);
   const [availability, setAvailability] = useState<
     Array<{ dayKey: string; label: string; enabled: boolean; start: string; end: string }>
   >([
@@ -84,6 +87,71 @@ export default function AddStationPage() {
     const auth = getClientAuth();
     return onAuthStateChanged(auth, (u) => setUser(u));
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const res = await fetch("/api/stations", { cache: "no-store" });
+        if (!res.ok) return;
+        const json = (await res.json().catch(() => null)) as null | {
+          stations?: Array<{
+            id: string;
+            title: string;
+            city: string;
+            connectorType: string;
+            powerKw: number;
+            location?: { lat: number; lng: number };
+          }>;
+        };
+        if (cancelled) return;
+        setNearbyStations(Array.isArray(json?.stations) ? json!.stations! : []);
+      } catch {
+        if (cancelled) return;
+        setNearbyStations([]);
+      }
+    }
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const nearbyList = useMemo(() => {
+    const base = Array.isArray(nearbyStations) ? nearbyStations : [];
+    const cityNeedle = city.trim();
+
+    function distKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
+      const R = 6371;
+      const dLat = ((b.lat - a.lat) * Math.PI) / 180;
+      const dLng = ((b.lng - a.lng) * Math.PI) / 180;
+      const lat1 = (a.lat * Math.PI) / 180;
+      const lat2 = (b.lat * Math.PI) / 180;
+      const x =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+      const c = 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
+      return R * c;
+    }
+
+    if (location) {
+      return base
+        .filter((s) => s.location && typeof s.location.lat === "number" && typeof s.location.lng === "number")
+        .map((s) => ({
+          ...s,
+          _distKm: distKm(location, s.location as { lat: number; lng: number }),
+        }))
+        .filter((s) => s._distKm <= 5)
+        .sort((a, b) => a._distKm - b._distKm)
+        .slice(0, 10);
+    }
+
+    if (cityNeedle) {
+      return base.filter((s) => (s.city ?? "").includes(cityNeedle)).slice(0, 10);
+    }
+
+    return [];
+  }, [city, location, nearbyStations]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -484,6 +552,30 @@ export default function AddStationPage() {
             </div>
           </div>
 
+          {nearbyList.length ? (
+            <div className="rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm">
+              <div className="text-sm font-semibold">עמדות בסביבה</div>
+              <div className="mt-1 text-xs text-zinc-500">מוצגות עמדות קרובות כדי למנוע כפילויות.</div>
+              <div className="mt-3 space-y-2">
+                {nearbyList.map((s: any) => (
+                  <a
+                    key={s.id}
+                    className="block rounded-xl border border-zinc-100 bg-zinc-50 p-3 text-right hover:bg-zinc-100"
+                    href={`/stations/${encodeURIComponent(s.id)}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    <div className="text-sm font-medium text-zinc-900">{s.title}</div>
+                    <div className="mt-0.5 text-xs text-zinc-600">
+                      {s.city} · {s.connectorType} · {s.powerKw}kW
+                      {typeof s._distKm === "number" ? ` · ${s._distKm.toFixed(1)} ק"מ` : ""}
+                    </div>
+                  </a>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-sm font-medium">שם מארח</label>
@@ -499,7 +591,7 @@ export default function AddStationPage() {
                 className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-right text-sm text-zinc-900 placeholder:text-zinc-400"
                 value={hostPhone}
                 onChange={(e) => setHostPhone(e.target.value)}
-                placeholder="+972..."
+                placeholder="0587710258"
               />
             </div>
           </div>

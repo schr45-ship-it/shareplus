@@ -5,6 +5,7 @@ import { onAuthStateChanged, type User } from "firebase/auth";
 
 import { getClientAuth } from "@/lib/firebaseClient";
 import { getIdToken } from "@/lib/auth";
+import { formatPhoneILLocal } from "@/lib/phone";
 
 type RequestItem = {
   id: string;
@@ -251,7 +252,9 @@ export default function ReportsPage() {
 
                     {tab === "sent" && item.status === "approved" && item.ownerPaidFee && item.stationHostPhone ? (
                       <div className="mt-3 rounded-xl border border-green-100 bg-green-50 p-3 text-sm text-zinc-800">
-                        <div className="font-medium">מספר הטלפון של בעל העמדה הוא: {item.stationHostPhone}</div>
+                        <div className="font-medium">
+                          מספר הטלפון של בעל העמדה הוא: {formatPhoneILLocal(item.stationHostPhone)}
+                        </div>
                         <a
                           className="mt-2 inline-block font-semibold text-zinc-900 underline"
                           href={`https://wa.me/${String(item.stationHostPhone).replace(/[^0-9]/g, "")}`}

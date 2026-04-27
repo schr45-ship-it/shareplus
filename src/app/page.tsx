@@ -7,6 +7,7 @@ import { onAuthStateChanged, signOut, type User } from "firebase/auth";
 import { getClientAuth, getWebPushToken, signInWithGoogle } from "@/lib/firebaseClient";
 import { isAdminEmail } from "@/lib/admin";
 import { getIdToken } from "@/lib/auth";
+import { formatPhoneILLocal } from "@/lib/phone";
 
 type StationPublic = {
   id: string;
@@ -15,6 +16,7 @@ type StationPublic = {
   powerKw: number;
   city: string;
   region?: string;
+  location?: { lat: number; lng: number };
   notes?: string;
   hoursStart?: string;
   hoursEnd?: string;
@@ -66,6 +68,10 @@ export default function Home() {
   const [filterTimeFrom, setFilterTimeFrom] = useState<string>("");
   const [filterTimeTo, setFilterTimeTo] = useState<string>("");
   const [highlightStationId, setHighlightStationId] = useState<string | null>(null);
+
+  const [stationsMapReady, setStationsMapReady] = useState(false);
+  const stationsMapRef = useRef<any>(null);
+  const stationsMarkersRef = useRef<any[]>([]);
 
   const [headerScrolled, setHeaderScrolled] = useState(false);
   const [hasNewMessage, setHasNewMessage] = useState(false);
@@ -299,6 +305,87 @@ export default function Home() {
       setError("לא ניתן לשתף כרגע");
     }
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if ((window as { L?: unknown }).L) {
+      setStationsMapReady(true);
+      return;
+    }
+
+    const existing = document.querySelector('link[data-leaflet="1"]');
+    if (!existing) {
+      const link = document.createElement("link");
+      link.rel = "stylesheet";
+      link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+      link.setAttribute("data-leaflet", "1");
+      document.head.appendChild(link);
+    }
+
+    const script = document.createElement("script");
+    script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+    script.async = true;
+    script.onload = () => setStationsMapReady(true);
+    script.onerror = () => setStationsMapReady(false);
+    document.body.appendChild(script);
+  }, []);
+
+  const stationsWithLocation = useMemo(() => {
+    return filteredStations.filter(
+      (s): s is StationPublic & { location: { lat: number; lng: number } } =>
+        typeof (s as any).location?.lat === "number" && typeof (s as any).location?.lng === "number"
+    );
+  }, [filteredStations]);
+
+  useEffect(() => {
+    if (!stationsMapReady) return;
+    if (typeof window === "undefined") return;
+    const L = (window as { L?: any }).L;
+    if (!L) return;
+
+    const el = document.getElementById("stations-map");
+    if (!el) return;
+
+    if (!stationsMapRef.current) {
+      const map = L.map(el, { scrollWheelZoom: false });
+      stationsMapRef.current = map;
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution: "&copy; OpenStreetMap",
+      }).addTo(map);
+    }
+
+    const map = stationsMapRef.current;
+
+    for (const m of stationsMarkersRef.current) {
+      try {
+        m.remove();
+      } catch {
+      }
+    }
+    stationsMarkersRef.current = [];
+
+    if (!stationsWithLocation.length) {
+      map.setView([32.0853, 34.7818], 8);
+      return;
+    }
+
+    const bounds = L.latLngBounds(
+      stationsWithLocation.map((s) => [s.location.lat, s.location.lng])
+    );
+
+    for (const s of stationsWithLocation) {
+      const marker = L.marker([s.location.lat, s.location.lng]).addTo(map);
+      marker.on("click", () => {
+        setHighlightStationId(s.id);
+        const el = document.getElementById(`station-${s.id}`);
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+      });
+      stationsMarkersRef.current.push(marker);
+    }
+
+    map.fitBounds(bounds, { padding: [24, 24] });
+  }, [stationsMapReady, stationsWithLocation]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -977,7 +1064,9 @@ export default function Home() {
                                   <div className="mt-1 text-xs text-zinc-500">רחוב: {s.street}</div>
                                 ) : null}
                                 {s.hostPhone ? (
-                                  <div className="mt-1 text-xs text-zinc-500">טלפון: {s.hostPhone}</div>
+                                  <div className="mt-1 text-xs text-zinc-500">
+                                    טלפון: {formatPhoneILLocal(s.hostPhone)}
+                                  </div>
                                 ) : null}
                               </div>
 
@@ -1247,6 +1336,12 @@ export default function Home() {
             </div>
           </div>
 
+          {stationsWithLocation.length ? (
+            <div className="mt-4 overflow-hidden rounded-2xl border border-zinc-100 bg-white shadow-sm">
+              <div id="stations-map" className="h-64 w-full" />
+            </div>
+          ) : null}
+
           {loadingStations ? (
             <div className="mt-4 text-sm text-zinc-600">טוען...</div>
           ) : filteredStations.length === 0 ? (
@@ -1258,6 +1353,7 @@ export default function Home() {
               {filteredStations.map((s) => (
                 <div
                   key={s.id}
+                  id={`station-${s.id}`}
                   className={`relative rounded-2xl border bg-white p-5 shadow-sm transition-colors ${
                     highlightStationId === s.id ? "border-emerald-400 bg-emerald-50/30" : "border-zinc-100"
                   }`}

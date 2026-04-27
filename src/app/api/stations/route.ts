@@ -14,6 +14,7 @@ export async function GET() {
         powerKw?: number;
         city?: string;
         region?: string;
+        location?: { lat?: number; lng?: number };
         notes?: string;
         hoursStart?: string;
         hoursEnd?: string;
@@ -31,6 +32,10 @@ export async function GET() {
         powerKw: data.powerKw ?? 11,
         city: data.city ?? "",
         region: data.region,
+        location:
+          typeof data.location?.lat === "number" && typeof data.location?.lng === "number"
+            ? { lat: data.location.lat, lng: data.location.lng }
+            : undefined,
         notes: data.notes,
         hoursStart: data.hoursStart,
         hoursEnd: data.hoursEnd,
