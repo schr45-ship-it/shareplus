@@ -27,7 +27,7 @@ export const metadata: Metadata = {
     siteName: "SharePlus",
     images: [
       {
-        url: "https://car.clap.co.il/hero.jpg",
+        url: "https://car.clap.co.il/hero.jpg?v=1",
         width: 1200,
         height: 630,
         alt: "SharePlus",
@@ -40,7 +40,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "SharePlus",
     description: "רשת טעינה שיתופית לקהילת ה-EV",
-    images: ["https://car.clap.co.il/hero.jpg"],
+    images: ["https://car.clap.co.il/hero.jpg?v=1"],
   },
 };
 
