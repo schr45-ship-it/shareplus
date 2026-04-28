@@ -19,6 +19,29 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "SharePlus",
   description: "רשת טעינה שיתופית לקהילת ה-EV",
+  metadataBase: new URL("https://car.clap.co.il"),
+  openGraph: {
+    title: "SharePlus",
+    description: "רשת טעינה שיתופית לקהילת ה-EV",
+    url: "https://car.clap.co.il/",
+    siteName: "SharePlus",
+    images: [
+      {
+        url: "https://car.clap.co.il/hero.jpg",
+        width: 1200,
+        height: 630,
+        alt: "SharePlus",
+      },
+    ],
+    locale: "he_IL",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "SharePlus",
+    description: "רשת טעינה שיתופית לקהילת ה-EV",
+    images: ["https://car.clap.co.il/hero.jpg"],
+  },
 };
 
 export default function RootLayout({
