@@ -20,6 +20,10 @@ export const metadata: Metadata = {
   title: "SharePlus",
   description: "רשת טעינה שיתופית לקהילת ה-EV",
   metadataBase: new URL("https://car.clap.co.il"),
+  other: {
+    "og:image:secure_url": "https://car.clap.co.il/hero.jpg?v=1",
+    "og:image:type": "image/jpeg",
+  },
   openGraph: {
     title: "SharePlus",
     description: "רשת טעינה שיתופית לקהילת ה-EV",
