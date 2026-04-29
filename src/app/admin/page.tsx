@@ -43,6 +43,12 @@ export default function AdminPage() {
   const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState<Stats | null>(null);
 
+  const [purgeDays, setPurgeDays] = useState<number>(30);
+  const [purgeIncludePending, setPurgeIncludePending] = useState(false);
+  const [purgeLoading, setPurgeLoading] = useState(false);
+  const [purgeError, setPurgeError] = useState<string | null>(null);
+  const [purgeOk, setPurgeOk] = useState<string | null>(null);
+
   const [view, setView] = useState<"stats" | "users">("stats");
   const [usersLoading, setUsersLoading] = useState(false);
   const [usersError, setUsersError] = useState<string | null>(null);
@@ -120,6 +126,50 @@ export default function AdminPage() {
       setUsersError(e instanceof Error ? e.message : "שגיאה לא צפויה");
     } finally {
       setUsersLoading(false);
+    }
+  }
+
+  async function purgeOldRequests() {
+    try {
+      setPurgeError(null);
+      setPurgeOk(null);
+      if (!user) {
+        setPurgeError("נדרשת התחברות");
+        return;
+      }
+
+      const ok = window.confirm(
+        `למחוק בקשות טעינה ישנות?\n\nימים: ${purgeDays}\nכולל ממתינות: ${purgeIncludePending ? "כן" : "לא"}\n\nלא ניתן לשחזר.`
+      );
+      if (!ok) return;
+
+      setPurgeLoading(true);
+      const token = await getIdToken(user);
+      const res = await fetch("/api/admin/interest-requests/purge", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          olderThanDays: purgeDays,
+          includePending: purgeIncludePending,
+        }),
+      });
+      const json = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+        deleted?: number;
+      };
+      if (!res.ok) throw new Error(json.error ?? "שגיאה במחיקה");
+
+      setPurgeOk(`נמחקו ${(json.deleted ?? 0).toLocaleString("he-IL")} בקשות`);
+      setTimeout(() => setPurgeOk(null), 2500);
+      await refresh();
+    } catch (e) {
+      setPurgeError(e instanceof Error ? e.message : "שגיאה לא צפויה");
+    } finally {
+      setPurgeLoading(false);
     }
   }
 
@@ -304,37 +354,89 @@ export default function AdminPage() {
           ) : null}
 
           {view === "stats" ? (
-            <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {items.map((it) => {
-                const clickable = it.key === "users";
-                if (clickable) {
+            <>
+              <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {items.map((it) => {
+                  const clickable = it.key === "users";
+                  if (clickable) {
+                    return (
+                      <button
+                        key={it.label}
+                        type="button"
+                        className="rounded-2xl border border-zinc-100 bg-zinc-50 p-4 text-right hover:bg-zinc-100"
+                        onClick={() => {
+                          setView("users");
+                        }}
+                      >
+                        <div className="text-xs font-medium text-zinc-500">{it.label}</div>
+                        <div className="mt-1 text-2xl font-semibold text-zinc-900">
+                          {typeof it.value === "number" ? it.value.toLocaleString("he-IL") : "—"}
+                        </div>
+                      </button>
+                    );
+                  }
+
                   return (
-                    <button
-                      key={it.label}
-                      type="button"
-                      className="rounded-2xl border border-zinc-100 bg-zinc-50 p-4 text-right hover:bg-zinc-100"
-                      onClick={() => {
-                        setView("users");
-                      }}
-                    >
+                    <div key={it.label} className="rounded-2xl border border-zinc-100 bg-zinc-50 p-4">
                       <div className="text-xs font-medium text-zinc-500">{it.label}</div>
                       <div className="mt-1 text-2xl font-semibold text-zinc-900">
                         {typeof it.value === "number" ? it.value.toLocaleString("he-IL") : "—"}
                       </div>
-                    </button>
-                  );
-                }
-
-                return (
-                  <div key={it.label} className="rounded-2xl border border-zinc-100 bg-zinc-50 p-4">
-                    <div className="text-xs font-medium text-zinc-500">{it.label}</div>
-                    <div className="mt-1 text-2xl font-semibold text-zinc-900">
-                      {typeof it.value === "number" ? it.value.toLocaleString("he-IL") : "—"}
                     </div>
+                  );
+                })}
+              </div>
+
+              <div className="mt-4 rounded-2xl border border-zinc-100 bg-zinc-50 p-4">
+                <div className="text-sm font-semibold">מחיקת בקשות ישנות</div>
+                <div className="mt-1 text-sm text-zinc-600">ברירת מחדל מוחקת רק בקשות סגורות/מבוטלות/נדחות/מאושרות.</div>
+
+                {purgeError ? (
+                  <div className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                    {purgeError}
                   </div>
-                );
-              })}
-            </div>
+                ) : null}
+                {purgeOk ? (
+                  <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">
+                    {purgeOk}
+                  </div>
+                ) : null}
+
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="text-xs text-zinc-500">מחק בקשות ישנות מ־(ימים)</label>
+                    <input
+                      className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm"
+                      inputMode="numeric"
+                      value={String(purgeDays)}
+                      onChange={(e) => {
+                        const n = Number(e.target.value);
+                        setPurgeDays(Number.isFinite(n) ? Math.max(1, Math.trunc(n)) : 30);
+                      }}
+                    />
+                  </div>
+                  <label className="flex items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm">
+                    <span>כולל בקשות ממתינות</span>
+                    <input
+                      type="checkbox"
+                      checked={purgeIncludePending}
+                      onChange={(e) => setPurgeIncludePending(e.target.checked)}
+                    />
+                  </label>
+                </div>
+
+                <div className="mt-3 flex justify-end">
+                  <button
+                    type="button"
+                    className="rounded-xl bg-black px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
+                    disabled={purgeLoading || loading}
+                    onClick={() => void purgeOldRequests()}
+                  >
+                    {purgeLoading ? "מוחק..." : "מחק בקשות"}
+                  </button>
+                </div>
+              </div>
+            </>
           ) : (
             <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="rounded-2xl border border-zinc-100 bg-white p-4">
