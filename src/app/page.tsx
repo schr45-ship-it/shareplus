@@ -9,6 +9,16 @@ import { isAdminEmail } from "@/lib/admin";
 import { getIdToken } from "@/lib/auth";
 import { formatPhoneILLocal } from "@/lib/phone";
 
+const PRESET_CITIES = [
+  "שדה תעופה",
+  "בית שאן",
+  "מירון",
+  "טבריה",
+  "ים המלח",
+  "אילת",
+  "הערבה",
+] as const;
+
 type StationPublic = {
   id: string;
   title: string;
@@ -62,12 +72,22 @@ export default function Home() {
   const [filterCity, setFilterCity] = useState("");
   const [filterConnector, setFilterConnector] = useState<string>("");
   const [filterMinPower, setFilterMinPower] = useState<number | "">("");
+  const [filterFast180, setFilterFast180] = useState(false);
   const [filterMaxPrice, setFilterMaxPrice] = useState<number | "">("");
   const [filterPricingType, setFilterPricingType] = useState<string>("");
   const [filterDate, setFilterDate] = useState<string>("");
   const [filterTimeFrom, setFilterTimeFrom] = useState<string>("");
   const [filterTimeTo, setFilterTimeTo] = useState<string>("");
   const [highlightStationId, setHighlightStationId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const minPower = filterMinPower === "" ? null : Number(filterMinPower);
+    if (minPower == null || !Number.isFinite(minPower)) {
+      setFilterFast180(false);
+      return;
+    }
+    setFilterFast180(minPower >= 180);
+  }, [filterMinPower]);
 
   const [stationsMapReady, setStationsMapReady] = useState(false);
   const stationsMapRef = useRef<any>(null);
@@ -95,12 +115,13 @@ export default function Home() {
   const isAdmin = useMemo(() => isAdminEmail(user?.email), [user?.email]);
 
   const citySuggestions = useMemo(() => {
-    const set = new Set(
+    const set = new Set<string>(
       stations
         .map((s) => (s.city ?? "").trim())
         .filter(Boolean)
         .map((c) => c)
     );
+    for (const c of PRESET_CITIES) set.add(c);
     return Array.from(set).sort((a, b) => a.localeCompare(b, "he"));
   }, [stations]);
 
@@ -1280,6 +1301,18 @@ export default function Home() {
                   inputMode="decimal"
                   placeholder="למשל 11"
                 />
+                <label className="mt-2 inline-flex items-center justify-end gap-2 text-xs text-zinc-700">
+                  <span>מהירה (180kW+)</span>
+                  <input
+                    type="checkbox"
+                    checked={filterFast180}
+                    onChange={(e) => {
+                      const on = e.target.checked;
+                      setFilterFast180(on);
+                      setFilterMinPower(on ? 180 : "");
+                    }}
+                  />
+                </label>
               </div>
 
               <div>

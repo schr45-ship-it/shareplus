@@ -9,6 +9,16 @@ import { getStation, updateStation, type StationDoc } from "@/lib/firestoreClien
 import { getIdToken } from "@/lib/auth";
 import { formatPhoneILLocal, isValidPhone, normalizePhoneE164 } from "@/lib/phone";
 
+const PRESET_CITIES = [
+  "שדה תעופה",
+  "בית שאן",
+  "מירון",
+  "טבריה",
+  "ים המלח",
+  "אילת",
+  "הערבה",
+] as const;
+
 declare global {
   interface Window {
     L?: unknown;
@@ -497,8 +507,14 @@ export default function EditStationPage({
               className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-right text-sm text-zinc-900 placeholder:text-zinc-400"
               value={city}
               onChange={(e) => setCity(e.target.value)}
+              list="cities"
               placeholder="לדוגמה: רעננה"
             />
+            <datalist id="cities">
+              {PRESET_CITIES.map((c) => (
+                <option key={c} value={c} />
+              ))}
+            </datalist>
           </div>
 
           <div>
