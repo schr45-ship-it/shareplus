@@ -21,7 +21,7 @@ export const metadata: Metadata = {
   description: "רשת טעינה שיתופית לקהילת ה-EV",
   metadataBase: new URL("https://car.clap.co.il"),
   other: {
-    "og:image:secure_url": "https://car.clap.co.il/hero.jpg?v=1",
+    "og:image:secure_url": "https://car.clap.co.il/og.jpg?v=1",
     "og:image:type": "image/jpeg",
   },
   openGraph: {
@@ -31,7 +31,7 @@ export const metadata: Metadata = {
     siteName: "SharePlus",
     images: [
       {
-        url: "https://car.clap.co.il/hero.jpg?v=1",
+        url: "https://car.clap.co.il/og.jpg?v=1",
         width: 1200,
         height: 630,
         alt: "SharePlus",
@@ -44,7 +44,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "SharePlus",
     description: "רשת טעינה שיתופית לקהילת ה-EV",
-    images: ["https://car.clap.co.il/hero.jpg?v=1"],
+    images: ["https://car.clap.co.il/og.jpg?v=1"],
   },
 };
 
