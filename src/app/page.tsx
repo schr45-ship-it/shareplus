@@ -994,6 +994,13 @@ export default function Home() {
             </div>
           </div>
         </div>
+
+        <div className="mx-auto mb-6 w-full max-w-xl text-right">
+          <div className="space-y-2 text-sm text-zinc-700">
+            <div>יש לכם עמדת טעינה? רוצים להרויח ממנה? רשמו את העמדה שלכם.</div>
+            <div>יש לכם רכב חשמלי ואתם רוצים לטעון בכל מקום ובזול? חפשו עמדה בחיפוש למטה.</div>
+          </div>
+        </div>
         <div className="rounded-2xl border border-zinc-100 bg-zinc-50 px-6 py-2">
           {user ? (
             <div>
