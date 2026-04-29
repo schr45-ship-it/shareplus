@@ -4,6 +4,7 @@ import "./globals.css";
 
 import AccessibilityWidget from "@/components/AccessibilityWidget";
 import Footer from "@/components/Footer";
+import PhoneGate from "@/components/PhoneGate";
 import TermsGate from "@/components/TermsGate";
 
 const geistSans = Geist({
@@ -60,6 +61,7 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <TermsGate />
+        <PhoneGate />
         {children}
         <Footer />
         <AccessibilityWidget />
