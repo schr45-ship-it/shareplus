@@ -1,0 +1,34 @@
+{
+  "metadata": {
+    "title": "AI SharePlus — AI-Powered News & Video Summaries",
+    "description": "Daily summaries of the latest news and videos, translated into multiple languages."
+  },
+  "nav": {
+    "home": "Home",
+    "search": "Search",
+    "categories": "Categories"
+  },
+  "home": {
+    "latest": "Latest Summaries",
+    "readMore": "Read more",
+    "noResults": "No articles found yet."
+  },
+  "article": {
+    "keyTakeaways": "Key Takeaways",
+    "source": "Original source",
+    "publishedAt": "Published",
+    "related": "Related summaries"
+  },
+  "search": {
+    "placeholder": "Search summaries...",
+    "searchButton": "Search",
+    "resultsFor": "Results for",
+    "noResults": "No results found. Try a different query."
+  },
+  "category": {
+    "articlesIn": "Articles in {{category}}"
+  },
+  "errors": {
+    "articleNotFound": "Article not found."
+  }
+}

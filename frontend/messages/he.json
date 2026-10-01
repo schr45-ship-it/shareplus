@@ -1,0 +1,34 @@
+{
+  "metadata": {
+    "title": "AI SharePlus — סיכומי חדשות וסרטונים מבוססי AI",
+    "description": "סיכומים יומיים של החדשות והסרטונים האחרונים, מתורגמים לשפות רבות."
+  },
+  "nav": {
+    "home": "דף הבית",
+    "search": "חיפוש",
+    "categories": "קטגוריות"
+  },
+  "home": {
+    "latest": "הסיכומים האחרונים",
+    "readMore": "קרא עוד",
+    "noResults": "טרם נמצאו מאמרים."
+  },
+  "article": {
+    "keyTakeaways": "נקודות מפתח",
+    "source": "מקור המאמר",
+    "publishedAt": "פורסם בתאריך",
+    "related": "סיכומים קשורים"
+  },
+  "search": {
+    "placeholder": "חפש בסיכומים...",
+    "searchButton": "חפש",
+    "resultsFor": "תוצאות עבור",
+    "noResults": "לא נמצאו תוצאות. נסה שאילתה אחרת."
+  },
+  "category": {
+    "articlesIn": "מאמרים בקטגוריה {{category}}"
+  },
+  "errors": {
+    "articleNotFound": "המאמר לא נמצא."
+  }
+}

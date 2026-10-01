@@ -1,0 +1,159 @@
+{
+  "name": "ai-shareplus: YouTube Ingestion (v2)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            { "field": "hours", "hoursInterval": 1 }
+          ]
+        }
+      },
+      "id": "yt-schedule-v2",
+      "name": "Every Hour",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "sources",
+        "filters": {
+          "conditions": [
+            { "column": "source_type", "condition": "equal", "value": "youtube" },
+            { "column": "is_active", "condition": "equal", "value": "true" }
+          ]
+        }
+      },
+      "id": "get-yt-sources-v2",
+      "name": "Get YouTube Sources",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [450, 300],
+      "credentials": { "supabaseApi": "supabase-service-role" }
+    },
+    {
+      "parameters": {
+        "jsCode": "const apiKey = $getEnvironmentVariable('YOUTUBE_DATA_API_KEY');\nconst sources = $input.all()[0].json || [];\nconst results = [];\n\nasync function resolveChannelId(handleOrId) {\n  // If already starts with UC and is 24 chars, treat as channel ID\n  if (/^UC[A-Za-z0-9_-]{22}$/.test(handleOrId)) {\n    return handleOrId;\n  }\n  // Handle @channelname or channel name\n  const handle = handleOrId.startsWith('@') ? handleOrId.slice(1) : handleOrId;\n  const url = `https://www.googleapis.com/youtube/v3/channels?part=id&forHandle=${encodeURIComponent(handle)}&key=${apiKey}`;\n  const res = await $httpRequest({ method: 'GET', url, responseFormat: 'json', timeout: 15000 });\n  if (!res.items || res.items.length === 0) {\n    throw new Error(`Could not resolve channel handle: ${handleOrId}`);\n  }\n  return res.items[0].id;\n}\n\nasync function fetchChannelVideos(channelId) {\n  const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${encodeURIComponent(channelId)}&maxResults=25&order=date&type=video&key=${apiKey}`;\n  return await $httpRequest({ method: 'GET', url, responseFormat: 'json', timeout: 20000 });\n}\n\nfor (const source of sources) {\n  try {\n    const channelId = await resolveChannelId(source.url);\n    const data = await fetchChannelVideos(channelId);\n    const videos = (data.items || []).map((item) => {\n      const videoId = item.id?.videoId;\n      const snippet = item.snippet || {};\n      if (!videoId) return null;\n      return {\n        source_id: source.id,\n        source_url: `https://www.youtube.com/watch?v=${videoId}`,\n        canonical_url: `https://www.youtube.com/watch?v=${videoId}`,\n        content_hash: videoId,\n        source_type: 'video',\n        original_language: source.language || 'en',\n        category_id: source.category_id,\n        title: snippet.title || '',\n        published_date: snippet.publishedAt,\n        featured_image_url: snippet.thumbnails?.high?.url || snippet.thumbnails?.default?.url,\n        status: 'pending',\n        fetch_error: null\n      };\n    }).filter(Boolean);\n    results.push(...videos.map(v => ({ json: v })));\n  } catch (err) {\n    results.push({\n      json: {\n        source_id: source.id,\n        step: 'fetch',\n        status: 'error',\n        message: err.message || 'YouTube fetch failed'\n      }\n    });\n  }\n}\nreturn results;",
+        "options": { "continueOnFail": true }
+      },
+      "id": "fetch-youtube-v2",
+      "name": "Fetch YouTube Videos",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Separate errors from valid videos\nconst all = $input.all();\nconst errors = all.filter(i => i.json.step === 'fetch' && i.json.status === 'error');\nconst videos = all.filter(i => !i.json.step && !i.json.fetch_error);\nreturn [...videos, ...errors];"
+      },
+      "id": "route-yt-errors-v2",
+      "name": "Route Errors",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "articles",
+        "returnAll": false,
+        "limit": 1,
+        "filters": {
+          "conditions": [
+            { "column": "content_hash", "condition": "equal", "value": "={{ $json.content_hash }}" }
+          ]
+        }
+      },
+      "id": "check-duplicate-v2",
+      "name": "Check Duplicate",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1050, 300],
+      "credentials": { "supabaseApi": "supabase-service-role" }
+    },
+    {
+      "parameters": {
+        "jsCode": "const duplicate = $input.all();\nconst item = $input.first().json;\n\nif (item.step && item.status === 'error') {\n  return [{ json: item }];\n}\n\nif (duplicate.length === 0 || !duplicate[0].json.id) {\n  return [{ json: item }];\n}\n\nreturn [{ json: { source_id: item.source_id, step: 'dedupe', status: 'skipped', message: 'Duplicate: ' + item.source_url } }];"
+      },
+      "id": "filter-new-v2",
+      "name": "Keep New Only",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "tableId": "articles",
+        "dataMode": "define",
+        "fieldsUi": {
+          "fieldValues": [
+            { "fieldId": "source_id", "fieldValue": "={{ $json.source_id }}" },
+            { "fieldId": "source_url", "fieldValue": "={{ $json.source_url }}" },
+            { "fieldId": "canonical_url", "fieldValue": "={{ $json.canonical_url }}" },
+            { "fieldId": "content_hash", "fieldValue": "={{ $json.content_hash }}" },
+            { "fieldId": "source_type", "fieldValue": "={{ $json.source_type }}" },
+            { "fieldId": "original_language", "fieldValue": "={{ $json.original_language }}" },
+            { "fieldId": "category_id", "fieldValue": "={{ $json.category_id }}" },
+            { "fieldId": "published_date", "fieldValue": "={{ $json.published_date }}" },
+            { "fieldId": "featured_image_url", "fieldValue": "={{ $json.featured_image_url }}" },
+            { "fieldId": "status", "fieldValue": "pending" }
+          ]
+        }
+      },
+      "id": "insert-article-v2",
+      "name": "Insert Article",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1450, 300],
+      "credentials": { "supabaseApi": "supabase-service-role" }
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nif (item.id) {\n  return [{ json: { article_id: item.id, source_id: item.source_id, step: 'fetch', status: 'success', message: 'YouTube video ingested' } }];\n}\nif (item.step) {\n  return [{ json: item }];\n}\nreturn [];"
+      },
+      "id": "prepare-log-v2",
+      "name": "Prepare Log",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1650, 300]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "tableId": "processing_logs",
+        "dataMode": "define",
+        "fieldsUi": {
+          "fieldValues": [
+            { "fieldId": "article_id", "fieldValue": "={{ $json.article_id }}" },
+            { "fieldId": "source_id", "fieldValue": "={{ $json.source_id }}" },
+            { "fieldId": "step", "fieldValue": "={{ $json.step }}" },
+            { "fieldId": "status", "fieldValue": "={{ $json.status }}" },
+            { "fieldId": "message", "fieldValue": "={{ $json.message }}" }
+          ]
+        }
+      },
+      "id": "log-result-v2",
+      "name": "Log Result",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1850, 300],
+      "credentials": { "supabaseApi": "supabase-service-role" }
+    }
+  ],
+  "connections": {
+    "Every Hour": { "main": [[{ "node": "Get YouTube Sources", "type": "main", "index": 0 }]] },
+    "Get YouTube Sources": { "main": [[{ "node": "Fetch YouTube Videos", "type": "main", "index": 0 }]] },
+    "Fetch YouTube Videos": { "main": [[{ "node": "Route Errors", "type": "main", "index": 0 }]] },
+    "Route Errors": { "main": [[{ "node": "Check Duplicate", "type": "main", "index": 0 }]] },
+    "Check Duplicate": { "main": [[{ "node": "Keep New Only", "type": "main", "index": 0 }]] },
+    "Keep New Only": { "main": [[{ "node": "Insert Article", "type": "main", "index": 0 }]] },
+    "Insert Article": { "main": [[{ "node": "Prepare Log", "type": "main", "index": 0 }]] },
+    "Prepare Log": { "main": [[{ "node": "Log Result", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "staticData": null,
+  "tags": []
+}

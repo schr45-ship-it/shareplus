@@ -1,0 +1,34 @@
+{
+  "metadata": {
+    "title": "AI SharePlus — Resúmenes de noticias y videos impulsados por IA",
+    "description": "Resúmenes diarios de las últimas noticias y videos, traducidos a varios idiomas."
+  },
+  "nav": {
+    "home": "Inicio",
+    "search": "Buscar",
+    "categories": "Categorías"
+  },
+  "home": {
+    "latest": "Últimos resúmenes",
+    "readMore": "Leer más",
+    "noResults": "Aún no se han encontrado artículos."
+  },
+  "article": {
+    "keyTakeaways": "Puntos clave",
+    "source": "Fuente original",
+    "publishedAt": "Publicado",
+    "related": "Resúmenes relacionados"
+  },
+  "search": {
+    "placeholder": "Buscar resúmenes...",
+    "searchButton": "Buscar",
+    "resultsFor": "Resultados para",
+    "noResults": "No se encontraron resultados. Prueba otra consulta."
+  },
+  "category": {
+    "articlesIn": "Artículos en {{category}}"
+  },
+  "errors": {
+    "articleNotFound": "Artículo no encontrado."
+  }
+}

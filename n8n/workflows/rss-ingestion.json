@@ -1,0 +1,174 @@
+{
+  "name": "ai-shareplus: RSS Ingestion (v2)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 30
+            }
+          ]
+        }
+      },
+      "id": "rss-schedule-v2",
+      "name": "Every 30 mins",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "sources",
+        "filters": {
+          "conditions": [
+            { "column": "source_type", "condition": "equal", "value": "rss" },
+            { "column": "is_active", "condition": "equal", "value": "true" }
+          ]
+        }
+      },
+      "id": "get-sources-v2",
+      "name": "Get RSS Sources",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [450, 300],
+      "credentials": { "supabaseApi": "supabase-service-role" }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Fetch each RSS feed and capture errors per source\nconst sources = $input.all()[0].json || [];\nconst results = [];\n\nfor (const source of sources) {\n  try {\n    const res = await $httpRequest({\n      method: 'GET',\n      url: source.url,\n      responseFormat: 'text',\n      timeout: 20000\n    });\n    results.push({\n      json: {\n        source_id: source.id,\n        source_name: source.name,\n        source_language: source.language || 'en',\n        category_id: source.category_id,\n        xml: String(res),\n        fetch_error: null\n      }\n    });\n  } catch (err) {\n    results.push({\n      json: {\n        source_id: source.id,\n        source_name: source.name,\n        fetch_error: err.message || 'Failed to fetch RSS'\n      }\n    });\n  }\n}\nreturn results;",
+        "options": { "continueOnFail": true }
+      },
+      "id": "fetch-rss-v2",
+      "name": "Fetch RSS Feeds",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse RSS XML and generate articles\nconst Parser = require('rss-parser');\nconst parser = new Parser();\nconst outputs = [];\n\nfor (const item of $input.all()) {\n  const feed = item.json;\n  if (feed.fetch_error) {\n    outputs.push({\n      json: {\n        source_id: feed.source_id,\n        step: 'fetch',\n        status: 'error',\n        message: feed.fetch_error\n      }\n    });\n    continue;\n  }\n\n  try {\n    const parsed = await parser.parseString(feed.xml);\n    for (const article of parsed.items.slice(0, 20)) {\n      const url = (article.link || article.guid || '').split('#')[0].trim();\n      if (!url) continue;\n      const cleanUrl = url.split('?')[0];\n      const title = (article.title || '').trim();\n      const contentHash = Buffer.from(title.toLowerCase() + '|' + cleanUrl).toString('base64');\n      outputs.push({\n        json: {\n          source_id: feed.source_id,\n          source_url: url,\n          canonical_url: cleanUrl,\n          content_hash: contentHash,\n          source_type: 'news',\n          original_language: feed.source_language,\n          category_id: feed.category_id,\n          title: title,\n          published_date: article.isoDate || article.pubDate || null,\n          author: article.author || article.creator || null,\n          status: 'pending',\n          parse_error: null\n        }\n      });\n    }\n  } catch (err) {\n    outputs.push({\n      json: {\n        source_id: feed.source_id,\n        step: 'parse',\n        status: 'error',\n        message: err.message || 'Failed to parse RSS'\n      }\n    });\n  }\n}\nreturn outputs;",
+        "options": { "continueOnFail": true }
+      },
+      "id": "parse-rss-v2",
+      "name": "Parse RSS Items",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Route parse errors to log; pass new articles forward\nconst items = $input.all();\nconst errors = items.filter(i => i.json.step && i.json.status === 'error');\nconst articles = items.filter(i => !i.json.step && !i.json.parse_error);\n\nconst output = [\n  ...articles.map(i => ({ json: i.json })),\n  ...errors.map(i => ({ json: i.json }))\n];\nreturn output;"
+      },
+      "id": "route-errors-v2",
+      "name": "Route Parse Errors",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "articles",
+        "returnAll": false,
+        "limit": 1,
+        "filters": {
+          "conditions": [
+            { "column": "content_hash", "condition": "equal", "value": "={{ $json.content_hash }}" }
+          ]
+        }
+      },
+      "id": "check-duplicate-v2",
+      "name": "Check Duplicate",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1250, 300],
+      "credentials": { "supabaseApi": "supabase-service-role" }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Keep only non-duplicate articles; log duplicates and errors\nconst duplicate = $input.all();\nconst item = $input.first().json;\n\nif (item.step && item.status === 'error') {\n  return [{ json: item }]; // pass through to log\n}\n\nif (duplicate.length === 0 || !duplicate[0].json.id) {\n  return [{ json: item }];\n}\n\nreturn [{ json: { source_id: item.source_id, step: 'dedupe', status: 'skipped', message: 'Duplicate: ' + item.source_url } }];"
+      },
+      "id": "filter-new-v2",
+      "name": "Keep New Only",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1450, 300]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "tableId": "articles",
+        "dataMode": "define",
+        "fieldsUi": {
+          "fieldValues": [
+            { "fieldId": "source_id", "fieldValue": "={{ $json.source_id }}" },
+            { "fieldId": "source_url", "fieldValue": "={{ $json.source_url }}" },
+            { "fieldId": "canonical_url", "fieldValue": "={{ $json.canonical_url }}" },
+            { "fieldId": "content_hash", "fieldValue": "={{ $json.content_hash }}" },
+            { "fieldId": "source_type", "fieldValue": "={{ $json.source_type }}" },
+            { "fieldId": "original_language", "fieldValue": "={{ $json.original_language }}" },
+            { "fieldId": "category_id", "fieldValue": "={{ $json.category_id }}" },
+            { "fieldId": "published_date", "fieldValue": "={{ $json.published_date }}" },
+            { "fieldId": "author", "fieldValue": "={{ $json.author }}" },
+            { "fieldId": "status", "fieldValue": "pending" }
+          ]
+        }
+      },
+      "id": "insert-article-v2",
+      "name": "Insert Article",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1650, 300],
+      "credentials": { "supabaseApi": "supabase-service-role" }
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nif (item.id) {\n  return [{ json: { article_id: item.id, source_id: item.source_id, step: 'fetch', status: 'success', message: 'Article ingested from RSS' } }];\n}\nif (item.step) {\n  return [{ json: item }]; // error/skip log\n}\nreturn [];"
+      },
+      "id": "prepare-log-v2",
+      "name": "Prepare Log",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1850, 300]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "tableId": "processing_logs",
+        "dataMode": "define",
+        "fieldsUi": {
+          "fieldValues": [
+            { "fieldId": "article_id", "fieldValue": "={{ $json.article_id }}" },
+            { "fieldId": "source_id", "fieldValue": "={{ $json.source_id }}" },
+            { "fieldId": "step", "fieldValue": "={{ $json.step }}" },
+            { "fieldId": "status", "fieldValue": "={{ $json.status }}" },
+            { "fieldId": "message", "fieldValue": "={{ $json.message }}" }
+          ]
+        }
+      },
+      "id": "log-result-v2",
+      "name": "Log Result",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [2050, 300],
+      "credentials": { "supabaseApi": "supabase-service-role" }
+    }
+  ],
+  "connections": {
+    "Every 30 mins": { "main": [[{ "node": "Get RSS Sources", "type": "main", "index": 0 }]] },
+    "Get RSS Sources": { "main": [[{ "node": "Fetch RSS Feeds", "type": "main", "index": 0 }]] },
+    "Fetch RSS Feeds": { "main": [[{ "node": "Parse RSS Items", "type": "main", "index": 0 }]] },
+    "Parse RSS Items": { "main": [[{ "node": "Route Parse Errors", "type": "main", "index": 0 }]] },
+    "Route Parse Errors": { "main": [[{ "node": "Check Duplicate", "type": "main", "index": 0 }]] },
+    "Check Duplicate": { "main": [[{ "node": "Keep New Only", "type": "main", "index": 0 }]] },
+    "Keep New Only": { "main": [[{ "node": "Insert Article", "type": "main", "index": 0 }]] },
+    "Insert Article": { "main": [[{ "node": "Prepare Log", "type": "main", "index": 0 }]] },
+    "Prepare Log": { "main": [[{ "node": "Log Result", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "staticData": null,
+  "tags": []
+}

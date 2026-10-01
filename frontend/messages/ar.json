@@ -1,0 +1,34 @@
+{
+  "metadata": {
+    "title": "AI SharePlus — ملخصات أخبار وفيديوهات مدعومة بالذكاء الاصطناعي",
+    "description": "ملخصات يومية لأحدث الأخبار والفيديوهات، مترجمة إلى عدة لغات."
+  },
+  "nav": {
+    "home": "الرئيسية",
+    "search": "بحث",
+    "categories": "التصنيفات"
+  },
+  "home": {
+    "latest": "أحدث الملخصات",
+    "readMore": "اقرأ المزيد",
+    "noResults": "لم يتم العثور على مقالات بعد."
+  },
+  "article": {
+    "keyTakeaways": "النقاط الرئيسية",
+    "source": "المصدر الأصلي",
+    "publishedAt": "نُشر في",
+    "related": "ملخصات ذات صلة"
+  },
+  "search": {
+    "placeholder": "ابحث في الملخصات...",
+    "searchButton": "بحث",
+    "resultsFor": "نتائج لـ",
+    "noResults": "لم يتم العثور على نتائج. جرّب استعلامًا آخر."
+  },
+  "category": {
+    "articlesIn": "مقالات في {{category}}"
+  },
+  "errors": {
+    "articleNotFound": "المقال غير موجود."
+  }
+}
