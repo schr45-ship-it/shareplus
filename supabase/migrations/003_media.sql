@@ -3,7 +3,9 @@
 -- Exposes youtube_video_id for video embeds on article pages
 -- ============================================================
 
-CREATE OR REPLACE FUNCTION get_article_by_slug(
+DROP FUNCTION IF EXISTS get_article_by_slug(varchar(5), text);
+
+CREATE FUNCTION get_article_by_slug(
   p_language VARCHAR(5),
   p_slug TEXT
 )

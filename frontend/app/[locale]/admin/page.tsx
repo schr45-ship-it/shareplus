@@ -27,6 +27,7 @@ type Category = {
 type RecentArticle = {
   id: string;
   status: string;
+  source_type: string;
   published_at: string | null;
   created_at: string;
   source_url: string;
@@ -35,6 +36,8 @@ type RecentArticle = {
   title_en: string | null;
   views: number;
   clicks: number;
+  featured_image_url: string | null;
+  youtube_video_id: string | null;
 };
 
 type Overview = {
@@ -45,6 +48,9 @@ type Overview = {
     pending: number;
     views: number;
     clicks: number;
+    videos: number;
+    videos_published: number;
+    news: number;
   };
   categories: Category[];
   sources: Source[];
@@ -208,11 +214,13 @@ export default function AdminPage() {
       )}
 
       {/* KPI cards */}
-      <section className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+      <section className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-8">
         {[
-          ["סה״כ כתבות", t.articles],
+          ["סה״כ תוכן", t.articles],
           ["מפורסמות", t.published],
           ["בתור", t.pending],
+          ["כתבות RSS", t.news],
+          ["סרטונים", t.videos],
           ["צפיות", t.views],
           ["קליקים למקור", t.clicks],
           ["מקורות פעילים", data.sources.filter((s) => s.is_active).length],
@@ -332,6 +340,7 @@ export default function AdminPage() {
           <thead>
             <tr className="border-b text-right text-xs text-zinc-500">
               <th className="py-2">כותרת</th>
+              <th>סוג</th>
               <th>קטגוריה</th>
               <th>סטטוס</th>
               <th>צפיות</th>
@@ -344,6 +353,17 @@ export default function AdminPage() {
               <tr key={a.id} className="border-b last:border-0">
                 <td className="max-w-64 truncate py-2" title={a.title_he ?? a.title_en ?? a.source_url}>
                   {a.title_he ?? a.title_en ?? a.source_url}
+                </td>
+                <td className="text-center">
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                      a.source_type === "video"
+                        ? "bg-red-100 text-red-700"
+                        : "bg-blue-100 text-blue-700"
+                    }`}
+                  >
+                    {a.source_type === "video" ? "וידאו" : "RSS"}
+                  </span>
                 </td>
                 <td className="text-center text-xs">{a.category_slug ?? "—"}</td>
                 <td className="text-center"><StatusBadge status={a.status} /></td>
