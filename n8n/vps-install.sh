@@ -9,8 +9,13 @@ echo " ai-shareplus n8n VPS Installer"
 echo "=================================="
 echo ""
 
-# Prompt for domain
-read -rp "Enter the domain for n8n (e.g., n8n.yourdomain.com): " N8N_DOMAIN
+# Prompt for domain (or accept as first argument)
+if [ -n "$1" ]; then
+  N8N_DOMAIN="$1"
+else
+  read -rp "Enter the domain for n8n (e.g., n8n.yourdomain.com): " N8N_DOMAIN
+fi
+
 if [ -z "$N8N_DOMAIN" ]; then
   echo "❌ Domain is required."
   exit 1

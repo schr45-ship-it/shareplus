@@ -32,3 +32,9 @@ yarn-error.log*
 # TypeScript
 *.tsbuildinfo
 next-env.d.ts
+
+exec*.json
+wf.json
+ai-run*.json
+g-*.json
+g-body.json

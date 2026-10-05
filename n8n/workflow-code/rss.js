@@ -5,7 +5,7 @@ for (const source of sources || []) {
   let found = 0;
   let inserted = 0;
   try {
-    const xml = await $httpRequest({ method: 'GET', url: source.url, responseFormat: 'text', timeout: 25000 });
+    const xml = await _http({ method: 'GET', url: source.url, responseFormat: 'text', timeout: 25000 });
     const blocks = String(xml).match(/<item[\s>][\s\S]*?<\/item>|<entry[\s>][\s\S]*?<\/entry>/gi) || [];
 
     for (const block of blocks.slice(0, 20)) {

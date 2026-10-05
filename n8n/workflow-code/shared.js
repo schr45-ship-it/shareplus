@@ -1,4 +1,22 @@
-const getVar = (name) => ($vars && $vars[name]) || ($env && $env[name]) || '';
+const __helpers = this.helpers;
+async function _http(o) {
+  const opts = {
+    method: o.method || 'GET',
+    url: o.url,
+    headers: o.headers || {},
+    timeout: o.timeout || 30000,
+  };
+  if (o.body !== undefined) opts.body = o.body;
+  if (o.responseFormat === 'json' || typeof o.body === 'object') opts.json = true;
+  return await __helpers.httpRequest(opts);
+}
+
+let __cfg = {};
+try { __cfg = $input.first()?.json || {}; } catch (_) {}
+const getVar = (name) => {
+  try { if ($vars && $vars[name]) return $vars[name]; } catch (_) {}
+  return __cfg[name] || '';
+};
 const SUPABASE_URL = getVar('SUPABASE_URL').replace(/\/$/, '');
 const SERVICE_KEY = getVar('SUPABASE_SERVICE_ROLE_KEY');
 const SITE_URL = getVar('NEXT_PUBLIC_SITE_URL').replace(/\/$/, '');
@@ -24,7 +42,7 @@ async function supabase(path, method = 'GET', body, extra = {}) {
     responseFormat: extra.responseFormat || 'json',
   };
   if (body !== undefined) options.body = body;
-  return await $httpRequest(options);
+  return await _http(options);
 }
 
 async function logStep(articleId, sourceId, step, status, message, metadata = {}) {
@@ -40,7 +58,7 @@ async function logStep(articleId, sourceId, step, status, message, metadata = {}
   } catch (_) {}
 }
 
-function cleanText(text, max = 12000) {
+function cleanText(text, max = 6000) {
   return String(text || '')
     .replace(/<script[\s\S]*?<\/script>/gi, ' ')
     .replace(/<style[\s\S]*?<\/style>/gi, ' ')

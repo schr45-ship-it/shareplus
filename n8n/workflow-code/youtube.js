@@ -2,7 +2,7 @@ const YOUTUBE_KEY = getVar('YOUTUBE_DATA_API_KEY');
 if (!YOUTUBE_KEY) throw new Error('Missing YOUTUBE_DATA_API_KEY in n8n Variables');
 
 async function ytJson(url) {
-  return await $httpRequest({ method: 'GET', url, responseFormat: 'json', timeout: 25000 });
+  return await _http({ method: 'GET', url, responseFormat: 'json', timeout: 25000 });
 }
 
 async function channelIdFor(value) {

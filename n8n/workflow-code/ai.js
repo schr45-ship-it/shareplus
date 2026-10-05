@@ -2,7 +2,7 @@ const GEMINI_KEY = getVar('GEMINI_API_KEY');
 const FIRECRAWL_KEY = getVar('FIRECRAWL_API_KEY');
 if (!GEMINI_KEY) throw new Error('Missing GEMINI_API_KEY in n8n Variables');
 
-const articles = await supabase('articles?select=*&status=in.(pending,failed)&order=created_at.asc&limit=10');
+const articles = await supabase('articles?select=*&status=in.(pending,failed)&order=created_at.asc&limit=2');
 const categories = await supabase('categories?select=id,slug');
 const categoryIds = Object.fromEntries((categories || []).map((c) => [c.slug, c.id]));
 const validCategories = ['technology', 'business', 'science', 'health', 'world', 'entertainment', 'sports'];
@@ -16,7 +16,7 @@ async function fetchText(article) {
   const meta = article.raw_metadata || {};
   if (article.source_type === 'video') {
     try {
-      const embed = await $httpRequest({ method: 'GET', url: `https://www.youtube.com/oembed?url=${encodeURIComponent(article.source_url)}&format=json`, responseFormat: 'json', timeout: 15000 });
+      const embed = await _http({ method: 'GET', url: `https://www.youtube.com/oembed?url=${encodeURIComponent(article.source_url)}&format=json`, responseFormat: 'json', timeout: 15000 });
       const title = embed.title || meta.title || '';
       const author = embed.author_name || meta.channel_title || '';
       const description = meta.description || '';
@@ -28,11 +28,11 @@ async function fetchText(article) {
 
   try {
     const jina = `https://r.jina.ai/http://${article.source_url.replace(/^https?:\/\//, '')}`;
-    const text = await $httpRequest({ method: 'GET', url: jina, responseFormat: 'text', timeout: 25000 });
+    const text = await _http({ method: 'GET', url: jina, responseFormat: 'text', timeout: 25000 });
     return cleanText(text);
   } catch (jinaError) {
     if (FIRECRAWL_KEY) {
-      const res = await $httpRequest({
+      const res = await _http({
         method: 'POST',
         url: 'https://api.firecrawl.dev/v1/scrape',
         headers: { Authorization: `Bearer ${FIRECRAWL_KEY}`, 'Content-Type': 'application/json' },
@@ -42,7 +42,7 @@ async function fetchText(article) {
       });
       return cleanText(res?.data?.markdown || res?.markdown || '');
     }
-    const html = await $httpRequest({ method: 'GET', url: article.source_url, responseFormat: 'text', timeout: 25000 });
+    const html = await _http({ method: 'GET', url: article.source_url, responseFormat: 'text', timeout: 25000 });
     return cleanText(`${meta.title || ''}\n${meta.description || ''}\n${html}`);
   }
 }
@@ -53,9 +53,9 @@ async function summarize(article, text) {
   let response;
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
-      response = await $httpRequest({
+      response = await _http({
         method: 'POST',
-        url: `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${encodeURIComponent(GEMINI_KEY)}`,
+        url: `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${encodeURIComponent(GEMINI_KEY)}`,
         headers: { 'Content-Type': 'application/json' },
         body: {
           contents: [{ role: 'user', parts: [{ text: prompt }] }],
@@ -76,7 +76,14 @@ async function summarize(article, text) {
 
   let output = response?.candidates?.[0]?.content?.parts?.map((p) => p.text || '').join('') || '';
   output = output.replace(/^```(?:json)?/i, '').replace(/```$/i, '').trim();
-  const parsed = JSON.parse(output);
+  let parsed;
+  try {
+    parsed = JSON.parse(output);
+  } catch (_) {
+    const start = output.indexOf('{');
+    const end = output.lastIndexOf('}');
+    parsed = JSON.parse(output.slice(start, end + 1));
+  }
 
   for (const lang of ['en', 'he', 'es', 'ar']) {
     if (!parsed[lang]?.title || !parsed[lang]?.executive_summary) throw new Error(`Gemini response missing ${lang}`);
@@ -131,7 +138,7 @@ for (const article of articles || []) {
 
     if (SITE_URL && REVALIDATE_SECRET) {
       try {
-        await $httpRequest({
+        await _http({
           method: 'POST',
           url: `${SITE_URL}/api/revalidate`,
           headers: { 'Content-Type': 'application/json', 'x-revalidate-secret': REVALIDATE_SECRET },
