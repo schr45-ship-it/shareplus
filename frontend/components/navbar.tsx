@@ -1,18 +1,20 @@
 "use client";
 
 import { Link } from "@/i18n/routing";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { LocaleSwitcher } from "./locale-switcher";
+import { SITE_URL } from "@/lib/site";
 
 export function Navbar() {
   const t = useTranslations("nav");
+  const locale = useLocale();
 
   return (
     <header className="border-b border-zinc-200 bg-white">
       <div className="mx-auto max-w-5xl px-4 py-3 sm:py-4">
         <div className="flex items-center justify-between">
-          <Link
-            href="/"
+          <a
+            href={`${SITE_URL}/${locale}`}
             className="flex items-center gap-2.5 hover:opacity-80"
           >
             <img
@@ -23,7 +25,7 @@ export function Navbar() {
             <span className="text-lg font-bold text-foreground sm:text-xl">
               SharePlus
             </span>
-          </Link>
+          </a>
           <LocaleSwitcher />
         </div>
         <nav className="mt-2 flex items-center gap-4 overflow-x-auto pb-1 sm:gap-5">
