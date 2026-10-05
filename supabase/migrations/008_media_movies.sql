@@ -16,7 +16,7 @@ ON CONFLICT (slug) DO UPDATE SET
 
 -- Subcategories under media
 INSERT INTO subcategories (category_id, slug, name_json)
-SELECT c.id, s.slug, s.names
+SELECT c.id, s.slug, s.names::jsonb
 FROM categories c
 JOIN (VALUES
   ('videos',      '{"en":"Videos","he":"סרטונים","es":"Videos","ar":"مقاطع فيديو"}'),

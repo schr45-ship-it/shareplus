@@ -24,7 +24,7 @@ CREATE INDEX IF NOT EXISTS idx_articles_subcategory ON articles(subcategory_id);
 -- Seed subcategories under their parent categories
 WITH cat AS (SELECT id, slug FROM categories)
 INSERT INTO subcategories (category_id, slug, name_json)
-SELECT cat.id, s.slug, s.names
+SELECT cat.id, s.slug, s.names::jsonb
 FROM cat
 JOIN (VALUES
   ('technology', 'ai',            '{"en":"AI & Machine Learning","he":"בינה מלאכותית","es":"IA y aprendizaje automático","ar":"الذكاء الاصطناعي"}'),
