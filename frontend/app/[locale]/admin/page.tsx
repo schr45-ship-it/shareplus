@@ -34,6 +34,8 @@ type RecentArticle = {
   category_slug: string | null;
   title_he: string | null;
   title_en: string | null;
+  slug_he: string | null;
+  slug_en: string | null;
   views: number;
   clicks: number;
   featured_image_url: string | null;
@@ -118,6 +120,7 @@ export default function AdminPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
+  const [filter, setFilter] = useState<string>("all");
 
   const supabase = createClient();
 
@@ -215,19 +218,22 @@ export default function AdminPage() {
 
       {/* KPI cards */}
       <section className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-8">
-        {[
-          ["סה״כ תוכן", t.articles],
-          ["מפורסמות", t.published],
-          ["בתור", t.pending],
-          ["כתבות RSS", t.news],
-          ["סרטונים", t.videos],
-          ["צפיות", t.views],
-          ["קליקים למקור", t.clicks],
-          ["מקורות פעילים", data.sources.filter((s) => s.is_active).length],
-        ].map(([label, value]) => (
+        {([
+          ["סה״כ תוכן", t.articles, "all"],
+          ["מפורסמות", t.published, "published"],
+          ["בתור", t.pending, "pending"],
+          ["כתבות RSS", t.news, "rss"],
+          ["סרטונים", t.videos, "video"],
+          ["צפיות", t.views, null],
+          ["קליקים למקור", t.clicks, null],
+          ["מקורות פעילים", data.sources.filter((s) => s.is_active).length, null],
+        ] as const).map(([label, value, f]) => (
           <div
             key={label}
-            className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm"
+            onClick={f ? () => setFilter(f) : undefined}
+            className={`rounded-xl border bg-white p-4 shadow-sm transition ${
+              f ? "cursor-pointer hover:border-blue-400" : ""
+            } ${filter === f ? "border-blue-500 ring-1 ring-blue-500" : "border-zinc-200"}`}
           >
             <div className="text-2xl font-bold text-zinc-900">{value}</div>
             <div className="text-xs text-zinc-500">{label}</div>
@@ -335,7 +341,17 @@ export default function AdminPage() {
 
       {/* Recent articles */}
       <section className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
-        <h2 className="mb-3 font-semibold">כתבות אחרונות</h2>
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="font-semibold">כתבות אחרונות</h2>
+          {filter !== "all" && (
+            <button
+              onClick={() => setFilter("all")}
+              className="rounded-lg bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100"
+            >
+              נקה סינון ✕
+            </button>
+          )}
+        </div>
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b text-right text-xs text-zinc-500">
@@ -350,7 +366,19 @@ export default function AdminPage() {
             </tr>
           </thead>
           <tbody>
-            {data.recent_articles.map((a) => (
+            {data.recent_articles
+              .filter((a) =>
+                filter === "all"
+                  ? true
+                  : filter === "pending"
+                    ? ["pending", "failed", "extracting", "summarizing", "translating"].includes(a.status)
+                    : filter === "rss"
+                      ? a.source_type === "news"
+                      : filter === "video"
+                        ? a.source_type === "video"
+                        : a.status === filter,
+              )
+              .map((a) => (
               <tr key={a.id} className="border-b last:border-0">
                 <td className="py-2">
                   {a.youtube_video_id ? (
@@ -372,7 +400,18 @@ export default function AdminPage() {
                   )}
                 </td>
                 <td className="max-w-64 truncate py-2" title={a.title_he ?? a.title_en ?? a.source_url}>
-                  {a.title_he ?? a.title_en ?? a.source_url}
+                  {a.status === "published" && a.category_slug && (a.slug_he || a.slug_en) ? (
+                    <a
+                      href={`/he/${a.category_slug}/${a.slug_he ?? a.slug_en}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:underline"
+                    >
+                      {a.title_he ?? a.title_en ?? a.source_url}
+                    </a>
+                  ) : (
+                    a.title_he ?? a.title_en ?? a.source_url
+                  )}
                 </td>
                 <td className="text-center">
                   <span

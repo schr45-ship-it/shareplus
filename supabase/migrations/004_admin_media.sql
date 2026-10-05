@@ -58,6 +58,10 @@ BEGIN
             WHERE at.article_id = a.id AND at.language = 'he' LIMIT 1) AS title_he,
           (SELECT at.title FROM article_translations at
             WHERE at.article_id = a.id AND at.language = 'en' LIMIT 1) AS title_en,
+          (SELECT at.seo_slug FROM article_translations at
+            WHERE at.article_id = a.id AND at.language = 'he' LIMIT 1) AS slug_he,
+          (SELECT at.seo_slug FROM article_translations at
+            WHERE at.article_id = a.id AND at.language = 'en' LIMIT 1) AS slug_en,
           COALESCE(s.views, 0) AS views,
           COALESCE(s.clicks_to_source, 0) AS clicks,
           a.featured_image_url,
