@@ -410,7 +410,14 @@ export default function AdminPage() {
                       {a.title_he ?? a.title_en ?? a.source_url}
                     </a>
                   ) : (
-                    a.title_he ?? a.title_en ?? a.source_url
+                    <a
+                      href={a.source_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-zinc-600 hover:text-blue-600 hover:underline"
+                    >
+                      {a.title_he ?? a.title_en ?? a.source_url}
+                    </a>
                   )}
                 </td>
                 <td className="text-center">
