@@ -132,6 +132,7 @@ export default function AdminPage() {
   const [showGallery, setShowGallery] = useState(false);
   const [galleryCat, setGalleryCat] = useState<string>("all");
   const [reports, setReports] = useState<any[]>([]);
+  const [messages, setMessages] = useState<any[]>([]);
   const [newCat, setNewCat] = useState({ slug: "", en: "", he: "", es: "", ar: "" });
   const ART_PAGE_SIZE = 20;
 
@@ -162,6 +163,8 @@ export default function AdminPage() {
       setData(data as Overview);
       const { data: reps } = await (supabase.rpc as any)("admin_reports", { p_token: t });
       setReports((reps as any[]) ?? []);
+      const { data: msgs } = await (supabase.rpc as any)("admin_contact_messages", { p_token: t });
+      setMessages((msgs as any[]) ?? []);
     },
     [supabase],
   );
@@ -334,6 +337,38 @@ export default function AdminPage() {
                 >
                   הסר כתבה
                 </button>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Contact messages */}
+      {messages.length > 0 && (
+        <section className="mb-8 rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
+          <h2 className="mb-3 font-semibold">הודעות צור קשר ({messages.length})</h2>
+          <div className="space-y-3">
+            {messages.map((m: any) => (
+              <div key={m.id} className={`rounded-lg border p-3 ${m.is_read ? "border-zinc-200 bg-zinc-50 opacity-70" : "border-blue-200 bg-blue-50"}`}>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0 text-sm">
+                    <b>{m.name}</b>{" "}
+                    <a href={`mailto:${m.email}`} className="text-blue-600 hover:underline">{m.email}</a>
+                    <span className="mr-2 text-xs text-zinc-400">
+                      {new Date(m.created_at).toLocaleDateString("he-IL")}{" "}
+                      {new Date(m.created_at).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" })}
+                      {m.locale ? ` · ${m.locale}` : ""}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => call("admin_mark_message", { p_message: m.id, p_read: !m.is_read }, m.id)}
+                    disabled={busy === m.id}
+                    className="rounded-md bg-zinc-100 px-3 py-1.5 text-xs font-medium hover:bg-zinc-200 disabled:opacity-50"
+                  >
+                    {m.is_read ? "סמן לא נקרא" : "סמן נקרא"}
+                  </button>
+                </div>
+                <p className="mt-1 whitespace-pre-wrap text-sm text-zinc-700">{m.message}</p>
               </div>
             ))}
           </div>

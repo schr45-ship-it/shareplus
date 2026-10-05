@@ -1,4 +1,5 @@
 import { Metadata } from "next";
+import ContactForm from "@/components/contact-form";
 
 type Props = { params: Promise<{ locale: string }> };
 
@@ -46,14 +47,8 @@ export default async function ContactPage({ params }: Props) {
       <h1 className="mb-4 text-3xl font-bold text-zinc-900">{c.title}</h1>
       <p className="mb-8 text-lg leading-relaxed text-zinc-600">{c.intro}</p>
       <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
-        <div className="text-sm text-zinc-500">{c.emailLabel}</div>
-        <a
-          href="mailto:contact@shareplus.news"
-          className="text-lg font-medium text-blue-600 hover:underline"
-        >
-          contact@shareplus.news
-        </a>
-        <p className="mt-3 text-sm text-zinc-500">{c.note}</p>
+        <ContactForm locale={locale} />
+        <p className="mt-4 text-sm text-zinc-500">{c.note}</p>
       </div>
     </div>
   );
