@@ -8,7 +8,11 @@ VALUES
    '{"en":"Media","he":"מדיה","es":"Medios","ar":"وسائط"}'::jsonb,
    '{"en":"Videos and full movies from YouTube","he":"סרטונים וסרטים מלאים מיוטיוב","es":"Videos y películas completas de YouTube","ar":"مقاطع فيديو وأفلام كاملة من يوتيوب"}'::jsonb,
    '#8b5cf6', true)
-ON CONFLICT (slug) DO NOTHING;
+ON CONFLICT (slug) DO UPDATE SET
+  name_json = EXCLUDED.name_json,
+  description_json = EXCLUDED.description_json,
+  color = EXCLUDED.color,
+  is_active = true;
 
 -- Subcategories under media
 INSERT INTO subcategories (category_id, slug, name_json)

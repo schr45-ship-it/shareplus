@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { articleImageUrl } from "@/lib/site";
 
 type Source = {
   id: string;
@@ -298,7 +299,7 @@ export default function AdminPage() {
             {reports.map((r: any) => (
               <div key={r.id} className="flex items-center gap-3 rounded-lg bg-white p-3">
                 {r.featured_image_url && (
-                  <img src={r.featured_image_url} alt="" className="h-12 w-20 rounded-md object-cover" />
+                  <img src={articleImageUrl(r.featured_image_url) ?? undefined} alt="" className="h-12 w-20 rounded-md object-cover" />
                 )}
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm font-medium">
@@ -368,7 +369,7 @@ export default function AdminPage() {
               {shown.map((a) => {
                 const img = a.youtube_video_id
                   ? `https://i.ytimg.com/vi/${a.youtube_video_id}/hqdefault.jpg`
-                  : a.featured_image_url!;
+                  : (articleImageUrl(a.featured_image_url) ?? "");
                 const inner = (
                   <>
                     <img src={img} alt="" className="aspect-video w-full rounded-lg object-cover" loading="lazy" />
@@ -403,7 +404,7 @@ export default function AdminPage() {
           <span className="text-zinc-400">{showCategories ? "▲" : "▼"}</span>
         </button>
         {showCategories && (
-        <table className="mt-3 w-full text-sm">
+        <div className="overflow-x-auto"><table className="mt-3 w-full text-sm">
           <thead>
             <tr className="border-b text-right text-xs text-zinc-500">
               <th className="py-2">נושא</th>
@@ -444,7 +445,7 @@ export default function AdminPage() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
         )}
         {showCategories && (
           <form
@@ -499,7 +500,7 @@ export default function AdminPage() {
           <span className="text-zinc-400">{showSources ? "▲" : "▼"}</span>
         </button>
         {showSources && (
-        <table className="mt-3 w-full text-sm">
+        <div className="overflow-x-auto"><table className="mt-3 w-full text-sm">
           <thead>
             <tr className="border-b text-right text-xs text-zinc-500">
               <th className="py-2">מקור</th>
@@ -542,7 +543,7 @@ export default function AdminPage() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
         )}
       </section>
 
@@ -559,7 +560,7 @@ export default function AdminPage() {
             </button>
           )}
         </div>
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto"><table className="w-full text-sm">
           <thead>
             <tr className="border-b text-right text-xs text-zinc-500">
               <th className="py-2">תמונה</th>
@@ -587,7 +588,7 @@ export default function AdminPage() {
                     />
                   ) : a.featured_image_url ? (
                     <img
-                      src={a.featured_image_url}
+                      src={articleImageUrl(a.featured_image_url) ?? undefined}
                       alt=""
                       className="h-12 w-20 rounded-md object-cover"
                     />
@@ -671,7 +672,7 @@ export default function AdminPage() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
         {(() => {
           const total = data.recent_articles.filter(matchesFilter).length;
           const pages = Math.ceil(total / ART_PAGE_SIZE);

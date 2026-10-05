@@ -12,7 +12,7 @@ import {
   SourceLinkTracker,
 } from "@/components/article-analytics";
 import { ReportButton } from "@/components/report-button";
-import { SITE_URL } from "@/lib/site";
+import { SITE_URL, articleImageUrl } from "@/lib/site";
 
 type Props = {
   params: Promise<{ locale: string; category: string; slug: string }>;
@@ -109,7 +109,7 @@ export default async function ArticlePage({ params }: Props) {
       ) : (
         article.featured_image_url && (
           <img
-            src={article.featured_image_url}
+            src={articleImageUrl(article.featured_image_url) ?? undefined}
             alt={article.title}
             className="mb-8 aspect-video w-full rounded-xl object-cover"
           />

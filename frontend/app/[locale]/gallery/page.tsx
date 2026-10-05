@@ -1,6 +1,7 @@
 import { getCategories, getLatestArticles } from "@/lib/supabase/queries";
 import { Link } from "@/i18n/routing";
 import { Metadata } from "next";
+import { articleImageUrl } from "@/lib/site";
 
 type Props = { params: Promise<{ locale: string }> };
 
@@ -60,7 +61,7 @@ export default async function GalleryPage({ params }: Props) {
               >
                 <div className="aspect-video w-full overflow-hidden bg-zinc-100">
                   <img
-                    src={a.featured_image_url!}
+                    src={articleImageUrl(a.featured_image_url) ?? undefined}
                     alt={a.title}
                     loading="lazy"
                     className="h-full w-full object-cover transition duration-300 group-hover:scale-105"

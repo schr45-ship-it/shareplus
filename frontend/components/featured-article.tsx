@@ -1,6 +1,7 @@
 import { Link } from "@/i18n/routing";
 import { ArticleSummary } from "@/lib/supabase/queries";
 import { formatDate } from "@/lib/utils";
+import { articleImageUrl } from "@/lib/site";
 
 const badgeLabels: Record<string, string> = {
   en: "Featured",
@@ -29,7 +30,7 @@ export function FeaturedArticle({
         <div className="relative aspect-video w-full overflow-hidden bg-zinc-100 md:aspect-auto md:min-h-64">
           {article.featured_image_url ? (
             <img
-              src={article.featured_image_url}
+              src={articleImageUrl(article.featured_image_url) ?? undefined}
               alt={article.title}
               className="absolute inset-0 h-full w-full object-cover transition duration-300 group-hover:scale-105"
             />

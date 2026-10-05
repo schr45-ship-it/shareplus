@@ -1,6 +1,7 @@
 import { Link } from "@/i18n/routing";
 import { ArticleSummary } from "@/lib/supabase/queries";
 import { formatDate } from "@/lib/utils";
+import { articleImageUrl } from "@/lib/site";
 
 export function ArticleCard({
   article,
@@ -24,7 +25,7 @@ export function ArticleCard({
       {article.featured_image_url && (
         <Link href={href as any} className="block aspect-video w-full overflow-hidden bg-zinc-100">
           <img
-            src={article.featured_image_url}
+            src={articleImageUrl(article.featured_image_url) ?? undefined}
             alt={title}
             className="h-full w-full object-cover transition duration-300 hover:scale-105"
             loading="lazy"
