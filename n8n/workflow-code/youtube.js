@@ -16,10 +16,14 @@ async function channelIdFor(value) {
   return res.items[0].id;
 }
 
-const sources = await supabase('sources?select=id,name,url,language,category_id&source_type=eq.youtube&is_active=eq.true');
+const sources = await supabase('sources?select=id,name,url,language,category_id,categories(is_active)&source_type=eq.youtube&is_active=eq.true');
 const results = [];
 
 for (const source of sources || []) {
+  if (source.categories && source.categories.is_active === false) {
+    results.push({ source: source.name, skipped: 'category inactive' });
+    continue;
+  }
   let found = 0;
   let inserted = 0;
   try {

@@ -117,6 +117,7 @@ export async function getCategories(language: string): Promise<Category[]> {
   const { data, error } = await supabase
     .from("categories")
     .select("*")
+    .eq("is_active", true)
     .order("slug");
 
   if (error) {
