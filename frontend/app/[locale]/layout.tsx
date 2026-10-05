@@ -7,6 +7,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "../globals.css";
 import { LocaleDirection } from "@/components/locale-direction";
 import { Navbar } from "@/components/navbar";
+import { CategoryNav } from "@/components/category-nav";
 import { GoogleAnalytics } from "@/components/google-analytics";
 import { AdSenseScript } from "@/components/adsense-banner";
 
@@ -59,6 +60,7 @@ export default async function LocaleLayout({ children, params }: Props) {
         <LocaleDirection locale={locale}>
           <NextIntlClientProvider locale={locale} messages={messages}>
             <Navbar />
+            <CategoryNav locale={locale} />
             <main className="flex-1">{children}</main>
           </NextIntlClientProvider>
         </LocaleDirection>

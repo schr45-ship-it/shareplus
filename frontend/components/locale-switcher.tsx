@@ -5,11 +5,11 @@ import { useParams } from "next/navigation";
 import { useTransition } from "react";
 import { locales, Locale } from "@/i18n/routing";
 
-const labels: Record<Locale, string> = {
-  en: "English",
-  he: "עברית",
-  es: "Español",
-  ar: "العربية",
+const labels: Record<Locale, { name: string; short: string }> = {
+  en: { name: "English", short: "EN" },
+  he: { name: "עברית", short: "עב" },
+  es: { name: "Español", short: "ES" },
+  ar: { name: "العربية", short: "عر" },
 };
 
 export function LocaleSwitcher() {
@@ -27,17 +27,26 @@ export function LocaleSwitcher() {
   }
 
   return (
-    <select
-      value={currentLocale}
-      onChange={(e) => handleChange(e.target.value)}
-      disabled={isPending}
-      className="rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm focus:border-blue-500 focus:outline-none"
+    <div
+      role="group"
+      aria-label="Language"
+      className="flex items-center gap-1 rounded-full border border-zinc-200 bg-zinc-50 p-1"
     >
       {locales.map((locale) => (
-        <option key={locale} value={locale}>
-          {labels[locale]}
-        </option>
+        <button
+          key={locale}
+          onClick={() => handleChange(locale)}
+          disabled={isPending}
+          title={labels[locale].name}
+          className={`rounded-full px-2.5 py-1 text-xs font-semibold transition disabled:opacity-50 ${
+            locale === currentLocale
+              ? "bg-blue-600 text-white shadow-sm"
+              : "text-zinc-600 hover:bg-zinc-200"
+          }`}
+        >
+          {labels[locale].short}
+        </button>
       ))}
-    </select>
+    </div>
   );
 }
