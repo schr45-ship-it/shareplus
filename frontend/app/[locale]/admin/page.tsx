@@ -40,6 +40,8 @@ type RecentArticle = {
   clicks: number;
   featured_image_url: string | null;
   youtube_video_id: string | null;
+  source_id: string | null;
+  source_name: string | null;
 };
 
 type Overview = {
@@ -123,6 +125,16 @@ export default function AdminPage() {
   const [filter, setFilter] = useState<string>("all");
   const [artPage, setArtPage] = useState(1);
   const ART_PAGE_SIZE = 20;
+
+  const matchesFilter = (a: RecentArticle) => {
+    if (filter === "all") return true;
+    if (filter === "pending") return ["pending", "failed", "extracting", "summarizing", "translating"].includes(a.status);
+    if (filter === "rss") return a.source_type === "news";
+    if (filter === "video") return a.source_type === "video";
+    if (filter.startsWith("cat:")) return a.category_slug === filter.slice(4);
+    if (filter.startsWith("src:")) return a.source_id === filter.slice(4);
+    return a.status === filter;
+  };
 
   const supabase = createClient();
 
@@ -276,7 +288,14 @@ export default function AdminPage() {
             {data.categories.map((c) => (
               <tr key={c.id} className="border-b last:border-0">
                 <td className="py-2 font-medium">
-                  {c.name_json?.he ?? c.name_json?.en ?? c.slug}
+                  <button
+                    onClick={() => { setFilter(`cat:${c.slug}`); setArtPage(1); }}
+                    className={`rounded-md px-1.5 py-0.5 hover:bg-blue-50 hover:text-blue-700 ${
+                      filter === `cat:${c.slug}` ? "bg-blue-100 text-blue-700" : ""
+                    }`}
+                  >
+                    {c.name_json?.he ?? c.name_json?.en ?? c.slug}
+                  </button>
                 </td>
                 <td className="text-center">{c.article_count}</td>
                 <td className="text-center">{c.published_count}</td>
@@ -316,7 +335,14 @@ export default function AdminPage() {
             {data.sources.map((s) => (
               <tr key={s.id} className="border-b last:border-0">
                 <td className="max-w-48 truncate py-2 font-medium" title={s.url}>
-                  {s.name}
+                  <button
+                    onClick={() => { setFilter(`src:${s.id}`); setArtPage(1); }}
+                    className={`rounded-md px-1.5 py-0.5 hover:bg-blue-50 hover:text-blue-700 ${
+                      filter === `src:${s.id}` ? "bg-blue-100 text-blue-700" : ""
+                    }`}
+                  >
+                    {s.name}
+                  </button>
                 </td>
                 <td className="text-center">{s.source_type}</td>
                 <td className="text-center">{s.article_count}</td>
@@ -369,17 +395,7 @@ export default function AdminPage() {
           </thead>
           <tbody>
             {data.recent_articles
-              .filter((a) =>
-                filter === "all"
-                  ? true
-                  : filter === "pending"
-                    ? ["pending", "failed", "extracting", "summarizing", "translating"].includes(a.status)
-                    : filter === "rss"
-                      ? a.source_type === "news"
-                      : filter === "video"
-                        ? a.source_type === "video"
-                        : a.status === filter,
-              )
+              .filter(matchesFilter)
               .slice((artPage - 1) * ART_PAGE_SIZE, artPage * ART_PAGE_SIZE)
               .map((a) => (
               <tr key={a.id} className="border-b last:border-0">
@@ -471,17 +487,7 @@ export default function AdminPage() {
           </tbody>
         </table>
         {(() => {
-          const total = data.recent_articles.filter((a) =>
-            filter === "all"
-              ? true
-              : filter === "pending"
-                ? ["pending", "failed", "extracting", "summarizing", "translating"].includes(a.status)
-                : filter === "rss"
-                  ? a.source_type === "news"
-                  : filter === "video"
-                    ? a.source_type === "video"
-                    : a.status === filter,
-          ).length;
+          const total = data.recent_articles.filter(matchesFilter).length;
           const pages = Math.ceil(total / ART_PAGE_SIZE);
           if (pages <= 1) return null;
           return (

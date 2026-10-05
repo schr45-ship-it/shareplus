@@ -54,6 +54,8 @@ BEGIN
         SELECT
           a.id, a.status, a.source_type, a.published_at, a.created_at, a.source_url,
           c.slug AS category_slug,
+          a.source_id,
+          (SELECT so.name FROM sources so WHERE so.id = a.source_id) AS source_name,
           (SELECT at.title FROM article_translations at
             WHERE at.article_id = a.id AND at.language = 'he' LIMIT 1) AS title_he,
           (SELECT at.title FROM article_translations at
