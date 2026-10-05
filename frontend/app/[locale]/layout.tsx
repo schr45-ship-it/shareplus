@@ -5,6 +5,7 @@ import { routing } from "@/i18n/routing";
 import { notFound } from "next/navigation";
 import { Geist, Geist_Mono } from "next/font/google";
 import "../globals.css";
+import { SITE_URL } from "@/lib/site";
 import { LocaleDirection } from "@/components/locale-direction";
 import { Navbar } from "@/components/navbar";
 import { CategoryNav } from "@/components/category-nav";
@@ -31,8 +32,24 @@ export async function generateMetadata({ params }: Props) {
   const t = await getTranslations({ locale, namespace: "metadata" });
 
   return {
+    metadataBase: new URL(SITE_URL),
     title: t("title"),
     description: t("description"),
+    alternates: {
+      canonical: `/${locale}`,
+      languages: Object.fromEntries([
+        ...routing.locales.map((l) => [l, `/${l}`]),
+        ["x-default", `/${routing.defaultLocale}`],
+      ]),
+    },
+    openGraph: {
+      siteName: "AI SharePlus",
+      type: "website",
+      locale,
+    },
+    ...(process.env.GOOGLE_SITE_VERIFICATION
+      ? { verification: { google: process.env.GOOGLE_SITE_VERIFICATION } }
+      : {}),
   };
 }
 

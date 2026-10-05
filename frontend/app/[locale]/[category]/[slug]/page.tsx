@@ -12,6 +12,7 @@ import {
   SourceLinkTracker,
 } from "@/components/article-analytics";
 import { ReportButton } from "@/components/report-button";
+import { SITE_URL } from "@/lib/site";
 
 type Props = {
   params: Promise<{ locale: string; category: string; slug: string }>;
@@ -32,7 +33,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const url = `/${locale}/${category}/${slug}`;
   const ogImage =
     article.featured_image_url ||
-    `${process.env.NEXT_PUBLIC_SITE_URL}/api/og?title=${encodeURIComponent(
+    `${SITE_URL}/api/og?title=${encodeURIComponent(
       title,
     )}&category=${encodeURIComponent(
       article.category_name?.[locale] ||
