@@ -11,6 +11,8 @@ import { Navbar } from "@/components/navbar";
 import { CategoryNav } from "@/components/category-nav";
 import { GoogleAnalytics } from "@/components/google-analytics";
 import { AdSenseScript } from "@/components/adsense-banner";
+import { Footer } from "@/components/footer";
+import { CookieBanner } from "@/components/cookie-banner";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -79,6 +81,8 @@ export default async function LocaleLayout({ children, params }: Props) {
             <Navbar />
             <CategoryNav locale={locale} />
             <main className="flex-1">{children}</main>
+            <Footer locale={locale} />
+            <CookieBanner locale={locale} />
           </NextIntlClientProvider>
         </LocaleDirection>
       </body>

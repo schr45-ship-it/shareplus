@@ -5,7 +5,16 @@ import { SITE_URL } from "@/lib/site";
 
 export const revalidate = 3600;
 
-const STATIC_PAGES = ["", "/about", "/contact", "/gallery", "/search"];
+const STATIC_PAGES = [
+  "",
+  "/about",
+  "/contact",
+  "/gallery",
+  "/search",
+  "/privacy",
+  "/terms",
+  "/accessibility",
+];
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const supabase = await createClient();
