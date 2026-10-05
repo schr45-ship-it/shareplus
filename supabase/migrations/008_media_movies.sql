@@ -34,6 +34,22 @@ FROM (VALUES
 JOIN categories c ON c.slug = 'media'
 WHERE NOT EXISTS (SELECT 1 FROM sources ex WHERE ex.url = s.url);
 
+-- Admin: update an article's image URL (fixes corrupted/duplicate images)
+CREATE OR REPLACE FUNCTION admin_set_article_image(
+  p_token TEXT,
+  p_article UUID,
+  p_url TEXT
+)
+RETURNS BOOLEAN AS $$
+BEGIN
+  IF NOT admin_check(p_token) THEN
+    RAISE EXCEPTION 'unauthorized';
+  END IF;
+  UPDATE articles SET featured_image_url = p_url WHERE id = p_article;
+  RETURN FOUND;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 -- Admin: create a subcategory from the dashboard
 CREATE OR REPLACE FUNCTION admin_add_subcategory(
   p_token TEXT,
