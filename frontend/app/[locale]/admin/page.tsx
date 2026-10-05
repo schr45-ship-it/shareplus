@@ -339,6 +339,7 @@ export default function AdminPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b text-right text-xs text-zinc-500">
+              <th className="py-2">תמונה</th>
               <th className="py-2">כותרת</th>
               <th>סוג</th>
               <th>קטגוריה</th>
@@ -351,6 +352,25 @@ export default function AdminPage() {
           <tbody>
             {data.recent_articles.map((a) => (
               <tr key={a.id} className="border-b last:border-0">
+                <td className="py-2">
+                  {a.youtube_video_id ? (
+                    <img
+                      src={`https://i.ytimg.com/vi/${a.youtube_video_id}/default.jpg`}
+                      alt=""
+                      className="h-12 w-20 rounded-md object-cover"
+                    />
+                  ) : a.featured_image_url ? (
+                    <img
+                      src={a.featured_image_url}
+                      alt=""
+                      className="h-12 w-20 rounded-md object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-12 w-20 items-center justify-center rounded-md bg-zinc-100 text-[10px] text-zinc-400">
+                      ללא תמונה
+                    </div>
+                  )}
+                </td>
                 <td className="max-w-64 truncate py-2" title={a.title_he ?? a.title_en ?? a.source_url}>
                   {a.title_he ?? a.title_en ?? a.source_url}
                 </td>
