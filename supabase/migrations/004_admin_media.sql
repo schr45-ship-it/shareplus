@@ -67,9 +67,12 @@ BEGIN
           COALESCE(s.views, 0) AS views,
           COALESCE(s.clicks_to_source, 0) AS clicks,
           a.featured_image_url,
-          a.raw_metadata->>'youtube_video_id' AS youtube_video_id
+          a.raw_metadata->>'youtube_video_id' AS youtube_video_id,
+          sc.slug AS subcategory_slug,
+          sc.name_json AS subcategory_name
         FROM articles a
         LEFT JOIN categories c ON c.id = a.category_id
+        LEFT JOIN subcategories sc ON sc.id = a.subcategory_id
         LEFT JOIN article_stats s ON s.article_id = a.id
         ORDER BY a.created_at DESC
         LIMIT 500

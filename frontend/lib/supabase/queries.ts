@@ -16,6 +16,8 @@ export type ArticleSummary = {
   category_slug: string | null;
   category_name: Record<string, string> | null;
   featured_image_url: string | null;
+  subcategory_slug?: string | null;
+  subcategory_name?: Record<string, string> | null;
 };
 
 export type ArticleDetail = {

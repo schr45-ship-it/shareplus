@@ -42,6 +42,8 @@ type RecentArticle = {
   youtube_video_id: string | null;
   source_id: string | null;
   source_name: string | null;
+  subcategory_slug: string | null;
+  subcategory_name: Record<string, string> | null;
 };
 
 type Overview = {
@@ -573,7 +575,14 @@ export default function AdminPage() {
                     {a.source_type === "video" ? "וידאו" : "RSS"}
                   </span>
                 </td>
-                <td className="text-center text-xs">{a.category_slug ?? "—"}</td>
+                <td className="text-center text-xs">
+                  {a.category_slug ?? "—"}
+                  {a.subcategory_name && (
+                    <div className="text-[10px] text-blue-600">
+                      {a.subcategory_name.he ?? a.subcategory_name.en}
+                    </div>
+                  )}
+                </td>
                 <td className="text-center"><StatusBadge status={a.status} /></td>
                 <td className="text-center">{a.views}</td>
                 <td className="text-center">{a.clicks}</td>

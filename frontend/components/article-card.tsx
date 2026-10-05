@@ -38,6 +38,11 @@ export function ArticleCard({
             {article.category_name[locale] ?? article.category_name["en"]}
           </span>
         )}
+        {article.subcategory_name && (
+          <span className="rounded-full bg-blue-50 px-2 py-1 font-medium text-blue-700">
+            {article.subcategory_name[locale] ?? article.subcategory_name["en"]}
+          </span>
+        )}
         <time dateTime={article.published_at ?? undefined}>
           {formatDate(article.published_at, locale)}
         </time>
