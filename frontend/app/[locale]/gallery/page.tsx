@@ -3,78 +3,161 @@ import { Link } from "@/i18n/routing";
 import { Metadata } from "next";
 import { articleImageUrl, categoryLabel } from "@/lib/site";
 
-type Props = { params: Promise<{ locale: string }> };
+export const dynamic = "force-dynamic";
 
-const titles: Record<string, string> = {
-  en: "Image Gallery",
-  he: "גלריית תמונות",
-  es: "Galería de imágenes",
-  ar: "معرض الصور",
+const PAGE_SIZE = 24;
+
+type Props = {
+  params: Promise<{ locale: string }>;
+  searchParams: Promise<{ page?: string }>;
+};
+
+const labels: Record<
+  string,
+  { title: string; empty: string; newer: string; older: string; page: string }
+> = {
+  en: {
+    title: "Image Gallery",
+    empty: "No images are available yet.",
+    newer: "Newer",
+    older: "Older",
+    page: "Page",
+  },
+  he: {
+    title: "גלריית תמונות",
+    empty: "עדיין אין תמונות להצגה.",
+    newer: "חדשות יותר",
+    older: "ישנות יותר",
+    page: "עמוד",
+  },
+  es: {
+    title: "Galería de imágenes",
+    empty: "Aún no hay imágenes disponibles.",
+    newer: "Más recientes",
+    older: "Más antiguas",
+    page: "Página",
+  },
+  ar: {
+    title: "معرض الصور",
+    empty: "لا توجد صور متاحة بعد.",
+    newer: "الأحدث",
+    older: "الأقدم",
+    page: "صفحة",
+  },
 };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
+  const text = labels[locale] ?? labels.en;
   return {
-    title: titles[locale] ?? titles.en,
+    title: text.title,
     alternates: { canonical: `/${locale}/gallery` },
   };
 }
 
-export const revalidate = 1800;
-
-export default async function GalleryPage({ params }: Props) {
+export default async function GalleryPage({ params, searchParams }: Props) {
   const { locale } = await params;
+  const { page: pageParam } = await searchParams;
+  const text = labels[locale] ?? labels.en;
+  const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
   const categories = await getCategories(locale);
 
-  const groups = await Promise.all(
-    categories.map(async (category) => {
-      const articles = await getLatestArticles(locale, {
+  const categoryResults = await Promise.all(
+    categories.map(async (category) => ({
+      category,
+      articles: await getLatestArticles(locale, {
         categorySlug: category.slug,
-        limit: 12,
-      });
-      return {
-        category,
-        articles: articles.filter((a) => a.featured_image_url),
-      };
-    }),
+        limit: 1000,
+      }),
+    })),
   );
 
-  const nonEmpty = groups.filter((g) => g.articles.length > 0);
+  const allImages = categoryResults
+    .flatMap(({ category, articles }) =>
+      articles
+        .filter((article) => article.featured_image_url)
+        .map((article) => ({ article, category })),
+    )
+    .sort((a, b) =>
+      (b.article.published_at ?? "").localeCompare(a.article.published_at ?? ""),
+    );
+
+  const totalPages = Math.max(1, Math.ceil(allImages.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const shown = allImages.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE,
+  );
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
-      <h1 className="mb-8 text-3xl font-bold text-zinc-900">
-        {titles[locale] ?? titles.en}
-      </h1>
+      <h1 className="mb-8 text-3xl font-bold text-zinc-900">{text.title}</h1>
 
-      {nonEmpty.map(({ category, articles }) => (
-        <section key={category.id} className="mb-10">
-          <h2 className="mb-4 text-xl font-semibold text-zinc-800">
-            {categoryLabel(category.name_json, category.slug, locale)}
-          </h2>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-            {articles.map((a) => (
-              <Link
-                key={a.article_id}
-                href={`/${category.slug}/${a.seo_slug}` as any}
-                className="group block overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm transition hover:shadow-md"
-              >
-                <div className="aspect-video w-full overflow-hidden bg-zinc-100">
-                  <img
-                    src={articleImageUrl(a.featured_image_url) ?? undefined}
-                    alt={a.title}
-                    loading="lazy"
-                    className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-                  />
-                </div>
-                <p className="line-clamp-2 p-3 text-sm font-medium text-zinc-800 group-hover:underline">
-                  {a.title}
+      {shown.length === 0 ? (
+        <p className="text-zinc-500">{text.empty}</p>
+      ) : (
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+          {shown.map(({ article, category }) => (
+            <Link
+              key={article.article_id}
+              href={`/${category.slug}/${article.seo_slug}` as any}
+              className="group block overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm transition hover:shadow-md"
+            >
+              <div className="aspect-video w-full overflow-hidden bg-zinc-100">
+                <img
+                  src={articleImageUrl(article.featured_image_url) ?? undefined}
+                  alt={article.title}
+                  loading="lazy"
+                  className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                />
+              </div>
+              <div className="p-3">
+                <span className="mb-1 block text-xs font-medium text-blue-600">
+                  {categoryLabel(category.name_json, category.slug, locale)}
+                </span>
+                <p className="line-clamp-2 text-sm font-medium text-zinc-800 group-hover:underline">
+                  {article.title}
                 </p>
-              </Link>
-            ))}
-          </div>
-        </section>
-      ))}
+              </div>
+            </Link>
+          ))}
+        </div>
+      )}
+
+      {totalPages > 1 && (
+        <nav
+          aria-label="Pagination"
+          className="mt-10 flex items-center justify-between"
+        >
+          {currentPage > 1 ? (
+            <Link
+              href={
+                currentPage === 2
+                  ? ("/gallery" as any)
+                  : (`/gallery?page=${currentPage - 1}` as any)
+              }
+              className="rounded-full border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50"
+            >
+              ← {text.newer}
+            </Link>
+          ) : (
+            <span />
+          )}
+          <span className="text-sm text-zinc-500">
+            {text.page} {currentPage} / {totalPages}
+          </span>
+          {currentPage < totalPages ? (
+            <Link
+              href={`/gallery?page=${currentPage + 1}` as any}
+              className="rounded-full border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50"
+            >
+              {text.older} →
+            </Link>
+          ) : (
+            <span />
+          )}
+        </nav>
+      )}
     </div>
   );
 }
