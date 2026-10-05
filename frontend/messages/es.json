@@ -6,7 +6,9 @@
   "nav": {
     "home": "Inicio",
     "search": "Buscar",
-    "categories": "Categorías"
+    "categories": "Categorías",
+    "about": "Acerca de",
+    "contact": "Contacto"
   },
   "home": {
     "latest": "Últimos resúmenes",

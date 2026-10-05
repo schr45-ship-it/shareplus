@@ -12,13 +12,24 @@ export function Navbar() {
       <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4">
         <Link
           href="/"
-          className="text-xl font-bold text-foreground hover:opacity-80"
+          className="flex items-center gap-2.5 hover:opacity-80"
         >
-          AI SharePlus
+          <img
+            src="/logo.jpg"
+            alt="SharePlus"
+            className="h-10 w-10 rounded-lg object-cover mix-blend-multiply"
+          />
+          <span className="text-xl font-bold text-foreground">SharePlus</span>
         </Link>
-        <nav className="flex items-center gap-6">
+        <nav className="flex items-center gap-5">
           <Link href="/" className="text-sm font-medium hover:underline">
             {t("home")}
+          </Link>
+          <Link href="/about" className="text-sm font-medium hover:underline">
+            {t("about")}
+          </Link>
+          <Link href="/contact" className="text-sm font-medium hover:underline">
+            {t("contact")}
           </Link>
           <Link href="/search" className="text-sm font-medium hover:underline">
             {t("search")}

@@ -6,7 +6,9 @@
   "nav": {
     "home": "דף הבית",
     "search": "חיפוש",
-    "categories": "קטגוריות"
+    "categories": "קטגוריות",
+    "about": "אודות",
+    "contact": "צור קשר"
   },
   "home": {
     "latest": "הסיכומים האחרונים",

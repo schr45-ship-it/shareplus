@@ -6,7 +6,9 @@
   "nav": {
     "home": "الرئيسية",
     "search": "بحث",
-    "categories": "التصنيفات"
+    "categories": "التصنيفات",
+    "about": "حول",
+    "contact": "اتصل بنا"
   },
   "home": {
     "latest": "أحدث الملخصات",
