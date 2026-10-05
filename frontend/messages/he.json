@@ -29,7 +29,7 @@
     "noResults": "לא נמצאו תוצאות. נסה שאילתה אחרת."
   },
   "category": {
-    "articlesIn": "מאמרים בקטגוריה {{category}}"
+    "articlesIn": "מאמרים בקטגוריה {category}"
   },
   "errors": {
     "articleNotFound": "המאמר לא נמצא."

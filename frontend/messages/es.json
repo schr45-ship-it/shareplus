@@ -29,7 +29,7 @@
     "noResults": "No se encontraron resultados. Prueba otra consulta."
   },
   "category": {
-    "articlesIn": "Artículos en {{category}}"
+    "articlesIn": "Artículos en {category}"
   },
   "errors": {
     "articleNotFound": "Artículo no encontrado."

@@ -29,7 +29,7 @@
     "noResults": "No results found. Try a different query."
   },
   "category": {
-    "articlesIn": "Articles in {{category}}"
+    "articlesIn": "Articles in {category}"
   },
   "errors": {
     "articleNotFound": "Article not found."

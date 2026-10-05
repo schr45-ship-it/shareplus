@@ -29,7 +29,7 @@
     "noResults": "لم يتم العثور على نتائج. جرّب استعلامًا آخر."
   },
   "category": {
-    "articlesIn": "مقالات في {{category}}"
+    "articlesIn": "مقالات في {category}"
   },
   "errors": {
     "articleNotFound": "المقال غير موجود."
