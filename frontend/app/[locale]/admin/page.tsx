@@ -124,6 +124,8 @@ export default function AdminPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [filter, setFilter] = useState<string>("all");
   const [artPage, setArtPage] = useState(1);
+  const [showCategories, setShowCategories] = useState(false);
+  const [showSources, setShowSources] = useState(false);
   const ART_PAGE_SIZE = 20;
 
   const matchesFilter = (a: RecentArticle) => {
@@ -273,8 +275,15 @@ export default function AdminPage() {
 
       {/* Categories */}
       <section className="mb-8 rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
-        <h2 className="mb-3 font-semibold">נושאים (קטגוריות)</h2>
-        <table className="w-full text-sm">
+        <button
+          onClick={() => setShowCategories((v) => !v)}
+          className="flex w-full items-center justify-between font-semibold"
+        >
+          <span>נושאים (קטגוריות)</span>
+          <span className="text-zinc-400">{showCategories ? "▲" : "▼"}</span>
+        </button>
+        {showCategories && (
+        <table className="mt-3 w-full text-sm">
           <thead>
             <tr className="border-b text-right text-xs text-zinc-500">
               <th className="py-2">נושא</th>
@@ -316,12 +325,20 @@ export default function AdminPage() {
             ))}
           </tbody>
         </table>
+        )}
       </section>
 
       {/* Sources */}
       <section className="mb-8 rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
-        <h2 className="mb-3 font-semibold">מקורות תוכן</h2>
-        <table className="w-full text-sm">
+        <button
+          onClick={() => setShowSources((v) => !v)}
+          className="flex w-full items-center justify-between font-semibold"
+        >
+          <span>מקורות תוכן</span>
+          <span className="text-zinc-400">{showSources ? "▲" : "▼"}</span>
+        </button>
+        {showSources && (
+        <table className="mt-3 w-full text-sm">
           <thead>
             <tr className="border-b text-right text-xs text-zinc-500">
               <th className="py-2">מקור</th>
@@ -365,6 +382,7 @@ export default function AdminPage() {
             ))}
           </tbody>
         </table>
+        )}
       </section>
 
       {/* Recent articles */}
