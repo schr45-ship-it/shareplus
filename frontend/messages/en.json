@@ -20,7 +20,9 @@
     "keyTakeaways": "Key Takeaways",
     "source": "Original source",
     "publishedAt": "Published",
-    "related": "Related summaries"
+    "related": "Related summaries",
+    "story": "The story",
+    "spokenLanguage": "Language"
   },
   "search": {
     "placeholder": "Search summaries...",

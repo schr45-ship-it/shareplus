@@ -31,6 +31,8 @@ export type ArticleDetail = {
     executive_summary?: string;
     key_takeaways?: string[];
     body?: string;
+    story?: string | null;
+    spoken_language?: string | null;
   };
   tags: string[];
   source_url: string;

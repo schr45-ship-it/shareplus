@@ -61,7 +61,8 @@ async function fetchText(article) {
 }
 
 async function summarize(article, text) {
-  const prompt = `Produce a JSON object with summaries in 4 languages: en, he, es, ar. For each language provide: title (max 70 chars), executive_summary (2-3 short paragraphs), key_takeaways (3-5 strings), tags (3-7 strings), category_slug (one of: ${validCategories.join(', ')}; use "other" when nothing fits), subcategory_slug (pick the single best match for the chosen category from these options: ${Object.entries(subByCat).map(([c, ss]) => `${c}: ${ss.join(', ')}`).join('; ') || 'none'}; use null if unsure), seo_slug (URL-safe lowercase ASCII, max 70 chars), seo_meta_description (max 155 chars). Return ONLY valid JSON in the exact shape {"en":{...},"he":{...},"es":{...},"ar":{...}}.\n\nArticle metadata:\n${JSON.stringify(article.raw_metadata || {})}\n\nArticle text:\n${text}`;
+  const isVideo = article.source_type === 'video';
+  const prompt = `Produce a JSON object with summaries in 4 languages: en, he, es, ar. For each language provide: title (max 70 chars), executive_summary (2-3 short paragraphs), key_takeaways (3-5 strings), tags (3-7 strings), category_slug (one of: ${validCategories.join(', ')}; use "other" when nothing fits), subcategory_slug (pick the single best match for the chosen category from these options: ${Object.entries(subByCat).map(([c, ss]) => `${c}: ${ss.join(', ')}`).join('; ') || 'none'}; use null if unsure), ${isVideo ? 'video_story (a clear, modest narrative retelling of what happens in the video or movie — plot, characters, key scenes — 3-5 short paragraphs; if the content is not a narrative video use null), ' : ''}seo_slug (URL-safe lowercase ASCII, max 70 chars), seo_meta_description (max 155 chars). At the top level also provide: "family_safe" (boolean — false if the content contains sexually explicit, graphic violence, hate or otherwise non-family-safe material), "spoken_language" (the main language actually spoken in the video/audio as a full language name, e.g. "English"; null if unknown). Return ONLY valid JSON in the exact shape {"family_safe":true,"spoken_language":"...","en":{...},"he":{...},"es":{...},"ar":{...}}.\n\nArticle metadata:\n${JSON.stringify(article.raw_metadata || {})}\n\nArticle text:\n${text}`;
 
   let response;
   for (let attempt = 1; attempt <= 3; attempt++) {
@@ -139,6 +140,14 @@ for (const article of articles || []) {
 
     await updateArticle(article.id, { status: 'summarizing' });
     const translations = await summarize(article, text);
+
+    if (translations.family_safe === false) {
+      await updateArticle(article.id, { status: 'archived', raw_metadata: { ...(article.raw_metadata || {}), moderation: 'family_safe=false' } });
+      await logStep(article.id, article.source_id, 'moderation', 'skipped', 'Content flagged as not family-safe, archived');
+      results.push({ article_id: article.id, status: 'archived', reason: 'not family-safe' });
+      continue;
+    }
+
     const detected = validCategories.includes(translations.en?.category_slug) ? translations.en.category_slug : fallbackCategory;
     const reqSub = translations.en?.subcategory_slug;
     const subcategoryId = (subByCat[detected] || []).includes(reqSub)
@@ -162,6 +171,8 @@ for (const article of articles || []) {
           executive_summary: summary,
           key_takeaways: Array.isArray(item.key_takeaways) ? item.key_takeaways : [],
           body: summary,
+          story: item.video_story || null,
+          spoken_language: translations.spoken_language || article.raw_metadata?.spoken_language || null,
         },
         tags: Array.isArray(item.tags) ? item.tags.slice(0, 8) : [],
         word_count: summary.split(/\s+/).filter(Boolean).length,

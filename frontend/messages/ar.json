@@ -20,7 +20,9 @@
     "keyTakeaways": "النقاط الرئيسية",
     "source": "المصدر الأصلي",
     "publishedAt": "نُشر في",
-    "related": "ملخصات ذات صلة"
+    "related": "ملخصات ذات صلة",
+    "story": "قصة الفيديو",
+    "spokenLanguage": "اللغة"
   },
   "search": {
     "placeholder": "ابحث في الملخصات...",

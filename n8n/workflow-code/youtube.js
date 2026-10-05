@@ -28,13 +28,27 @@ for (const source of sources || []) {
   let inserted = 0;
   try {
     const channelId = await channelIdFor(source.url);
-    const search = await ytJson(`https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${encodeURIComponent(channelId)}&maxResults=15&order=date&type=video&key=${encodeURIComponent(YOUTUBE_KEY)}`);
+    const search = await ytJson(`https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${encodeURIComponent(channelId)}&maxResults=15&order=date&type=video&safeSearch=strict&key=${encodeURIComponent(YOUTUBE_KEY)}`);
+
+    // Fetch moderation + language details for the returned videos in one batch
+    const ids = (search.items || []).map((v) => v.id?.videoId).filter(Boolean);
+    let detailsById = {};
+    if (ids.length) {
+      const det = await ytJson(`https://www.googleapis.com/youtube/v3/videos?part=contentDetails,status,snippet&id=${ids.map(encodeURIComponent).join(',')}&key=${encodeURIComponent(YOUTUBE_KEY)}`);
+      for (const d of det.items || []) detailsById[d.id] = d;
+    }
 
     for (const video of search.items || []) {
       const videoId = video.id?.videoId;
       const snippet = video.snippet || {};
       if (!videoId || !snippet.title) continue;
       found++;
+
+      const det = detailsById[videoId];
+      if (det) {
+        const rating = det.contentDetails?.contentRating || {};
+        if (rating.ytRating === 'ytAgeRestricted' || det.status?.embeddable === false) continue;
+      }
 
       const existing = await supabase(`articles?select=id&content_hash=eq.${encodeURIComponent(videoId)}&limit=1`);
       if (existing?.length) continue;
@@ -46,7 +60,7 @@ for (const source of sources || []) {
         canonical_url: videoUrl,
         content_hash: videoId,
         source_type: 'video',
-        original_language: source.language || 'en',
+        original_language: det?.snippet?.defaultAudioLanguage?.slice(0, 2) || det?.snippet?.defaultLanguage?.slice(0, 2) || source.language || 'en',
         category_id: source.category_id,
         published_date: snippet.publishedAt || null,
         author: snippet.channelTitle || source.name,
@@ -57,6 +71,10 @@ for (const source of sources || []) {
           description: snippet.description || '',
           channel_title: snippet.channelTitle,
           youtube_video_id: videoId,
+          duration: det?.contentDetails?.duration || null,
+          made_for_kids: det?.status?.madeForKids || false,
+          spoken_language: det?.snippet?.defaultAudioLanguage || det?.snippet?.defaultLanguage || null,
+          tags: det?.snippet?.tags || [],
         },
       }], { headers: { Prefer: 'return=representation' } });
 

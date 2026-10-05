@@ -20,7 +20,9 @@
     "keyTakeaways": "נקודות מפתח",
     "source": "מקור המאמר",
     "publishedAt": "פורסם בתאריך",
-    "related": "סיכומים קשורים"
+    "related": "סיכומים קשורים",
+    "story": "הסיפור בסרטון",
+    "spokenLanguage": "שפה"
   },
   "search": {
     "placeholder": "חפש בסיכומים...",

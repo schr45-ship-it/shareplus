@@ -20,7 +20,9 @@
     "keyTakeaways": "Puntos clave",
     "source": "Fuente original",
     "publishedAt": "Publicado",
-    "related": "Resúmenes relacionados"
+    "related": "Resúmenes relacionados",
+    "story": "La historia",
+    "spokenLanguage": "Idioma"
   },
   "search": {
     "placeholder": "Buscar resúmenes...",

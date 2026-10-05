@@ -89,6 +89,8 @@ export default async function ArticlePage({ params }: Props) {
   const body =
     article.summary?.body || article.summary?.executive_summary || "";
   const takeaways = article.summary?.key_takeaways || [];
+  const story = article.summary?.story || "";
+  const spokenLanguage = article.summary?.spoken_language || "";
 
   return (
     <article className="mx-auto max-w-3xl px-4 py-10">
@@ -127,6 +129,11 @@ export default async function ArticlePage({ params }: Props) {
             {formatDate(article.published_at, locale)}
           </time>
           {article.author && <span>by {article.author}</span>}
+          {spokenLanguage && (
+            <span className="rounded-full bg-purple-50 px-2.5 py-0.5 text-xs font-medium text-purple-700">
+              {t("spokenLanguage")}: {spokenLanguage}
+            </span>
+          )}
         </div>
         <h1 className="text-3xl font-bold leading-tight text-zinc-900 sm:text-4xl">
           {article.title}
@@ -159,6 +166,23 @@ export default async function ArticlePage({ params }: Props) {
           </p>
         ))}
       </div>
+
+      {story && (
+        <section className="mb-10 rounded-xl bg-purple-50 p-6">
+          <h2 className="mb-4 text-lg font-semibold text-purple-900">
+            {t("story")}
+          </h2>
+          <div className="space-y-4 text-purple-950">
+            {String(story)
+              .split("\n\n")
+              .map((p, i) => (
+                <p key={i} className="leading-relaxed">
+                  {p}
+                </p>
+              ))}
+          </div>
+        </section>
+      )}
 
       <AdSenseInArticle slot="article-in-content" className="my-8" />
 
