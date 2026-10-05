@@ -1,0 +1,83 @@
+{
+  "name": "ai-shareplus: AI Summarize & Translate (v3)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 5
+            }
+          ]
+        }
+      },
+      "id": "shareplus-ai-v3-schedule",
+      "name": "Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "path": "shareplus-ai-v3",
+        "httpMethod": "POST",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "shareplus-ai-v3-webhook",
+      "name": "Manual Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        250,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const getVar = (name) => ($vars && $vars[name]) || ($env && $env[name]) || '';\nconst SUPABASE_URL = getVar('SUPABASE_URL').replace(/\\/$/, '');\nconst SERVICE_KEY = getVar('SUPABASE_SERVICE_ROLE_KEY');\nconst SITE_URL = getVar('NEXT_PUBLIC_SITE_URL').replace(/\\/$/, '');\nconst REVALIDATE_SECRET = getVar('REVALIDATE_SECRET');\n\nif (!SUPABASE_URL || !SERVICE_KEY) {\n  throw new Error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in n8n Variables');\n}\n\nconst supabaseHeaders = (extra = {}) => ({\n  apikey: SERVICE_KEY,\n  Authorization: `Bearer ${SERVICE_KEY}`,\n  'Content-Type': 'application/json',\n  ...extra,\n});\n\nasync function supabase(path, method = 'GET', body, extra = {}) {\n  const options = {\n    method,\n    url: `${SUPABASE_URL}/rest/v1/${path}`,\n    headers: supabaseHeaders(extra.headers || {}),\n    timeout: 30000,\n    responseFormat: extra.responseFormat || 'json',\n  };\n  if (body !== undefined) options.body = body;\n  return await $httpRequest(options);\n}\n\nasync function logStep(articleId, sourceId, step, status, message, metadata = {}) {\n  try {\n    await supabase('processing_logs', 'POST', {\n      article_id: articleId || null,\n      source_id: sourceId || null,\n      step,\n      status,\n      message: String(message || '').slice(0, 2000),\n      metadata,\n    }, { headers: { Prefer: 'return=minimal' }, responseFormat: 'text' });\n  } catch (_) {}\n}\n\nfunction cleanText(text, max = 12000) {\n  return String(text || '')\n    .replace(/<script[\\s\\S]*?<\\/script>/gi, ' ')\n    .replace(/<style[\\s\\S]*?<\\/style>/gi, ' ')\n    .replace(/<[^>]+>/g, ' ')\n    .replace(/&nbsp;/g, ' ')\n    .replace(/&amp;/g, '&')\n    .replace(/&quot;/g, '\"')\n    .replace(/&#39;|&apos;/g, \"'\")\n    .replace(/\\s+/g, ' ')\n    .trim()\n    .slice(0, max);\n}\n\nfunction stableHash(value) {\n  return Buffer.from(String(value || '')).toString('base64url').slice(0, 120);\n}\n\nfunction decodeXml(value) {\n  return String(value || '')\n    .replace(/<!\\[CDATA\\[([\\s\\S]*?)\\]\\]>/g, '$1')\n    .replace(/&lt;/g, '<')\n    .replace(/&gt;/g, '>')\n    .replace(/&quot;/g, '\"')\n    .replace(/&#39;|&apos;/g, \"'\")\n    .replace(/&amp;/g, '&')\n    .trim();\n}\n\nfunction xmlTag(xml, names) {\n  for (const name of names) {\n    const match = xml.match(new RegExp(`<${name}[^>]*>([\\\\s\\\\S]*?)<\\\\/${name}>`, 'i'));\n    if (match) return decodeXml(match[1]);\n  }\n  return '';\n}\n\nfunction xmlLink(item) {\n  const href = item.match(/<link[^>]+href=[\"']([^\"']+)[\"'][^>]*>/i)?.[1];\n  return decodeXml(href || xmlTag(item, ['link', 'guid']));\n}\n\nfunction slugify(value, fallback) {\n  const slug = String(value || '')\n    .toLowerCase()\n    .normalize('NFKD')\n    .replace(/[\\u0300-\\u036f]/g, '')\n    .replace(/[^a-z0-9]+/g, '-')\n    .replace(/^-+|-+$/g, '')\n    .slice(0, 65);\n  return slug || fallback;\n}\n\n\nconst GEMINI_KEY = getVar('GEMINI_API_KEY');\nconst FIRECRAWL_KEY = getVar('FIRECRAWL_API_KEY');\nif (!GEMINI_KEY) throw new Error('Missing GEMINI_API_KEY in n8n Variables');\n\nconst articles = await supabase('articles?select=*&status=in.(pending,failed)&order=created_at.asc&limit=10');\nconst categories = await supabase('categories?select=id,slug');\nconst categoryIds = Object.fromEntries((categories || []).map((c) => [c.slug, c.id]));\nconst validCategories = ['technology', 'business', 'science', 'health', 'world', 'entertainment', 'sports'];\nconst results = [];\n\nasync function updateArticle(id, patch) {\n  await supabase(`articles?id=eq.${id}`, 'PATCH', patch, { headers: { Prefer: 'return=minimal' }, responseFormat: 'text' });\n}\n\nasync function fetchText(article) {\n  const meta = article.raw_metadata || {};\n  if (article.source_type === 'video') {\n    try {\n      const embed = await $httpRequest({ method: 'GET', url: `https://www.youtube.com/oembed?url=${encodeURIComponent(article.source_url)}&format=json`, responseFormat: 'json', timeout: 15000 });\n      const title = embed.title || meta.title || '';\n      const author = embed.author_name || meta.channel_title || '';\n      const description = meta.description || '';\n      return cleanText(`${title}\\n${author}\\n${description}`, 8000);\n    } catch (_) {\n      return cleanText(`${meta.title || ''}\\n${meta.description || ''}`, 8000);\n    }\n  }\n\n  try {\n    const jina = `https://r.jina.ai/http://${article.source_url.replace(/^https?:\\/\\//, '')}`;\n    const text = await $httpRequest({ method: 'GET', url: jina, responseFormat: 'text', timeout: 25000 });\n    return cleanText(text);\n  } catch (jinaError) {\n    if (FIRECRAWL_KEY) {\n      const res = await $httpRequest({\n        method: 'POST',\n        url: 'https://api.firecrawl.dev/v1/scrape',\n        headers: { Authorization: `Bearer ${FIRECRAWL_KEY}`, 'Content-Type': 'application/json' },\n        body: { url: article.source_url, formats: ['markdown'] },\n        responseFormat: 'json',\n        timeout: 35000,\n      });\n      return cleanText(res?.data?.markdown || res?.markdown || '');\n    }\n    const html = await $httpRequest({ method: 'GET', url: article.source_url, responseFormat: 'text', timeout: 25000 });\n    return cleanText(`${meta.title || ''}\\n${meta.description || ''}\\n${html}`);\n  }\n}\n\nasync function summarize(article, text) {\n  const prompt = `Produce a JSON object with summaries in 4 languages: en, he, es, ar. For each language provide: title (max 70 chars), executive_summary (2-3 short paragraphs), key_takeaways (3-5 strings), tags (3-7 strings), category_slug (one of: technology, business, science, health, world, entertainment, sports), seo_slug (URL-safe lowercase ASCII, max 70 chars), seo_meta_description (max 155 chars). Return ONLY valid JSON in the exact shape {\"en\":{...},\"he\":{...},\"es\":{...},\"ar\":{...}}.\\n\\nArticle metadata:\\n${JSON.stringify(article.raw_metadata || {})}\\n\\nArticle text:\\n${text}`;\n\n  let response;\n  for (let attempt = 1; attempt <= 3; attempt++) {\n    try {\n      response = await $httpRequest({\n        method: 'POST',\n        url: `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${encodeURIComponent(GEMINI_KEY)}`,\n        headers: { 'Content-Type': 'application/json' },\n        body: {\n          contents: [{ role: 'user', parts: [{ text: prompt }] }],\n          generationConfig: { responseMimeType: 'application/json', temperature: 0.25 },\n        },\n        responseFormat: 'json',\n        timeout: 90000,\n      });\n      break;\n    } catch (error) {\n      if (attempt === 3) {\n        error.transient = /429|500|502|503|504|UNAVAILABLE|RESOURCE_EXHAUSTED|timed out/i.test(error.message || '');\n        throw error;\n      }\n      await new Promise((resolve) => setTimeout(resolve, attempt * 20000));\n    }\n  }\n\n  let output = response?.candidates?.[0]?.content?.parts?.map((p) => p.text || '').join('') || '';\n  output = output.replace(/^```(?:json)?/i, '').replace(/```$/i, '').trim();\n  const parsed = JSON.parse(output);\n\n  for (const lang of ['en', 'he', 'es', 'ar']) {\n    if (!parsed[lang]?.title || !parsed[lang]?.executive_summary) throw new Error(`Gemini response missing ${lang}`);\n  }\n  return parsed;\n}\n\nfor (const article of articles || []) {\n  try {\n    await updateArticle(article.id, { status: 'extracting', processing_started_at: new Date().toISOString() });\n    const text = await fetchText(article);\n    if (!text || text.length < 20) throw new Error('Could not extract enough text from source');\n\n    await updateArticle(article.id, { status: 'summarizing' });\n    const translations = await summarize(article, text);\n    const detected = validCategories.includes(translations.en?.category_slug) ? translations.en.category_slug : 'technology';\n    const suffix = article.id.slice(0, 8);\n\n    await updateArticle(article.id, { status: 'translating' });\n    const rows = ['en', 'he', 'es', 'ar'].map((lang) => {\n      const item = translations[lang];\n      const baseSlug = slugify(item.seo_slug || item.title, `article-${suffix}`);\n      const summary = item.executive_summary || '';\n      return {\n        article_id: article.id,\n        language: lang,\n        title: String(item.title).slice(0, 180),\n        seo_slug: `${baseSlug}-${suffix}`,\n        seo_meta_title: String(item.title).slice(0, 70),\n        seo_meta_description: String(item.seo_meta_description || summary).slice(0, 160),\n        summary: {\n          executive_summary: summary,\n          key_takeaways: Array.isArray(item.key_takeaways) ? item.key_takeaways : [],\n          body: summary,\n        },\n        tags: Array.isArray(item.tags) ? item.tags.slice(0, 8) : [],\n        word_count: summary.split(/\\s+/).filter(Boolean).length,\n        is_primary: lang === article.original_language || lang === 'en',\n      };\n    });\n\n    await supabase('article_translations?on_conflict=article_id,language', 'POST', rows, {\n      headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },\n      responseFormat: 'text',\n    });\n\n    await updateArticle(article.id, {\n      status: 'published',\n      category_id: categoryIds[detected] || article.category_id,\n      published_at: new Date().toISOString(),\n    });\n\n    if (SITE_URL && REVALIDATE_SECRET) {\n      try {\n        await $httpRequest({\n          method: 'POST',\n          url: `${SITE_URL}/api/revalidate`,\n          headers: { 'Content-Type': 'application/json', 'x-revalidate-secret': REVALIDATE_SECRET },\n          body: { slug: rows[0].seo_slug, category: detected, locales: ['en', 'he', 'es', 'ar'] },\n          responseFormat: 'json',\n          timeout: 15000,\n        });\n      } catch (_) {}\n    }\n\n    await logStep(article.id, article.source_id, 'publish', 'success', 'Article processed and published', { languages: ['en', 'he', 'es', 'ar'] });\n    results.push({ article_id: article.id, status: 'published', languages: ['en', 'he', 'es', 'ar'] });\n  } catch (error) {\n    const transient = Boolean(error.transient) || /429|500|502|503|504|UNAVAILABLE|RESOURCE_EXHAUSTED|timed out/i.test(error.message || '');\n    const metadata = { ...(article.raw_metadata || {}), processing_error: error.message, retryable: transient };\n    await updateArticle(article.id, { status: transient ? 'pending' : 'failed', raw_metadata: metadata });\n    await logStep(article.id, article.source_id, 'error', transient ? 'skipped' : 'error', error.message);\n    results.push({ article_id: article.id, status: transient ? 'pending' : 'failed', error: error.message });\n  }\n}\n\nreturn [{ json: { ok: true, processed: results.length, results } }];\n"
+      },
+      "id": "shareplus-ai-v3-code",
+      "name": "Run Pipeline",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        550,
+        400
+      ]
+    }
+  ],
+  "connections": {
+    "Schedule": {
+      "main": [
+        [
+          {
+            "node": "Run Pipeline",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Webhook": {
+      "main": [
+        [
+          {
+            "node": "Run Pipeline",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": []
+}
