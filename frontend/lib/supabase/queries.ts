@@ -41,6 +41,7 @@ export type ArticleDetail = {
   author: string | null;
   video_duration_seconds: number | null;
   available_languages: string[];
+  youtube_video_id: string | null;
 };
 
 export async function getLatestArticles(

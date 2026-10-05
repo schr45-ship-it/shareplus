@@ -91,6 +91,33 @@ async function summarize(article, text) {
   return parsed;
 }
 
+async function generateImage(article, title) {
+  if (article.featured_image_url) return article.featured_image_url;
+  try {
+    const prompt = `flat editorial illustration, news thumbnail, minimal, ${String(title || 'technology news').slice(0, 200)}`;
+    const img = await _http({
+      method: 'GET',
+      url: `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1200&height=675&nologo=true&seed=${article.id.replace(/-/g, '').slice(0, 12)}`,
+      timeout: 90000,
+      binary: true,
+    });
+    const buf = Buffer.from(img);
+    if (buf.length < 5000) return null;
+    const path = `${article.id}.jpg`;
+    await _http({
+      method: 'POST',
+      url: `${SUPABASE_URL}/storage/v1/object/article-images/${path}`,
+      headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'Content-Type': 'image/jpeg', 'x-upsert': 'true' },
+      body: buf,
+      timeout: 60000,
+    });
+    return `${SUPABASE_URL}/storage/v1/object/public/article-images/${path}`;
+  } catch (e) {
+    await logStep(article.id, article.source_id, 'publish', 'skipped', `image generation skipped: ${e.message}`);
+    return null;
+  }
+}
+
 for (const article of articles || []) {
   try {
     await updateArticle(article.id, { status: 'extracting', processing_started_at: new Date().toISOString() });
@@ -130,10 +157,12 @@ for (const article of articles || []) {
       responseFormat: 'text',
     });
 
+    const imageUrl = await generateImage(article, translations.en?.title);
     await updateArticle(article.id, {
       status: 'published',
       category_id: categoryIds[detected] || article.category_id,
       published_at: new Date().toISOString(),
+      ...(imageUrl ? { featured_image_url: imageUrl } : {}),
     });
 
     if (SITE_URL && REVALIDATE_SECRET) {

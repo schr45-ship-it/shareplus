@@ -92,12 +92,24 @@ export default async function ArticlePage({ params }: Props) {
   return (
     <article className="mx-auto max-w-3xl px-4 py-10">
       <ArticleTracker articleId={article.article_id} />
-      {article.featured_image_url && (
-        <img
-          src={article.featured_image_url}
-          alt={article.title}
-          className="mb-8 aspect-video w-full rounded-xl object-cover"
-        />
+      {article.youtube_video_id ? (
+        <div className="mb-8 aspect-video w-full overflow-hidden rounded-xl bg-black">
+          <iframe
+            src={`https://www.youtube.com/embed/${article.youtube_video_id}`}
+            title={article.title}
+            className="h-full w-full"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+          />
+        </div>
+      ) : (
+        article.featured_image_url && (
+          <img
+            src={article.featured_image_url}
+            alt={article.title}
+            className="mb-8 aspect-video w-full rounded-xl object-cover"
+          />
+        )
       )}
 
       <header className="mb-8">

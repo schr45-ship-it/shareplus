@@ -7,7 +7,8 @@ async function _http(o) {
     timeout: o.timeout || 30000,
   };
   if (o.body !== undefined) opts.body = o.body;
-  if (o.responseFormat === 'json' || typeof o.body === 'object') opts.json = true;
+  if (o.responseFormat === 'json' || (typeof o.body === 'object' && !Buffer.isBuffer(o.body))) opts.json = true;
+  if (o.binary) opts.encoding = 'arraybuffer';
   return await __helpers.httpRequest(opts);
 }
 
