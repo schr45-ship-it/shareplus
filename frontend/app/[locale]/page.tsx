@@ -1,5 +1,5 @@
 import { getTranslations } from "next-intl/server";
-import { getLatestArticles } from "@/lib/supabase/queries";
+import { getLatestArticles, getPopularTags } from "@/lib/supabase/queries";
 import { ArticleCard } from "@/components/article-card";
 import { FeaturedArticle } from "@/components/featured-article";
 import { Link } from "@/i18n/routing";
@@ -27,11 +27,11 @@ export const revalidate = 1800;
 
 const PAGE_SIZE = 12;
 
-const pageLabels: Record<string, { prev: string; next: string; page: string }> = {
-  en: { prev: "Newer", next: "Older", page: "Page" },
-  he: { prev: "חדשות יותר", next: "ישנות יותר", page: "עמוד" },
-  es: { prev: "Más recientes", next: "Más antiguos", page: "Página" },
-  ar: { prev: "الأحدث", next: "الأقدم", page: "صفحة" },
+const pageLabels: Record<string, { prev: string; next: string; page: string; topics: string }> = {
+  en: { prev: "Newer", next: "Older", page: "Page", topics: "Popular topics" },
+  he: { prev: "חדשות יותר", next: "ישנות יותר", page: "עמוד", topics: "נושאים פופולריים" },
+  es: { prev: "Más recientes", next: "Más antiguos", page: "Página", topics: "Temas populares" },
+  ar: { prev: "الأحدث", next: "الأقدم", page: "صفحة", topics: "مواضيع شائعة" },
 };
 
 export default async function HomePage({ params, searchParams }: Props) {
@@ -42,10 +42,13 @@ export default async function HomePage({ params, searchParams }: Props) {
 
   const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
   const offset = (page - 1) * PAGE_SIZE;
-  const articles = await getLatestArticles(locale, {
-    limit: PAGE_SIZE + 1,
-    offset,
-  });
+  const [articles, popularTags] = await Promise.all([
+    getLatestArticles(locale, {
+      limit: PAGE_SIZE + 1,
+      offset,
+    }),
+    getPopularTags(locale, 12),
+  ]);
   const hasNext = articles.length > PAGE_SIZE;
   const pageArticles = articles.slice(0, PAGE_SIZE);
 
@@ -67,6 +70,25 @@ export default async function HomePage({ params, searchParams }: Props) {
       <p className="mb-8 text-zinc-600">
         AI summaries from around the web, translated for you.
       </p>
+
+      {popularTags.length > 0 && (
+        <div className="mb-8">
+          <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-400">
+            {labels.topics}
+          </h2>
+          <div className="flex flex-wrap gap-2">
+            {popularTags.map((p) => (
+              <Link
+                key={p.tag}
+                href={`/tag/${encodeURIComponent(p.tag)}` as any}
+                className="rounded-full border border-zinc-200 bg-white px-3 py-1 text-sm text-zinc-700 transition-colors hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
+              >
+                {p.tag}
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       {pageArticles.length === 0 ? (
         <p className="text-zinc-500">{t("noResults")}</p>

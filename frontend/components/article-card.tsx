@@ -61,12 +61,13 @@ export function ArticleCard({
       {article.tags && article.tags.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
           {article.tags.slice(0, 5).map((tag) => (
-            <span
+            <Link
               key={tag}
-              className="rounded-md bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700"
+              href={`/tag/${encodeURIComponent(tag)}` as any}
+              className="rounded-md bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-100"
             >
               {tag}
-            </span>
+            </Link>
           ))}
         </div>
       )}

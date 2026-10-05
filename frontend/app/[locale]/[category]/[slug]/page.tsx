@@ -196,12 +196,13 @@ export default async function ArticlePage({ params }: Props) {
       {article.tags.length > 0 && (
         <div className="mt-8 flex flex-wrap gap-2">
           {article.tags.map((tag) => (
-            <span
+            <Link
               key={tag}
-              className="rounded-md bg-zinc-100 px-3 py-1 text-sm font-medium text-zinc-700"
+              href={`/tag/${encodeURIComponent(tag)}` as any}
+              className="rounded-md bg-zinc-100 px-3 py-1 text-sm font-medium text-zinc-700 transition-colors hover:bg-blue-100 hover:text-blue-700"
             >
               {tag}
-            </span>
+            </Link>
           ))}
         </div>
       )}

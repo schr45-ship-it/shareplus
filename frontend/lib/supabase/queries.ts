@@ -115,6 +115,45 @@ export async function searchArticles(
   });
 }
 
+export async function getArticlesByTag(
+  language: string,
+  tag: string,
+  options: { limit?: number; offset?: number } = {},
+): Promise<ArticleSummary[]> {
+  const supabase = supabaseBuild;
+  const { data, error } = await (supabase.rpc as any)("get_articles_by_tag", {
+    p_language: language,
+    p_tag: tag,
+    p_limit: options.limit ?? 20,
+    p_offset: options.offset ?? 0,
+  });
+
+  if (error) {
+    console.error("getArticlesByTag error:", error);
+    return [];
+  }
+
+  return (data ?? []) as unknown as ArticleSummary[];
+}
+
+export async function getPopularTags(
+  language: string,
+  limit = 20,
+): Promise<{ tag: string; count: number }[]> {
+  const supabase = supabaseBuild;
+  const { data, error } = await (supabase.rpc as any)("get_popular_tags", {
+    p_language: language,
+    p_limit: limit,
+  });
+
+  if (error) {
+    console.error("getPopularTags error:", error);
+    return [];
+  }
+
+  return (data ?? []) as unknown as { tag: string; count: number }[];
+}
+
 export type Category = Database["public"]["Tables"]["categories"]["Row"];
 
 export async function getCategories(language: string): Promise<Category[]> {
