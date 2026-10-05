@@ -2,7 +2,18 @@ const GEMINI_KEY = getVar('GEMINI_API_KEY');
 const FIRECRAWL_KEY = getVar('FIRECRAWL_API_KEY');
 if (!GEMINI_KEY) throw new Error('Missing GEMINI_API_KEY in n8n Variables');
 
-const articles = await supabase('articles?select=*&status=in.(pending,failed)&order=created_at.asc&limit=2');
+// Reset articles stuck mid-pipeline (server restarted while processing)
+const stuckSince = new Date(Date.now() - 20 * 60 * 1000).toISOString();
+try {
+  await supabase(
+    `articles?status=in.(extracting,summarizing,translating)&processing_started_at=lt.${stuckSince}`,
+    'PATCH',
+    { status: 'pending' },
+    { headers: { Prefer: 'return=minimal' }, responseFormat: 'text' },
+  );
+} catch (_) {}
+
+const articles = await supabase('articles?select=*&status=in.(pending,failed)&order=created_at.asc&limit=5');
 const categories = await supabase('categories?select=id,slug');
 const categoryIds = Object.fromEntries((categories || []).map((c) => [c.slug, c.id]));
 const validCategories = (categories || []).map((c) => c.slug);
