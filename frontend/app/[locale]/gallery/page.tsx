@@ -1,7 +1,7 @@
 import { getCategories, getLatestArticles } from "@/lib/supabase/queries";
 import { Link } from "@/i18n/routing";
 import { Metadata } from "next";
-import { articleImageUrl } from "@/lib/site";
+import { articleImageUrl, categoryLabel } from "@/lib/site";
 
 type Props = { params: Promise<{ locale: string }> };
 
@@ -50,7 +50,7 @@ export default async function GalleryPage({ params }: Props) {
       {nonEmpty.map(({ category, articles }) => (
         <section key={category.id} className="mb-10">
           <h2 className="mb-4 text-xl font-semibold text-zinc-800">
-            {category.name_json[locale] ?? category.name_json["en"] ?? category.slug}
+            {categoryLabel(category.name_json, category.slug, locale)}
           </h2>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
             {articles.map((a) => (

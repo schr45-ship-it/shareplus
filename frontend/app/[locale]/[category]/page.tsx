@@ -1,3 +1,4 @@
+import { categoryLabel } from "@/lib/site";
 import { getTranslations } from "next-intl/server";
 import { getLatestArticles, getCategories } from "@/lib/supabase/queries";
 import { ArticleCard } from "@/components/article-card";
@@ -60,7 +61,7 @@ export default async function CategoryPage({ params, searchParams }: Props) {
   const pageArticles = articles.slice(0, PAGE_SIZE);
 
   const categoryName =
-    categoryData.name_json[locale] ?? categoryData.name_json["en"] ?? category;
+    categoryLabel(categoryData.name_json, categoryData.slug, locale);
 
   const t = await getTranslations({ locale, namespace: "category" });
 

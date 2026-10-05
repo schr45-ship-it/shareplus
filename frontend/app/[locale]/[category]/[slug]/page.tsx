@@ -12,7 +12,7 @@ import {
   SourceLinkTracker,
 } from "@/components/article-analytics";
 import { ReportButton } from "@/components/report-button";
-import { SITE_URL, articleImageUrl } from "@/lib/site";
+import { SITE_URL, articleImageUrl, categoryLabel } from "@/lib/site";
 
 type Props = {
   params: Promise<{ locale: string; category: string; slug: string }>;
@@ -123,7 +123,7 @@ export default async function ArticlePage({ params }: Props) {
               href={`/${article.category_slug}` as any}
               className="rounded-full bg-zinc-100 px-3 py-1 font-medium text-zinc-700 hover:bg-zinc-200"
             >
-              {article.category_name[locale] ?? article.category_name["en"]}
+              {categoryLabel(article.category_name, article.category_slug, locale)}
             </Link>
           )}
           <time dateTime={article.published_at ?? undefined}>

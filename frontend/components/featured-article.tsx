@@ -1,7 +1,7 @@
 import { Link } from "@/i18n/routing";
 import { ArticleSummary } from "@/lib/supabase/queries";
 import { formatDate } from "@/lib/utils";
-import { articleImageUrl } from "@/lib/site";
+import { articleImageUrl, categoryLabel } from "@/lib/site";
 
 const badgeLabels: Record<string, string> = {
   en: "Featured",
@@ -47,7 +47,7 @@ export function FeaturedArticle({
             </span>
             {article.category_name && (
               <span className="rounded-full bg-zinc-100 px-2 py-1 font-medium text-zinc-700">
-                {article.category_name[locale] ?? article.category_name["en"]}
+                {categoryLabel(article.category_name, article.category_slug, locale)}
               </span>
             )}
             <time

@@ -1,3 +1,4 @@
+import { categoryLabel } from "@/lib/site";
 import { Link } from "@/i18n/routing";
 import { getCategories } from "@/lib/supabase/queries";
 
@@ -18,7 +19,7 @@ export async function CategoryNav({ locale }: { locale: string }) {
             href={`/${category.slug}` as any}
             className="whitespace-nowrap rounded-full px-3 py-1 text-sm font-medium text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-900"
           >
-            {category.name_json[locale] ?? category.name_json["en"] ?? category.slug}
+            {categoryLabel(category.name_json, category.slug, locale)}
           </Link>
         ))}
       </div>

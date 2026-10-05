@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { articleImageUrl } from "@/lib/site";
+import { articleImageUrl, categoryLabel } from "@/lib/site";
 
 type Source = {
   id: string;
@@ -361,7 +361,7 @@ export default function AdminPage() {
                   onClick={() => setGalleryCat(c)}
                   className={`rounded-full px-3 py-1 text-xs font-medium ${galleryCat === c ? "bg-blue-600 text-white" : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"}`}
                 >
-                  {data.categories.find((x) => x.slug === c)?.name_json?.he ?? c}
+                  {categoryLabel(data.categories.find((x) => x.slug === c)?.name_json, c, "he")}
                 </button>
               ))}
             </div>
@@ -424,7 +424,7 @@ export default function AdminPage() {
                       filter === `cat:${c.slug}` ? "bg-blue-100 text-blue-700" : ""
                     }`}
                   >
-                    {c.name_json?.he ?? c.name_json?.en ?? c.slug}
+                    {categoryLabel(c.name_json, c.slug, "he")}
                   </button>
                 </td>
                 <td className="text-center">{c.article_count}</td>

@@ -1,7 +1,7 @@
 import { Link } from "@/i18n/routing";
 import { ArticleSummary } from "@/lib/supabase/queries";
 import { formatDate } from "@/lib/utils";
-import { articleImageUrl } from "@/lib/site";
+import { articleImageUrl, categoryLabel } from "@/lib/site";
 
 export function ArticleCard({
   article,
@@ -36,12 +36,12 @@ export function ArticleCard({
       <div className="flex items-center gap-2 text-xs text-zinc-500">
         {article.category_name && (
           <span className="rounded-full bg-zinc-100 px-2 py-1 font-medium text-zinc-700">
-            {article.category_name[locale] ?? article.category_name["en"]}
+            {categoryLabel(article.category_name, article.category_slug, locale)}
           </span>
         )}
         {article.subcategory_name && (
           <span className="rounded-full bg-blue-50 px-2 py-1 font-medium text-blue-700">
-            {article.subcategory_name[locale] ?? article.subcategory_name["en"]}
+            {categoryLabel(article.subcategory_name, article.subcategory_slug, locale)}
           </span>
         )}
         <time dateTime={article.published_at ?? undefined}>
