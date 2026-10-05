@@ -5,7 +5,8 @@ if (!GEMINI_KEY) throw new Error('Missing GEMINI_API_KEY in n8n Variables');
 const articles = await supabase('articles?select=*&status=in.(pending,failed)&order=created_at.asc&limit=2');
 const categories = await supabase('categories?select=id,slug');
 const categoryIds = Object.fromEntries((categories || []).map((c) => [c.slug, c.id]));
-const validCategories = ['technology', 'business', 'science', 'health', 'world', 'entertainment', 'sports'];
+const validCategories = (categories || []).map((c) => c.slug);
+const fallbackCategory = categoryIds.other ? 'other' : 'technology';
 const results = [];
 
 async function updateArticle(id, patch) {
@@ -48,7 +49,7 @@ async function fetchText(article) {
 }
 
 async function summarize(article, text) {
-  const prompt = `Produce a JSON object with summaries in 4 languages: en, he, es, ar. For each language provide: title (max 70 chars), executive_summary (2-3 short paragraphs), key_takeaways (3-5 strings), tags (3-7 strings), category_slug (one of: technology, business, science, health, world, entertainment, sports), seo_slug (URL-safe lowercase ASCII, max 70 chars), seo_meta_description (max 155 chars). Return ONLY valid JSON in the exact shape {"en":{...},"he":{...},"es":{...},"ar":{...}}.\n\nArticle metadata:\n${JSON.stringify(article.raw_metadata || {})}\n\nArticle text:\n${text}`;
+  const prompt = `Produce a JSON object with summaries in 4 languages: en, he, es, ar. For each language provide: title (max 70 chars), executive_summary (2-3 short paragraphs), key_takeaways (3-5 strings), tags (3-7 strings), category_slug (one of: ${validCategories.join(', ')}; use "other" when nothing fits), seo_slug (URL-safe lowercase ASCII, max 70 chars), seo_meta_description (max 155 chars). Return ONLY valid JSON in the exact shape {"en":{...},"he":{...},"es":{...},"ar":{...}}.\n\nArticle metadata:\n${JSON.stringify(article.raw_metadata || {})}\n\nArticle text:\n${text}`;
 
   let response;
   for (let attempt = 1; attempt <= 3; attempt++) {
@@ -126,7 +127,7 @@ for (const article of articles || []) {
 
     await updateArticle(article.id, { status: 'summarizing' });
     const translations = await summarize(article, text);
-    const detected = validCategories.includes(translations.en?.category_slug) ? translations.en.category_slug : 'technology';
+    const detected = validCategories.includes(translations.en?.category_slug) ? translations.en.category_slug : fallbackCategory;
     const suffix = article.id.slice(0, 8);
 
     await updateArticle(article.id, { status: 'translating' });

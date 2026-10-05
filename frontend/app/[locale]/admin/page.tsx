@@ -126,6 +126,7 @@ export default function AdminPage() {
   const [artPage, setArtPage] = useState(1);
   const [showCategories, setShowCategories] = useState(false);
   const [showSources, setShowSources] = useState(false);
+  const [newCat, setNewCat] = useState({ slug: "", en: "", he: "", es: "", ar: "" });
   const ART_PAGE_SIZE = 20;
 
   const matchesFilter = (a: RecentArticle) => {
@@ -325,6 +326,47 @@ export default function AdminPage() {
             ))}
           </tbody>
         </table>
+        )}
+        {showCategories && (
+          <form
+            className="mt-4 rounded-lg border border-dashed border-zinc-300 p-3"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              if (!newCat.slug || !newCat.en) return;
+              await call("admin_add_category", {
+                p_slug: newCat.slug.toLowerCase().trim(),
+                p_name_json: {
+                  en: newCat.en,
+                  he: newCat.he || newCat.en,
+                  es: newCat.es || newCat.en,
+                  ar: newCat.ar || newCat.en,
+                },
+              }, "new-cat");
+              setNewCat({ slug: "", en: "", he: "", es: "", ar: "" });
+            }}
+          >
+            <div className="mb-2 text-sm font-medium">הוסף נושא חדש</div>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+              {(["slug", "en", "he", "es", "ar"] as const).map((f) => (
+                <input
+                  key={f}
+                  value={newCat[f]}
+                  onChange={(e) => setNewCat({ ...newCat, [f]: e.target.value })}
+                  placeholder={f === "slug" ? "slug (באנגלית)" : `שם ב${{ en: "אנגלית", he: "עברית", es: "ספרדית", ar: "ערבית" }[f]}`}
+                  required={f === "slug" || f === "en"}
+                  className="rounded-md border border-zinc-300 px-2 py-1.5 text-sm"
+                  dir={f === "slug" || f === "en" ? "ltr" : "auto"}
+                />
+              ))}
+            </div>
+            <button
+              type="submit"
+              disabled={busy === "new-cat"}
+              className="mt-2 rounded-md bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            >
+              {busy === "new-cat" ? "מוסיף..." : "הוסף נושא"}
+            </button>
+          </form>
         )}
       </section>
 
