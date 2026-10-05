@@ -121,6 +121,8 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [filter, setFilter] = useState<string>("all");
+  const [artPage, setArtPage] = useState(1);
+  const ART_PAGE_SIZE = 20;
 
   const supabase = createClient();
 
@@ -230,7 +232,7 @@ export default function AdminPage() {
         ] as const).map(([label, value, f]) => (
           <div
             key={label}
-            onClick={f ? () => setFilter(f) : undefined}
+            onClick={f ? () => { setFilter(f); setArtPage(1); } : undefined}
             className={`rounded-xl border bg-white p-4 shadow-sm transition ${
               f ? "cursor-pointer hover:border-blue-400" : ""
             } ${filter === f ? "border-blue-500 ring-1 ring-blue-500" : "border-zinc-200"}`}
@@ -345,7 +347,7 @@ export default function AdminPage() {
           <h2 className="font-semibold">כתבות אחרונות</h2>
           {filter !== "all" && (
             <button
-              onClick={() => setFilter("all")}
+              onClick={() => { setFilter("all"); setArtPage(1); }}
               className="rounded-lg bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100"
             >
               נקה סינון ✕
@@ -378,6 +380,7 @@ export default function AdminPage() {
                         ? a.source_type === "video"
                         : a.status === filter,
               )
+              .slice((artPage - 1) * ART_PAGE_SIZE, artPage * ART_PAGE_SIZE)
               .map((a) => (
               <tr key={a.id} className="border-b last:border-0">
                 <td className="py-2">
@@ -467,6 +470,42 @@ export default function AdminPage() {
             ))}
           </tbody>
         </table>
+        {(() => {
+          const total = data.recent_articles.filter((a) =>
+            filter === "all"
+              ? true
+              : filter === "pending"
+                ? ["pending", "failed", "extracting", "summarizing", "translating"].includes(a.status)
+                : filter === "rss"
+                  ? a.source_type === "news"
+                  : filter === "video"
+                    ? a.source_type === "video"
+                    : a.status === filter,
+          ).length;
+          const pages = Math.ceil(total / ART_PAGE_SIZE);
+          if (pages <= 1) return null;
+          return (
+            <div className="mt-4 flex items-center justify-between text-sm">
+              <button
+                onClick={() => setArtPage((p) => Math.max(1, p - 1))}
+                disabled={artPage === 1}
+                className="rounded-lg border border-zinc-300 px-3 py-1.5 disabled:opacity-40"
+              >
+                → קודם
+              </button>
+              <span className="text-zinc-500">
+                עמוד {artPage} מתוך {pages} ({total} פריטים)
+              </span>
+              <button
+                onClick={() => setArtPage((p) => Math.min(pages, p + 1))}
+                disabled={artPage === pages}
+                className="rounded-lg border border-zinc-300 px-3 py-1.5 disabled:opacity-40"
+              >
+                הבא ←
+              </button>
+            </div>
+          );
+        })()}
       </section>
     </main>
   );

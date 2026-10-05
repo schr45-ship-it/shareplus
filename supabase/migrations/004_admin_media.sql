@@ -70,7 +70,7 @@ BEGIN
         LEFT JOIN categories c ON c.id = a.category_id
         LEFT JOIN article_stats s ON s.article_id = a.id
         ORDER BY a.created_at DESC
-        LIMIT 40
+        LIMIT 500
       ) row
     )
   ) INTO result;
