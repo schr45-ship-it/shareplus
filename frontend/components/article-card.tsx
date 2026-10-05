@@ -20,7 +20,18 @@ export function ArticleCard({
     article.summary?.executive_summary || article.summary?.body || "";
 
   return (
-    <article className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white p-5 shadow-sm transition hover:shadow-md">
+    <article className="flex flex-col overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm transition hover:shadow-md">
+      {article.featured_image_url && (
+        <Link href={href as any} className="block aspect-video w-full overflow-hidden bg-zinc-100">
+          <img
+            src={article.featured_image_url}
+            alt={title}
+            className="h-full w-full object-cover transition duration-300 hover:scale-105"
+            loading="lazy"
+          />
+        </Link>
+      )}
+      <div className="flex flex-col gap-3 p-5">
       <div className="flex items-center gap-2 text-xs text-zinc-500">
         {article.category_name && (
           <span className="rounded-full bg-zinc-100 px-2 py-1 font-medium text-zinc-700">
@@ -53,6 +64,7 @@ export function ArticleCard({
           ))}
         </div>
       )}
+      </div>
     </article>
   );
 }
