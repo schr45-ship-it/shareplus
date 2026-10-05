@@ -154,7 +154,7 @@ export default function AdminPage() {
       });
       setLoading(false);
       if (error) {
-        setError(error.message.includes("unauthorized") ? "טוקן שגוי" : error.message);
+        setError(error.message.includes("unauthorized") ? "סיסמה שגויה" : error.message);
         return;
       }
       setData(data as Overview);
@@ -197,7 +197,7 @@ export default function AdminPage() {
           }}
         >
           <label className="text-sm text-zinc-600">
-            טוקן ניהול (מופיע ב־Supabase: admin_config → admin_token)
+            סיסמת ניהול
           </label>
           <input
             type="password"
