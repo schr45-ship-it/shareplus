@@ -126,6 +126,8 @@ export default function AdminPage() {
   const [artPage, setArtPage] = useState(1);
   const [showCategories, setShowCategories] = useState(false);
   const [showSources, setShowSources] = useState(false);
+  const [showGallery, setShowGallery] = useState(false);
+  const [galleryCat, setGalleryCat] = useState<string>("all");
   const [newCat, setNewCat] = useState({ slug: "", en: "", he: "", es: "", ar: "" });
   const ART_PAGE_SIZE = 20;
 
@@ -241,16 +243,23 @@ export default function AdminPage() {
           ["בתור", t.pending, "pending"],
           ["כתבות RSS", t.news, "rss"],
           ["סרטונים", t.videos, "video"],
+          ["תמונות", data.recent_articles.filter((a) => a.featured_image_url || a.youtube_video_id).length, "gallery"],
           ["צפיות", t.views, null],
           ["קליקים למקור", t.clicks, null],
           ["מקורות פעילים", data.sources.filter((s) => s.is_active).length, null],
         ] as const).map(([label, value, f]) => (
           <div
             key={label}
-            onClick={f ? () => { setFilter(f); setArtPage(1); } : undefined}
+            onClick={
+              f === "gallery"
+                ? () => setShowGallery((v) => !v)
+                : f
+                  ? () => { setFilter(f); setArtPage(1); }
+                  : undefined
+            }
             className={`rounded-xl border bg-white p-4 shadow-sm transition ${
               f ? "cursor-pointer hover:border-blue-400" : ""
-            } ${filter === f ? "border-blue-500 ring-1 ring-blue-500" : "border-zinc-200"}`}
+            } ${(f === "gallery" ? showGallery : filter === f) ? "border-blue-500 ring-1 ring-blue-500" : "border-zinc-200"}`}
           >
             <div className="text-2xl font-bold text-zinc-900">{value}</div>
             <div className="text-xs text-zinc-500">{label}</div>
@@ -273,6 +282,60 @@ export default function AdminPage() {
           ))}
         </div>
       </section>
+
+      {/* Image gallery */}
+      {showGallery && (() => {
+        const withImgs = data.recent_articles.filter((a) => a.featured_image_url || a.youtube_video_id);
+        const cats = Array.from(new Set(withImgs.map((a) => a.category_slug).filter(Boolean))) as string[];
+        const shown = galleryCat === "all" ? withImgs : withImgs.filter((a) => a.category_slug === galleryCat);
+        return (
+          <section className="mb-8 rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <h2 className="ml-auto font-semibold">תמונות ({shown.length})</h2>
+              <button
+                onClick={() => setGalleryCat("all")}
+                className={`rounded-full px-3 py-1 text-xs font-medium ${galleryCat === "all" ? "bg-blue-600 text-white" : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"}`}
+              >
+                הכל
+              </button>
+              {cats.map((c) => (
+                <button
+                  key={c}
+                  onClick={() => setGalleryCat(c)}
+                  className={`rounded-full px-3 py-1 text-xs font-medium ${galleryCat === c ? "bg-blue-600 text-white" : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"}`}
+                >
+                  {data.categories.find((x) => x.slug === c)?.name_json?.he ?? c}
+                </button>
+              ))}
+            </div>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
+              {shown.map((a) => {
+                const img = a.youtube_video_id
+                  ? `https://i.ytimg.com/vi/${a.youtube_video_id}/hqdefault.jpg`
+                  : a.featured_image_url!;
+                const inner = (
+                  <>
+                    <img src={img} alt="" className="aspect-video w-full rounded-lg object-cover" loading="lazy" />
+                    <div className="mt-1 flex items-center justify-between text-[11px] text-zinc-500">
+                      <span>{a.category_slug ?? ""}</span>
+                      <span>{a.status === "published" ? "🟢" : "🟡"}</span>
+                    </div>
+                  </>
+                );
+                return a.status === "published" && a.category_slug && (a.slug_he || a.slug_en) ? (
+                  <a key={a.id} href={`/he/${a.category_slug}/${a.slug_he ?? a.slug_en}`} target="_blank" rel="noopener noreferrer" className="block hover:opacity-80">
+                    {inner}
+                  </a>
+                ) : (
+                  <a key={a.id} href={a.source_url} target="_blank" rel="noopener noreferrer" className="block hover:opacity-80">
+                    {inner}
+                  </a>
+                );
+              })}
+            </div>
+          </section>
+        );
+      })()}
 
       {/* Categories */}
       <section className="mb-8 rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">

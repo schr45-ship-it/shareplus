@@ -25,6 +25,9 @@ export function Navbar() {
           <Link href="/" className="text-sm font-medium hover:underline">
             {t("home")}
           </Link>
+          <Link href="/gallery" className="text-sm font-medium hover:underline">
+            {t("gallery")}
+          </Link>
           <Link href="/about" className="text-sm font-medium hover:underline">
             {t("about")}
           </Link>
