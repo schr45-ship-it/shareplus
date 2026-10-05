@@ -11,6 +11,7 @@ import {
   ArticleTracker,
   SourceLinkTracker,
 } from "@/components/article-analytics";
+import { ReportButton } from "@/components/report-button";
 
 type Props = {
   params: Promise<{ locale: string; category: string; slug: string }>;
@@ -188,6 +189,9 @@ export default async function ArticlePage({ params }: Props) {
         >
           {t("source")} →
         </SourceLinkTracker>
+        <div className="mt-4">
+          <ReportButton articleId={article.article_id} locale={locale} />
+        </div>
       </div>
 
       <AdSenseBanner

@@ -130,6 +130,7 @@ export default function AdminPage() {
   const [showSources, setShowSources] = useState(false);
   const [showGallery, setShowGallery] = useState(false);
   const [galleryCat, setGalleryCat] = useState<string>("all");
+  const [reports, setReports] = useState<any[]>([]);
   const [newCat, setNewCat] = useState({ slug: "", en: "", he: "", es: "", ar: "" });
   const ART_PAGE_SIZE = 20;
 
@@ -158,6 +159,8 @@ export default function AdminPage() {
         return;
       }
       setData(data as Overview);
+      const { data: reps } = await (supabase.rpc as any)("admin_reports", { p_token: t });
+      setReports((reps as any[]) ?? []);
     },
     [supabase],
   );
@@ -284,6 +287,57 @@ export default function AdminPage() {
           ))}
         </div>
       </section>
+
+      {/* Pending reports */}
+      {reports.length > 0 && (
+        <section className="mb-8 rounded-xl border-2 border-red-300 bg-red-50 p-5 shadow-sm">
+          <h2 className="mb-3 font-semibold text-red-800">
+            דיווחים לבדיקה ({reports.length})
+          </h2>
+          <div className="space-y-3">
+            {reports.map((r: any) => (
+              <div key={r.id} className="flex items-center gap-3 rounded-lg bg-white p-3">
+                {r.featured_image_url && (
+                  <img src={r.featured_image_url} alt="" className="h-12 w-20 rounded-md object-cover" />
+                )}
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-medium">
+                    {r.title_he ?? r.source_url}
+                  </div>
+                  <div className="text-xs text-zinc-500">
+                    {r.category_slug ?? ""} · {r.reason}
+                    {r.details ? ` · ${r.details}` : ""}
+                  </div>
+                </div>
+                {r.article_status === "published" && r.category_slug && r.slug_he && (
+                  <a
+                    href={`/he/${r.category_slug}/${r.slug_he}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-blue-600 hover:underline"
+                  >
+                    צפה
+                  </a>
+                )}
+                <button
+                  onClick={() => call("admin_resolve_report", { p_report: r.id }, r.id)}
+                  disabled={busy === r.id}
+                  className="rounded-md bg-zinc-100 px-3 py-1.5 text-xs font-medium hover:bg-zinc-200 disabled:opacity-50"
+                >
+                  תקין
+                </button>
+                <button
+                  onClick={() => call("admin_resolve_report", { p_report: r.id, p_article_status: "archived" }, r.id)}
+                  disabled={busy === r.id}
+                  className="rounded-md bg-red-100 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-200 disabled:opacity-50"
+                >
+                  הסר כתבה
+                </button>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Image gallery */}
       {showGallery && (() => {
