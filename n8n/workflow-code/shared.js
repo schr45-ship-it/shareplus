@@ -9,7 +9,13 @@ async function _http(o) {
   if (o.body !== undefined) opts.body = o.body;
   if (o.responseFormat === 'json' || (typeof o.body === 'object' && !Buffer.isBuffer(o.body))) opts.json = true;
   if (o.binary) opts.encoding = 'arraybuffer';
-  return await __helpers.httpRequest(opts);
+  try {
+    return await __helpers.httpRequest(opts);
+  } catch (e) {
+    const body = e?.response?.body ?? e?.context?.data ?? e?.description ?? '';
+    const detail = typeof body === 'string' ? body.slice(0, 300) : JSON.stringify(body).slice(0, 300);
+    throw new Error(`${e.message || 'HTTP request failed'} :: ${opts.method} ${opts.url.slice(0, 120)} :: ${detail}`);
+  }
 }
 
 let __cfg = {};

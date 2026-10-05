@@ -21,8 +21,10 @@ const fallbackCategory = categoryIds.other ? 'other' : 'technology';
 
 let subByCat = {};
 let subIds = {};
+let subcategoryColumnOk = false;
 try {
   const subs = await supabase('subcategories?select=id,slug,categories(slug)&is_active=eq.true');
+  subcategoryColumnOk = true;
   for (const s of subs || []) {
     const catSlug = s.categories?.slug;
     if (!catSlug) continue;
@@ -200,17 +202,11 @@ for (const article of articles || []) {
     const publishPatch = {
       status: 'published',
       category_id: categoryIds[detected] || article.category_id,
-      subcategory_id: subcategoryId,
+      ...(subcategoryColumnOk && subcategoryId ? { subcategory_id: subcategoryId } : {}),
       published_at: new Date().toISOString(),
       ...(imageUrl ? { featured_image_url: imageUrl } : {}),
     };
-    try {
-      await updateArticle(article.id, publishPatch);
-    } catch (e) {
-      if (!/subcategory/i.test(e.message || '')) throw e;
-      delete publishPatch.subcategory_id;
-      await updateArticle(article.id, publishPatch);
-    }
+    await updateArticle(article.id, publishPatch);
 
     if (SITE_URL && REVALIDATE_SECRET) {
       try {
