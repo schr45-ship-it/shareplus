@@ -155,6 +155,36 @@ export async function getPopularTags(
   return (data ?? []) as unknown as { tag: string; count: number }[];
 }
 
+export async function getCategoryCounts(language: string): Promise<Record<string, number>> {
+  const counts: Record<string, number> = {};
+  const pageSize = 1000;
+  let offset = 0;
+
+  while (true) {
+    const { data, error } = await (supabaseBuild.from("articles") as any)
+      .select("category_id,categories!inner(slug),article_translations!inner(language)")
+      .eq("status", "published")
+      .eq("article_translations.language", language)
+      .range(offset, offset + pageSize - 1);
+
+    if (error) {
+      console.error("getCategoryCounts error:", error);
+      return counts;
+    }
+
+    const rows = (data ?? []) as Array<{ categories?: { slug?: string } | null }>;
+    for (const row of rows) {
+      const slug = row.categories?.slug;
+      if (slug) counts[slug] = (counts[slug] ?? 0) + 1;
+    }
+
+    if (rows.length < pageSize) break;
+    offset += pageSize;
+  }
+
+  return counts;
+}
+
 export type Category = Database["public"]["Tables"]["categories"]["Row"];
 
 export async function getCategories(language: string): Promise<Category[]> {

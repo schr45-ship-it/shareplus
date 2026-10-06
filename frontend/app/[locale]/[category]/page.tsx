@@ -1,6 +1,6 @@
 import { categoryLabel } from "@/lib/site";
 import { getTranslations } from "next-intl/server";
-import { getLatestArticles, getCategories } from "@/lib/supabase/queries";
+import { getLatestArticles, getCategories, getCategoryCounts } from "@/lib/supabase/queries";
 import { ArticleCard } from "@/components/article-card";
 import { Link } from "@/i18n/routing";
 import { Metadata } from "next";
@@ -43,7 +43,10 @@ const pageLabels: Record<string, { prev: string; next: string; page: string }> =
 export default async function CategoryPage({ params, searchParams }: Props) {
   const { locale, category } = await params;
   const { page: pageParam } = await searchParams;
-  const categories = await getCategories(locale);
+  const [categories, categoryCounts] = await Promise.all([
+    getCategories(locale),
+    getCategoryCounts(locale),
+  ]);
   const categoryData = categories.find((c) => c.slug === category);
 
   if (!categoryData) {
@@ -69,6 +72,9 @@ export default async function CategoryPage({ params, searchParams }: Props) {
     <div className="mx-auto max-w-5xl px-4 py-10">
       <h1 className="mb-8 text-3xl font-bold text-zinc-900">
         {t("articlesIn", { category: categoryName })}
+        <span className="ms-2 text-xl font-medium text-zinc-400">
+          ({categoryCounts[category] ?? 0})
+        </span>
       </h1>
 
       {pageArticles.length === 0 ? (

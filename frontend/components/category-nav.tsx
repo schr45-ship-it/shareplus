@@ -1,9 +1,12 @@
 import { categoryLabel } from "@/lib/site";
 import { Link } from "@/i18n/routing";
-import { getCategories } from "@/lib/supabase/queries";
+import { getCategories, getCategoryCounts } from "@/lib/supabase/queries";
 
 export async function CategoryNav({ locale }: { locale: string }) {
-  const categories = await getCategories(locale);
+  const [categories, counts] = await Promise.all([
+    getCategories(locale),
+    getCategoryCounts(locale),
+  ]);
 
   if (categories.length === 0) return null;
 
@@ -20,6 +23,9 @@ export async function CategoryNav({ locale }: { locale: string }) {
             className="whitespace-nowrap rounded-full px-3 py-1 text-sm font-medium text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-900"
           >
             {categoryLabel(category.name_json, category.slug, locale)}
+            <span className="ms-1.5 rounded-full bg-zinc-100 px-1.5 py-0.5 text-[10px] tabular-nums text-zinc-500">
+              {counts[category.slug] ?? 0}
+            </span>
           </Link>
         ))}
       </div>
