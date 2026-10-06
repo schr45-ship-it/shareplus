@@ -1,7 +1,7 @@
-import { getCategories, getLatestArticles } from "@/lib/supabase/queries";
+import { getGalleryArticles } from "@/lib/supabase/queries";
 import { Link } from "@/i18n/routing";
 import { Metadata } from "next";
-import { articleImageUrl, categoryLabel } from "@/lib/site";
+import { articleThumbnailUrl, categoryLabel } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
 
@@ -59,61 +59,46 @@ export default async function GalleryPage({ params, searchParams }: Props) {
   const { locale } = await params;
   const { page: pageParam } = await searchParams;
   const text = labels[locale] ?? labels.en;
-  const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
-  const categories = await getCategories(locale);
-
-  const categoryResults = await Promise.all(
-    categories.map(async (category) => ({
-      category,
-      articles: await getLatestArticles(locale, {
-        categorySlug: category.slug,
-        limit: 1000,
-      }),
-    })),
-  );
-
-  const allImages = categoryResults
-    .flatMap(({ category, articles }) =>
-      articles
-        .filter((article) => article.featured_image_url)
-        .map((article) => ({ article, category })),
-    )
-    .sort((a, b) =>
-      (b.article.published_at ?? "").localeCompare(a.article.published_at ?? ""),
-    );
-
-  const totalPages = Math.max(1, Math.ceil(allImages.length / PAGE_SIZE));
-  const currentPage = Math.min(page, totalPages);
-  const shown = allImages.slice(
-    (currentPage - 1) * PAGE_SIZE,
-    currentPage * PAGE_SIZE,
-  );
+  const requestedPage = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
+  const articles = await getGalleryArticles(locale, {
+    limit: PAGE_SIZE,
+    offset: (requestedPage - 1) * PAGE_SIZE,
+  });
+  const totalCount = Number(articles[0]?.total_count ?? 0);
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+  const currentPage = Math.min(requestedPage, totalPages);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
-      <h1 className="mb-8 text-3xl font-bold text-zinc-900">{text.title}</h1>
+      <div className="mb-8 flex flex-wrap items-end justify-between gap-2">
+        <h1 className="text-3xl font-bold text-zinc-900">{text.title}</h1>
+        {totalCount > 0 && <span className="text-sm text-zinc-500">{totalCount}</span>}
+      </div>
 
-      {shown.length === 0 ? (
+      {articles.length === 0 ? (
         <p className="text-zinc-500">{text.empty}</p>
       ) : (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-          {shown.map(({ article, category }) => (
+          {articles.map((article) => (
             <Link
               key={article.article_id}
-              href={`/${category.slug}/${article.seo_slug}` as any}
+              href={`/${article.category_slug}/${article.seo_slug}` as any}
               className="group block overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm transition hover:shadow-md"
             >
               <div className="aspect-video w-full overflow-hidden bg-zinc-100">
                 <img
-                  src={articleImageUrl(article.featured_image_url) ?? undefined}
+                  src={articleThumbnailUrl(article.featured_image_url) ?? undefined}
                   alt={article.title}
+                  width={480}
+                  height={270}
                   loading="lazy"
+                  decoding="async"
                   className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
                 />
               </div>
               <div className="p-3">
                 <span className="mb-1 block text-xs font-medium text-blue-600">
-                  {categoryLabel(category.name_json, category.slug, locale)}
+                  {categoryLabel(article.category_name, article.category_slug, locale)}
                 </span>
                 <p className="line-clamp-2 text-sm font-medium text-zinc-800 group-hover:underline">
                   {article.title}
@@ -125,17 +110,10 @@ export default async function GalleryPage({ params, searchParams }: Props) {
       )}
 
       {totalPages > 1 && (
-        <nav
-          aria-label="Pagination"
-          className="mt-10 flex items-center justify-between"
-        >
+        <nav aria-label="Pagination" className="mt-10 flex items-center justify-between">
           {currentPage > 1 ? (
             <Link
-              href={
-                currentPage === 2
-                  ? ("/gallery" as any)
-                  : (`/gallery?page=${currentPage - 1}` as any)
-              }
+              href={currentPage === 2 ? ("/gallery" as any) : (`/gallery?page=${currentPage - 1}` as any)}
               className="rounded-full border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50"
             >
               ← {text.newer}

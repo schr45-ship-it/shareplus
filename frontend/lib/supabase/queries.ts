@@ -155,6 +155,33 @@ export async function getPopularTags(
   return (data ?? []) as unknown as { tag: string; count: number }[];
 }
 
+export type GalleryArticle = {
+  article_id: string;
+  title: string;
+  seo_slug: string;
+  published_at: string | null;
+  featured_image_url: string;
+  category_slug: string;
+  category_name: Record<string, string>;
+  total_count: number;
+};
+
+export async function getGalleryArticles(
+  language: string,
+  options: { limit?: number; offset?: number } = {},
+): Promise<GalleryArticle[]> {
+  const { data, error } = await (supabaseBuild.rpc as any)("get_gallery_articles", {
+    p_language: language,
+    p_limit: options.limit ?? 24,
+    p_offset: options.offset ?? 0,
+  });
+  if (error) {
+    console.error("getGalleryArticles error:", error);
+    return [];
+  }
+  return (data ?? []) as GalleryArticle[];
+}
+
 export async function getCategoryCounts(language: string): Promise<Record<string, number>> {
   const counts: Record<string, number> = {};
   const pageSize = 1000;
