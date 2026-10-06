@@ -92,6 +92,7 @@ export default async function ArticlePage({ params }: Props) {
   const takeaways = article.summary?.key_takeaways || [];
   const story = article.summary?.story || "";
   const spokenLanguage = article.summary?.spoken_language || "";
+  const uploadedVideoUrl = article.summary?.video_url || "";
 
   return (
     <article className="mx-auto max-w-3xl px-4 py-10">
@@ -106,6 +107,16 @@ export default async function ArticlePage({ params }: Props) {
             allowFullScreen
           />
         </div>
+      ) : uploadedVideoUrl ? (
+        <video
+          src={uploadedVideoUrl}
+          poster={articleImageUrl(article.featured_image_url) ?? undefined}
+          controls
+          preload="metadata"
+          className="mb-8 aspect-video w-full rounded-xl bg-black object-contain"
+        >
+          <track kind="captions" />
+        </video>
       ) : (
         article.featured_image_url && (
           <img

@@ -33,6 +33,7 @@ export type ArticleDetail = {
     body?: string;
     story?: string | null;
     spoken_language?: string | null;
+    video_url?: string | null;
   };
   tags: string[];
   source_url: string;

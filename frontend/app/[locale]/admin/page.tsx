@@ -157,6 +157,18 @@ export default function AdminPage() {
   const [articleLanguage, setArticleLanguage] = useState("he");
   const [articleLong, setArticleLong] = useState(true);
   const [articleRequestStatus, setArticleRequestStatus] = useState<string | null>(null);
+  const [showManualEditor, setShowManualEditor] = useState(false);
+  const [manualDraft, setManualDraft] = useState({
+    title: "",
+    body: "",
+    category: "",
+    tags: "",
+    youtubeUrl: "",
+  });
+  const [manualImage, setManualImage] = useState<File | null>(null);
+  const [manualVideo, setManualVideo] = useState<File | null>(null);
+  const [manualTranslations, setManualTranslations] = useState<string[]>([]);
+  const [manualStatus, setManualStatus] = useState<string | null>(null);
   const ART_PAGE_SIZE = 20;
 
   const matchesFilter = (a: RecentArticle) => {
@@ -215,6 +227,60 @@ export default function AdminPage() {
     });
     if (error) setError(error.message);
     else await load(savedToken);
+    setBusy(null);
+  }
+
+  async function uploadManualMedia(file: File) {
+    if (!savedToken) throw new Error("אין הרשאת ניהול");
+    const signed = await fetch("/api/admin/media-upload", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: savedToken, filename: file.name, contentType: file.type }),
+    });
+    const upload = await signed.json();
+    if (!signed.ok) throw new Error(upload.error || "יצירת קישור העלאה נכשלה");
+    const result = await fetch(upload.signedUrl, {
+      method: "PUT",
+      headers: { "Content-Type": file.type },
+      body: file,
+    });
+    if (!result.ok) throw new Error("העלאת הקובץ נכשלה");
+    return upload.publicUrl as string;
+  }
+
+  async function createManualArticle(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!savedToken) return;
+    setBusy("manual-article");
+    setManualStatus(null);
+    try {
+      if (manualImage && manualImage.size > 10 * 1024 * 1024) throw new Error("תמונה יכולה להיות עד 10MB");
+      if (manualVideo && manualVideo.size > 200 * 1024 * 1024) throw new Error("סרטון יכול להיות עד 200MB");
+      const imageUrl = manualImage ? await uploadManualMedia(manualImage) : null;
+      const videoUrl = manualVideo ? await uploadManualMedia(manualVideo) : null;
+      const youtubeMatch = manualDraft.youtubeUrl.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([\w-]{11})/);
+      const { error } = await (supabase.rpc as any)("admin_create_manual_article", {
+        p_token: savedToken,
+        p_title: manualDraft.title.trim(),
+        p_body: manualDraft.body.trim(),
+        p_category_slug: manualDraft.category,
+        p_tags: manualDraft.tags.split(",").map((tag) => tag.trim()).filter(Boolean).slice(0, 12),
+        p_image_url: imageUrl,
+        p_video_url: videoUrl,
+        p_youtube_url: manualDraft.youtubeUrl.trim() || null,
+        p_youtube_video_id: youtubeMatch?.[1] || null,
+        p_translate_languages: manualTranslations,
+      });
+      if (error) throw new Error(error.message);
+      setManualDraft({ title: "", body: "", category: "", tags: "", youtubeUrl: "" });
+      setManualImage(null);
+      setManualVideo(null);
+      setManualTranslations([]);
+      setManualStatus(manualTranslations.length ? "הכתבה נוספה ותפורסם לאחר התרגום." : "הכתבה פורסמה בהצלחה.");
+      await load(savedToken);
+    } catch (error) {
+      setManualStatus(`שגיאה: ${error instanceof Error ? error.message : "הפעולה נכשלה"}`);
+    }
     setBusy(null);
   }
 
@@ -323,6 +389,145 @@ export default function AdminPage() {
             <div className="text-xs text-zinc-500">{label}</div>
           </div>
         ))}
+      </section>
+
+      <section className="mb-8 overflow-hidden rounded-xl border border-emerald-200 bg-white shadow-sm">
+        <button
+          type="button"
+          onClick={() => setShowManualEditor((value) => !value)}
+          className="flex w-full items-center justify-between bg-emerald-50 p-5 text-right hover:bg-emerald-100"
+          aria-expanded={showManualEditor}
+        >
+          <span>
+            <b className="block text-emerald-950">הוספת כתבה ידנית</b>
+            <span className="text-sm text-emerald-700">כותרת, תוכן, תמונה או סרטון ותרגום אופציונלי</span>
+          </span>
+          <span className="text-xl text-emerald-700">{showManualEditor ? "−" : "+"}</span>
+        </button>
+
+        {showManualEditor && (
+          <form onSubmit={createManualArticle} className="space-y-4 border-t border-emerald-200 p-5">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="text-sm font-medium text-zinc-700">
+                כותרת הכתבה
+                <input
+                  value={manualDraft.title}
+                  onChange={(e) => setManualDraft((draft) => ({ ...draft, title: e.target.value }))}
+                  minLength={3}
+                  maxLength={180}
+                  required
+                  className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 font-normal"
+                />
+              </label>
+              <label className="text-sm font-medium text-zinc-700">
+                קטגוריה
+                <select
+                  value={manualDraft.category}
+                  onChange={(e) => setManualDraft((draft) => ({ ...draft, category: e.target.value }))}
+                  required
+                  className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 font-normal"
+                >
+                  <option value="">בחר קטגוריה</option>
+                  {data.categories.map((category) => (
+                    <option key={category.id} value={category.slug}>
+                      {categoryLabel(category.name_json, category.slug, "he")}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            <label className="block text-sm font-medium text-zinc-700">
+              תוכן הכתבה
+              <textarea
+                value={manualDraft.body}
+                onChange={(e) => setManualDraft((draft) => ({ ...draft, body: e.target.value }))}
+                minLength={20}
+                maxLength={50000}
+                rows={10}
+                required
+                placeholder="כתוב כאן את הכתבה המלאה. הפרד פסקאות בשורה ריקה."
+                className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 font-normal leading-relaxed"
+              />
+            </label>
+
+            <label className="block text-sm font-medium text-zinc-700">
+              תגיות, מופרדות בפסיקים
+              <input
+                value={manualDraft.tags}
+                onChange={(e) => setManualDraft((draft) => ({ ...draft, tags: e.target.value }))}
+                placeholder="לדוגמה: בינה מלאכותית, עסקים, מדריך"
+                className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 font-normal"
+              />
+            </label>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="text-sm font-medium text-zinc-700">
+                תמונה ראשית
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  onChange={(e) => setManualImage(e.target.files?.[0] || null)}
+                  className="mt-1 block w-full rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-2 text-xs font-normal"
+                />
+                <span className="mt-1 block text-xs font-normal text-zinc-400">JPG, PNG או WebP עד 10MB</span>
+              </label>
+              <label className="text-sm font-medium text-zinc-700">
+                העלאת סרטון
+                <input
+                  type="file"
+                  accept="video/mp4,video/webm,video/quicktime"
+                  onChange={(e) => setManualVideo(e.target.files?.[0] || null)}
+                  className="mt-1 block w-full rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-2 text-xs font-normal"
+                />
+                <span className="mt-1 block text-xs font-normal text-zinc-400">MP4, WebM או MOV עד 200MB</span>
+              </label>
+            </div>
+
+            <label className="block text-sm font-medium text-zinc-700">
+              או קישור YouTube
+              <input
+                type="url"
+                value={manualDraft.youtubeUrl}
+                onChange={(e) => setManualDraft((draft) => ({ ...draft, youtubeUrl: e.target.value }))}
+                placeholder="https://www.youtube.com/watch?v=..."
+                className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 font-normal" dir="ltr"
+              />
+            </label>
+
+            <fieldset>
+              <legend className="mb-2 text-sm font-medium text-zinc-700">תרגם גם ל…</legend>
+              <div className="flex flex-wrap gap-4">
+                {[["en", "אנגלית"], ["es", "ספרדית"], ["ar", "ערבית"]].map(([code, label]) => (
+                  <label key={code} className="flex items-center gap-2 text-sm text-zinc-700">
+                    <input
+                      type="checkbox"
+                      checked={manualTranslations.includes(code)}
+                      onChange={(e) => setManualTranslations((languages) =>
+                        e.target.checked ? [...languages, code] : languages.filter((language) => language !== code)
+                      )}
+                    />
+                    {label}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+
+            {manualStatus && (
+              <p className={`rounded-lg px-3 py-2 text-sm ${manualStatus.startsWith("שגיאה") ? "bg-red-50 text-red-700" : "bg-green-50 text-green-700"}`}>
+                {manualStatus}
+              </p>
+            )}
+
+            <button
+              type="submit"
+              disabled={busy === "manual-article"}
+              className="rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+            >
+              {busy === "manual-article" ? "מעלה ושומר..." : manualTranslations.length ? "שמור ושלח לתרגום" : "פרסם כתבה"}
+            </button>
+          </form>
+        )}
       </section>
 
       <section className="mb-8 rounded-xl border-2 border-blue-200 bg-blue-50 p-5 shadow-sm">
