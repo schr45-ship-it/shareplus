@@ -293,6 +293,38 @@ export default function AdminPage() {
         <p className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
       )}
 
+      {/* KPI cards */}
+      <section className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-8">
+        {([
+          ["סה״כ תוכן", t.articles, "all"],
+          ["מפורסמות", t.published, "published"],
+          ["בתור", t.pending, "pending"],
+          ["כתבות RSS", t.news, "rss"],
+          ["סרטונים", t.videos, "video"],
+          ["תמונות", data.recent_articles.filter((a) => a.featured_image_url || a.youtube_video_id).length, "gallery"],
+          ["צפיות", t.views, null],
+          ["קליקים למקור", t.clicks, null],
+          ["מקורות פעילים", data.sources.filter((s) => s.is_active).length, null],
+        ] as const).map(([label, value, f]) => (
+          <div
+            key={label}
+            onClick={
+              f === "gallery"
+                ? () => setShowGallery((v) => !v)
+                : f
+                  ? () => { setFilter(f); setArtPage(1); }
+                  : undefined
+            }
+            className={`rounded-xl border bg-white p-4 shadow-sm transition ${
+              f ? "cursor-pointer hover:border-blue-400" : ""
+            } ${(f === "gallery" ? showGallery : filter === f) ? "border-blue-500 ring-1 ring-blue-500" : "border-zinc-200"}`}
+          >
+            <div className="text-2xl font-bold text-zinc-900">{value}</div>
+            <div className="text-xs text-zinc-500">{label}</div>
+          </div>
+        ))}
+      </section>
+
       <section className="mb-8 rounded-xl border-2 border-blue-200 bg-blue-50 p-5 shadow-sm">
         <h2 className="mb-1 text-lg font-semibold text-blue-950">יצירת כתבה לפי נושא</h2>
         <p className="mb-4 text-sm text-blue-800">
@@ -420,38 +452,6 @@ export default function AdminPage() {
             )}
           </div>
         )}
-      </section>
-
-      {/* KPI cards */}
-      <section className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-8">
-        {([
-          ["סה״כ תוכן", t.articles, "all"],
-          ["מפורסמות", t.published, "published"],
-          ["בתור", t.pending, "pending"],
-          ["כתבות RSS", t.news, "rss"],
-          ["סרטונים", t.videos, "video"],
-          ["תמונות", data.recent_articles.filter((a) => a.featured_image_url || a.youtube_video_id).length, "gallery"],
-          ["צפיות", t.views, null],
-          ["קליקים למקור", t.clicks, null],
-          ["מקורות פעילים", data.sources.filter((s) => s.is_active).length, null],
-        ] as const).map(([label, value, f]) => (
-          <div
-            key={label}
-            onClick={
-              f === "gallery"
-                ? () => setShowGallery((v) => !v)
-                : f
-                  ? () => { setFilter(f); setArtPage(1); }
-                  : undefined
-            }
-            className={`rounded-xl border bg-white p-4 shadow-sm transition ${
-              f ? "cursor-pointer hover:border-blue-400" : ""
-            } ${(f === "gallery" ? showGallery : filter === f) ? "border-blue-500 ring-1 ring-blue-500" : "border-zinc-200"}`}
-          >
-            <div className="text-2xl font-bold text-zinc-900">{value}</div>
-            <div className="text-xs text-zinc-500">{label}</div>
-          </div>
-        ))}
       </section>
 
       {/* Status breakdown */}
