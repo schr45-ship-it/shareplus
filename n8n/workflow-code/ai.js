@@ -78,11 +78,13 @@ async function summarize(article, text) {
   const prompt = `Produce a JSON object with summaries in 4 languages: en, he, es, ar. For each language provide: title (max 70 chars), executive_summary (2-3 short paragraphs), key_takeaways (3-5 strings), tags (3-7 strings), category_slug (one of: ${validCategories.join(', ')}; use "other" when nothing fits), subcategory_slug (pick the single best match for the chosen category from these options: ${Object.entries(subByCat).map(([c, ss]) => `${c}: ${ss.join(', ')}`).join('; ') || 'none'}; use null if unsure), ${isVideo ? 'video_story (a clear, modest narrative retelling of what happens in the video or movie — plot, characters, key scenes — 3-5 short paragraphs; if the content is not a narrative video use null), ' : ''}seo_slug (URL-safe lowercase ASCII, max 70 chars), seo_meta_description (max 155 chars). At the top level also provide: "family_safe" (boolean — false if the content contains sexually explicit, graphic violence, hate or otherwise non-family-safe material), "spoken_language" (the main language actually spoken in the video/audio as a full language name, e.g. "English"; null if unknown). Return ONLY valid JSON in the exact shape {"family_safe":true,"spoken_language":"...","en":{...},"he":{...},"es":{...},"ar":{...}}.\n\nArticle metadata:\n${JSON.stringify(article.raw_metadata || {})}\n\nArticle text:\n${text}`;
 
   let response;
-  for (let attempt = 1; attempt <= 2; attempt++) {
+  let lastError;
+  const models = ['gemini-flash-lite-latest', 'gemini-flash-latest', 'gemini-3.1-flash-lite'];
+  for (const model of models) {
     try {
       response = await _http({
         method: 'POST',
-        url: `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${encodeURIComponent(GEMINI_KEY)}`,
+        url: `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(GEMINI_KEY)}`,
         headers: { 'Content-Type': 'application/json' },
         body: {
           contents: [{ role: 'user', parts: [{ text: prompt }] }],
@@ -93,12 +95,13 @@ async function summarize(article, text) {
       });
       break;
     } catch (error) {
-      if (attempt === 2) {
-        error.transient = /429|500|502|503|504|UNAVAILABLE|RESOURCE_EXHAUSTED|timed out/i.test(error.message || '');
-        throw error;
-      }
-      await new Promise((resolve) => setTimeout(resolve, attempt * 5000));
+      lastError = error;
+      if (!/404|429|500|502|503|504|UNAVAILABLE|RESOURCE_EXHAUSTED|timed out/i.test(error.message || '')) throw error;
     }
+  }
+  if (!response) {
+    lastError.transient = true;
+    throw lastError;
   }
 
   let output = response?.candidates?.[0]?.content?.parts?.map((p) => p.text || '').join('') || '';

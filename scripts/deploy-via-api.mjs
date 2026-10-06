@@ -62,14 +62,30 @@ function injectConfig(wf) {
 
 for (const [file, name] of Object.entries(wanted)) {
   const wf = injectConfig(JSON.parse(fs.readFileSync(path.join(dir, file), 'utf8')));
+  const matches = existing.filter((w) => w.name === name);
+  const details = await Promise.all(matches.map((item) => api(`/workflows/${item.id}`)));
+  const configScore = (item) => {
+    const config = item.nodes?.find((node) => node.name === 'Config');
+    return (config?.parameters?.assignments?.assignments || []).filter((entry) => entry.value).length;
+  };
+  const current = details.sort((a, b) => configScore(b) - configScore(a))[0];
+  const match = current && matches.find((item) => item.id === current.id);
+  if (match) {
+    const currentConfig = current.nodes?.find((node) => node.name === 'Config');
+    const nextConfig = wf.nodes?.find((node) => node.name === 'Config');
+    const values = Object.fromEntries(
+      (currentConfig?.parameters?.assignments?.assignments || []).map((item) => [item.name, item.value]),
+    );
+    for (const item of nextConfig?.parameters?.assignments?.assignments || []) {
+      if (!process.env[`CFG_${item.name}`] && values[item.name]) item.value = values[item.name];
+    }
+  }
   const payload = {
     name,
     nodes: wf.nodes,
     connections: wf.connections,
     settings: wf.settings || {},
   };
-  const matches = existing.filter((w) => w.name === name);
-  const match = matches.find((w) => w.active) || matches[0];
   // Deactivate duplicate workflows with the same name so only one holds the webhook
   for (const w of matches) {
     if (w.id !== match?.id && w.active) {
