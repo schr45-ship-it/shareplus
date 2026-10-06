@@ -13,7 +13,7 @@ try {
   );
 } catch (_) {}
 
-const articles = await supabase('articles?select=*&status=in.(pending,failed)&order=created_at.asc&limit=1');
+const articles = await supabase('articles?select=*&status=eq.pending&order=created_at.asc&limit=2');
 const categories = await supabase('categories?select=id,slug');
 const categoryIds = Object.fromEntries((categories || []).map((c) => [c.slug, c.id]));
 const validCategories = (categories || []).map((c) => c.slug);
