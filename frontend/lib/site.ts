@@ -39,5 +39,9 @@ export function categoryLabel(
 export function articleImageUrl(url: string | null | undefined): string | null {
   if (!url) return null;
   const m = url.match(/article-images\/([a-zA-Z0-9-]+\.jpg)/);
-  return m ? `/api/img/${m[1]}` : url;
+  if (m) return `/api/img/${m[1]}`;
+  if (url.startsWith("https://image.pollinations.ai/")) {
+    return `/api/generated-image?url=${encodeURIComponent(url)}`;
+  }
+  return url;
 }
