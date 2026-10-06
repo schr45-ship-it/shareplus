@@ -28,6 +28,16 @@ const wanted = {
 const existing = (await api('/workflows?limit=100')).data || [];
 console.log('Existing:', existing.map((w) => `${w.name}(${w.active ? 'on' : 'off'})`).join(', '));
 
+const existingDetails = await Promise.all(existing.map((item) => api(`/workflows/${item.id}`)));
+const configValues = (workflow) => Object.fromEntries(
+  (workflow.nodes?.find((node) => node.name === 'Config')?.parameters?.assignments?.assignments || [])
+    .filter((item) => item.value && !String(item.value).startsWith('__'))
+    .map((item) => [item.name, item.value]),
+);
+const sharedConfig = existingDetails
+  .map(configValues)
+  .sort((a, b) => Object.keys(b).length - Object.keys(a).length)[0] || {};
+
 // Deactivate stale workflows that are not the wanted v3 set
 for (const w of existing) {
   const isWantedV3 = Object.values(wanted).includes(w.name);
@@ -64,21 +74,13 @@ for (const [file, name] of Object.entries(wanted)) {
   const wf = injectConfig(JSON.parse(fs.readFileSync(path.join(dir, file), 'utf8')));
   const matches = existing.filter((w) => w.name === name);
   const details = await Promise.all(matches.map((item) => api(`/workflows/${item.id}`)));
-  const configScore = (item) => {
-    const config = item.nodes?.find((node) => node.name === 'Config');
-    return (config?.parameters?.assignments?.assignments || []).filter((entry) => entry.value).length;
-  };
+  const configScore = (item) => Object.keys(configValues(item)).length;
   const current = details.sort((a, b) => configScore(b) - configScore(a))[0];
   const match = current && matches.find((item) => item.id === current.id);
-  if (match) {
-    const currentConfig = current.nodes?.find((node) => node.name === 'Config');
-    const nextConfig = wf.nodes?.find((node) => node.name === 'Config');
-    const values = Object.fromEntries(
-      (currentConfig?.parameters?.assignments?.assignments || []).map((item) => [item.name, item.value]),
-    );
-    for (const item of nextConfig?.parameters?.assignments?.assignments || []) {
-      if (!process.env[`CFG_${item.name}`] && values[item.name]) item.value = values[item.name];
-    }
+  const values = { ...sharedConfig, ...(current ? configValues(current) : {}) };
+  const nextConfig = wf.nodes?.find((node) => node.name === 'Config');
+  for (const item of nextConfig?.parameters?.assignments?.assignments || []) {
+    if (!process.env[`CFG_${item.name}`] && values[item.name]) item.value = values[item.name];
   }
   const payload = {
     name,
