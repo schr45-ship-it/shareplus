@@ -134,6 +134,10 @@ export default function AdminPage() {
   const [reports, setReports] = useState<any[]>([]);
   const [messages, setMessages] = useState<any[]>([]);
   const [newCat, setNewCat] = useState({ slug: "", en: "", he: "", es: "", ar: "" });
+  const [articleTopic, setArticleTopic] = useState("");
+  const [articleLanguage, setArticleLanguage] = useState("he");
+  const [articleLong, setArticleLong] = useState(true);
+  const [articleRequestStatus, setArticleRequestStatus] = useState<string | null>(null);
   const ART_PAGE_SIZE = 20;
 
   const matchesFilter = (a: RecentArticle) => {
@@ -190,6 +194,27 @@ export default function AdminPage() {
     setBusy(null);
   }
 
+  async function requestArticle(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!savedToken || articleTopic.trim().length < 3) return;
+    setBusy("article-request");
+    setArticleRequestStatus(null);
+    const { error } = await (supabase.rpc as any)("admin_create_article_request", {
+      p_token: savedToken,
+      p_topic: articleTopic.trim(),
+      p_language: articleLanguage,
+      p_long: articleLong,
+    });
+    if (error) {
+      setArticleRequestStatus(`שגיאה: ${error.message}`);
+    } else {
+      setArticleTopic("");
+      setArticleRequestStatus("הבקשה נוספה לתור. הבוט ייצור ויפרסם את הכתבה אוטומטית.");
+      await load(savedToken);
+    }
+    setBusy(null);
+  }
+
   if (!savedToken || !data) {
     return (
       <main dir="rtl" className="mx-auto max-w-md px-4 py-16">
@@ -243,6 +268,61 @@ export default function AdminPage() {
       {error && (
         <p className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
       )}
+
+      <section className="mb-8 rounded-xl border-2 border-blue-200 bg-blue-50 p-5 shadow-sm">
+        <h2 className="mb-1 text-lg font-semibold text-blue-950">יצירת כתבה לפי נושא</h2>
+        <p className="mb-4 text-sm text-blue-800">
+          כתוב נושא או הנחיה מפורטת. הבוט ייצור כתבה בארבע שפות, ישייך קטגוריה ויוסיף תמונה מתאימה.
+        </p>
+        <form onSubmit={requestArticle} className="space-y-3">
+          <textarea
+            value={articleTopic}
+            onChange={(e) => setArticleTopic(e.target.value)}
+            minLength={3}
+            maxLength={500}
+            rows={3}
+            required
+            placeholder="לדוגמה: מדריך מעשי לשימוש בטוח בבינה מלאכותית לעסקים קטנים"
+            className="w-full rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+          />
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="flex items-center gap-2 text-sm text-zinc-700">
+              שפת הנושא
+              <select
+                value={articleLanguage}
+                onChange={(e) => setArticleLanguage(e.target.value)}
+                className="rounded-md border border-zinc-300 bg-white px-2 py-1.5"
+              >
+                <option value="he">עברית</option>
+                <option value="en">English</option>
+                <option value="es">Español</option>
+                <option value="ar">العربية</option>
+              </select>
+            </label>
+            <label className="flex items-center gap-2 text-sm text-zinc-700">
+              <input
+                type="checkbox"
+                checked={articleLong}
+                onChange={(e) => setArticleLong(e.target.checked)}
+                className="h-4 w-4 rounded border-zinc-300"
+              />
+              כתבה ארוכה ומעמיקה
+            </label>
+            <button
+              type="submit"
+              disabled={busy === "article-request" || articleTopic.trim().length < 3}
+              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+            >
+              {busy === "article-request" ? "מוסיף לתור..." : "צור כתבה"}
+            </button>
+          </div>
+          {articleRequestStatus && (
+            <p className={`text-sm ${articleRequestStatus.startsWith("שגיאה") ? "text-red-700" : "text-green-700"}`}>
+              {articleRequestStatus}
+            </p>
+          )}
+        </form>
+      </section>
 
       {/* KPI cards */}
       <section className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-8">

@@ -40,6 +40,9 @@ async function updateArticle(id, patch) {
 
 async function fetchText(article) {
   const meta = article.raw_metadata || {};
+  if (meta.manual_request && meta.manual_topic) {
+    return cleanText(`Write an original, accurate and useful article about this requested topic: ${meta.manual_topic}. Do not claim access to current events or invent unsupported facts.`, 4000);
+  }
   if (article.source_type === 'video') {
     try {
       const embed = await _http({ method: 'GET', url: `https://www.youtube.com/oembed?url=${encodeURIComponent(article.source_url)}&format=json`, responseFormat: 'json', timeout: 15000 });
@@ -75,11 +78,14 @@ async function fetchText(article) {
 
 async function summarize(article, text) {
   const isVideo = article.source_type === 'video';
-  const isLong = parseInt(article.id.replace(/-/g, '').slice(-1), 16) % 2 === 0;
+  const isLong = article.raw_metadata?.force_long === true || parseInt(article.id.replace(/-/g, '').slice(-1), 16) % 2 === 0;
   const contentInstruction = isLong
     ? 'Also provide body: an original, detailed 600-900 word article with a clear introduction, context, analysis, useful details and conclusion. Use short paragraphs and no markdown headings. Do not invent facts beyond the source.'
     : 'Also provide body equal to a concise 2-3 paragraph summary.';
-  const prompt = `Produce a JSON object with articles in 4 languages: en, he, es, ar. For each language provide: title (max 70 chars), executive_summary (2-3 short paragraphs), ${contentInstruction} key_takeaways (3-5 strings), tags (3-7 strings), category_slug (one of: ${validCategories.join(', ')}; use "other" when nothing fits), subcategory_slug (pick the single best match for the chosen category from these options: ${Object.entries(subByCat).map(([c, ss]) => `${c}: ${ss.join(', ')}`).join('; ') || 'none'}; use null if unsure), ${isVideo ? 'video_story (a clear, modest narrative retelling of what happens in the video or movie — plot, characters, key scenes — 3-5 short paragraphs; if the content is not a narrative video use null), ' : ''}seo_slug (URL-safe lowercase ASCII, max 70 chars), seo_meta_description (max 155 chars). At the top level also provide: "family_safe" (boolean — false if the content contains sexually explicit, graphic violence, hate or otherwise non-family-safe material), "spoken_language" (the main language actually spoken in the video/audio as a full language name, e.g. "English"; null if unknown). Return ONLY valid JSON in the exact shape {"family_safe":true,"spoken_language":"...","en":{...},"he":{...},"es":{...},"ar":{...}}.\n\nArticle metadata:\n${JSON.stringify(article.raw_metadata || {})}\n\nArticle text:\n${text}`;
+  const requestContext = article.raw_metadata?.manual_request
+    ? `This is an editor-requested original article. Follow the requested topic precisely: ${article.raw_metadata.manual_topic}. `
+    : '';
+  const prompt = `${requestContext}Produce a JSON object with articles in 4 languages: en, he, es, ar. For each language provide: title (max 70 chars), executive_summary (2-3 short paragraphs), ${contentInstruction} key_takeaways (3-5 strings), tags (3-7 strings), category_slug (one of: ${validCategories.join(', ')}; use "other" when nothing fits), subcategory_slug (pick the single best match for the chosen category from these options: ${Object.entries(subByCat).map(([c, ss]) => `${c}: ${ss.join(', ')}`).join('; ') || 'none'}; use null if unsure), ${isVideo ? 'video_story (a clear, modest narrative retelling of what happens in the video or movie — plot, characters, key scenes — 3-5 short paragraphs; if the content is not a narrative video use null), ' : ''}seo_slug (URL-safe lowercase ASCII, max 70 chars), seo_meta_description (max 155 chars). At the top level also provide: "family_safe" (boolean — false if the content contains sexually explicit, graphic violence, hate or otherwise non-family-safe material), "spoken_language" (the main language actually spoken in the video/audio as a full language name, e.g. "English"; null if unknown). Return ONLY valid JSON in the exact shape {"family_safe":true,"spoken_language":"...","en":{...},"he":{...},"es":{...},"ar":{...}}.\n\nArticle metadata:\n${JSON.stringify(article.raw_metadata || {})}\n\nArticle text:\n${text}`;
 
   let response;
   let lastError;
