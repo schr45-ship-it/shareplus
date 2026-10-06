@@ -75,7 +75,11 @@ async function fetchText(article) {
 
 async function summarize(article, text) {
   const isVideo = article.source_type === 'video';
-  const prompt = `Produce a JSON object with summaries in 4 languages: en, he, es, ar. For each language provide: title (max 70 chars), executive_summary (2-3 short paragraphs), key_takeaways (3-5 strings), tags (3-7 strings), category_slug (one of: ${validCategories.join(', ')}; use "other" when nothing fits), subcategory_slug (pick the single best match for the chosen category from these options: ${Object.entries(subByCat).map(([c, ss]) => `${c}: ${ss.join(', ')}`).join('; ') || 'none'}; use null if unsure), ${isVideo ? 'video_story (a clear, modest narrative retelling of what happens in the video or movie — plot, characters, key scenes — 3-5 short paragraphs; if the content is not a narrative video use null), ' : ''}seo_slug (URL-safe lowercase ASCII, max 70 chars), seo_meta_description (max 155 chars). At the top level also provide: "family_safe" (boolean — false if the content contains sexually explicit, graphic violence, hate or otherwise non-family-safe material), "spoken_language" (the main language actually spoken in the video/audio as a full language name, e.g. "English"; null if unknown). Return ONLY valid JSON in the exact shape {"family_safe":true,"spoken_language":"...","en":{...},"he":{...},"es":{...},"ar":{...}}.\n\nArticle metadata:\n${JSON.stringify(article.raw_metadata || {})}\n\nArticle text:\n${text}`;
+  const isLong = parseInt(article.id.replace(/-/g, '').slice(-1), 16) % 2 === 0;
+  const contentInstruction = isLong
+    ? 'Also provide body: an original, detailed 600-900 word article with a clear introduction, context, analysis, useful details and conclusion. Use short paragraphs and no markdown headings. Do not invent facts beyond the source.'
+    : 'Also provide body equal to a concise 2-3 paragraph summary.';
+  const prompt = `Produce a JSON object with articles in 4 languages: en, he, es, ar. For each language provide: title (max 70 chars), executive_summary (2-3 short paragraphs), ${contentInstruction} key_takeaways (3-5 strings), tags (3-7 strings), category_slug (one of: ${validCategories.join(', ')}; use "other" when nothing fits), subcategory_slug (pick the single best match for the chosen category from these options: ${Object.entries(subByCat).map(([c, ss]) => `${c}: ${ss.join(', ')}`).join('; ') || 'none'}; use null if unsure), ${isVideo ? 'video_story (a clear, modest narrative retelling of what happens in the video or movie — plot, characters, key scenes — 3-5 short paragraphs; if the content is not a narrative video use null), ' : ''}seo_slug (URL-safe lowercase ASCII, max 70 chars), seo_meta_description (max 155 chars). At the top level also provide: "family_safe" (boolean — false if the content contains sexually explicit, graphic violence, hate or otherwise non-family-safe material), "spoken_language" (the main language actually spoken in the video/audio as a full language name, e.g. "English"; null if unknown). Return ONLY valid JSON in the exact shape {"family_safe":true,"spoken_language":"...","en":{...},"he":{...},"es":{...},"ar":{...}}.\n\nArticle metadata:\n${JSON.stringify(article.raw_metadata || {})}\n\nArticle text:\n${text}`;
 
   let response;
   let lastError;
@@ -88,7 +92,11 @@ async function summarize(article, text) {
         headers: { 'Content-Type': 'application/json' },
         body: {
           contents: [{ role: 'user', parts: [{ text: prompt }] }],
-          generationConfig: { responseMimeType: 'application/json', temperature: 0.25 },
+          generationConfig: {
+            responseMimeType: 'application/json',
+            temperature: 0.25,
+            maxOutputTokens: isLong ? 16384 : 8192,
+          },
         },
         responseFormat: 'json',
         timeout: 45000,
@@ -116,8 +124,9 @@ async function summarize(article, text) {
   }
 
   for (const lang of ['en', 'he', 'es', 'ar']) {
-    if (!parsed[lang]?.title || !parsed[lang]?.executive_summary) throw new Error(`Gemini response missing ${lang}`);
+    if (!parsed[lang]?.title || !parsed[lang]?.executive_summary || !parsed[lang]?.body) throw new Error(`Gemini response missing ${lang}`);
   }
+  parsed._isLong = isLong;
   return parsed;
 }
 
@@ -166,9 +175,10 @@ for (const article of articles || []) {
         summary: {
           executive_summary: summary,
           key_takeaways: Array.isArray(item.key_takeaways) ? item.key_takeaways : [],
-          body: summary,
+          body: String(item.body || summary),
           story: item.video_story || null,
           spoken_language: translations.spoken_language || article.raw_metadata?.spoken_language || null,
+          is_long: translations._isLong,
         },
         tags: Array.isArray(item.tags) ? item.tags.slice(0, 8) : [],
         word_count: summary.split(/\s+/).filter(Boolean).length,
@@ -205,7 +215,13 @@ for (const article of articles || []) {
     }
 
     await logStep(article.id, article.source_id, 'publish', 'success', 'Article processed and published', { languages: ['en', 'he', 'es', 'ar'] });
-    results.push({ article_id: article.id, status: 'published', languages: ['en', 'he', 'es', 'ar'] });
+    results.push({
+      article_id: article.id,
+      status: 'published',
+      languages: ['en', 'he', 'es', 'ar'],
+      content_type: translations._isLong ? 'long' : 'short',
+      words_en: String(translations.en?.body || '').split(/\s+/).filter(Boolean).length,
+    });
   } catch (error) {
     const transient = Boolean(error.transient) || /429|500|502|503|504|UNAVAILABLE|RESOURCE_EXHAUSTED|timed out/i.test(error.message || '');
     const metadata = { ...(article.raw_metadata || {}), processing_error: error.message, retryable: transient };
