@@ -47,6 +47,23 @@ type RecentArticle = {
   subcategory_name: Record<string, string> | null;
 };
 
+type ManualArticle = {
+  id: string;
+  status: string;
+  original_language: string;
+  created_at: string;
+  published_at: string | null;
+  featured_image_url: string | null;
+  requested_topic: string;
+  requested_long: boolean;
+  processing_error: string | null;
+  category_slug: string | null;
+  title_he: string | null;
+  title_en: string | null;
+  slug_he: string | null;
+  slug_en: string | null;
+};
+
 type Overview = {
   status_counts: Record<string, number>;
   totals: {
@@ -133,6 +150,8 @@ export default function AdminPage() {
   const [galleryCat, setGalleryCat] = useState<string>("all");
   const [reports, setReports] = useState<any[]>([]);
   const [messages, setMessages] = useState<any[]>([]);
+  const [manualArticles, setManualArticles] = useState<ManualArticle[]>([]);
+  const [showManualArticles, setShowManualArticles] = useState(true);
   const [newCat, setNewCat] = useState({ slug: "", en: "", he: "", es: "", ar: "" });
   const [articleTopic, setArticleTopic] = useState("");
   const [articleLanguage, setArticleLanguage] = useState("he");
@@ -169,6 +188,11 @@ export default function AdminPage() {
       setReports((reps as any[]) ?? []);
       const { data: msgs } = await (supabase.rpc as any)("admin_contact_messages", { p_token: t });
       setMessages((msgs as any[]) ?? []);
+      const { data: requested } = await (supabase.rpc as any)("admin_manual_articles", {
+        p_token: t,
+        p_limit: 100,
+      });
+      setManualArticles((requested as ManualArticle[]) ?? []);
     },
     [supabase],
   );
@@ -322,6 +346,80 @@ export default function AdminPage() {
             </p>
           )}
         </form>
+      </section>
+
+      <section className="mb-8 overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm">
+        <button
+          type="button"
+          onClick={() => setShowManualArticles((value) => !value)}
+          className="flex w-full items-center justify-between p-5 text-right hover:bg-zinc-50"
+          aria-expanded={showManualArticles}
+        >
+          <span className="font-semibold">כתבות שיצרתי עם הבוט ({manualArticles.length})</span>
+          <span className="text-zinc-400">{showManualArticles ? "▲" : "▼"}</span>
+        </button>
+        {showManualArticles && (
+          <div className="border-t border-zinc-200 p-4">
+            {manualArticles.length === 0 ? (
+              <p className="text-sm text-zinc-500">עדיין לא נוצרו כתבות לפי בקשה ידנית.</p>
+            ) : (
+              <div className="space-y-3">
+                {manualArticles.map((article) => {
+                  const title = article.title_he || article.title_en || article.requested_topic;
+                  const slug = article.slug_he || article.slug_en;
+                  const language = article.slug_he ? "he" : "en";
+                  const href = article.status === "published" && article.category_slug && slug
+                    ? `/${language}/${article.category_slug}/${slug}`
+                    : null;
+                  return (
+                    <article
+                      key={article.id}
+                      className="flex flex-col gap-3 rounded-lg border border-zinc-200 p-3 sm:flex-row sm:items-center"
+                    >
+                      {article.featured_image_url && (
+                        <img
+                          src={articleImageUrl(article.featured_image_url) ?? undefined}
+                          alt=""
+                          className="h-20 w-full rounded-md object-cover sm:h-16 sm:w-28"
+                        />
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="mb-1 flex flex-wrap items-center gap-2">
+                          <StatusBadge status={article.status} />
+                          {article.requested_long && (
+                            <span className="rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700">
+                              ארוכה
+                            </span>
+                          )}
+                          <time className="text-xs text-zinc-400" dateTime={article.created_at}>
+                            {new Date(article.created_at).toLocaleString("he-IL")}
+                          </time>
+                        </div>
+                        <h3 className="truncate text-sm font-semibold text-zinc-900">{title}</h3>
+                        <p className="mt-1 line-clamp-2 text-xs text-zinc-500">
+                          נושא שביקשת: {article.requested_topic}
+                        </p>
+                        {article.processing_error && (
+                          <p className="mt-1 text-xs text-red-600">{article.processing_error}</p>
+                        )}
+                      </div>
+                      {href && (
+                        <a
+                          href={href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="shrink-0 rounded-md bg-blue-50 px-3 py-2 text-center text-xs font-medium text-blue-700 hover:bg-blue-100"
+                        >
+                          צפייה בכתבה
+                        </a>
+                      )}
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
       </section>
 
       {/* KPI cards */}
