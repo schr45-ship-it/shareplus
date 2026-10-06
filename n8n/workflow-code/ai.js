@@ -13,7 +13,7 @@ try {
   );
 } catch (_) {}
 
-const articles = await supabase('articles?select=*&status=in.(pending,failed)&order=created_at.asc&limit=5');
+const articles = await supabase('articles?select=*&status=in.(pending,failed)&order=created_at.asc&limit=1');
 const categories = await supabase('categories?select=id,slug');
 const categoryIds = Object.fromEntries((categories || []).map((c) => [c.slug, c.id]));
 const validCategories = (categories || []).map((c) => c.slug);
@@ -46,16 +46,16 @@ async function fetchText(article) {
       const title = embed.title || meta.title || '';
       const author = embed.author_name || meta.channel_title || '';
       const description = meta.description || '';
-      return cleanText(`${title}\n${author}\n${description}`, 8000);
+      return cleanText(`${title}\n${author}\n${description}`, 4000);
     } catch (_) {
-      return cleanText(`${meta.title || ''}\n${meta.description || ''}`, 8000);
+      return cleanText(`${meta.title || ''}\n${meta.description || ''}`, 4000);
     }
   }
 
   try {
     const jina = `https://r.jina.ai/http://${article.source_url.replace(/^https?:\/\//, '')}`;
-    const text = await _http({ method: 'GET', url: jina, responseFormat: 'text', timeout: 25000 });
-    return cleanText(text);
+    const text = await _http({ method: 'GET', url: jina, responseFormat: 'text', timeout: 15000 });
+    return cleanText(text, 4000);
   } catch (jinaError) {
     if (FIRECRAWL_KEY) {
       const res = await _http({
@@ -64,12 +64,12 @@ async function fetchText(article) {
         headers: { Authorization: `Bearer ${FIRECRAWL_KEY}`, 'Content-Type': 'application/json' },
         body: { url: article.source_url, formats: ['markdown'] },
         responseFormat: 'json',
-        timeout: 35000,
+        timeout: 20000,
       });
       return cleanText(res?.data?.markdown || res?.markdown || '');
     }
-    const html = await _http({ method: 'GET', url: article.source_url, responseFormat: 'text', timeout: 25000 });
-    return cleanText(`${meta.title || ''}\n${meta.description || ''}\n${html}`);
+    const html = await _http({ method: 'GET', url: article.source_url, responseFormat: 'text', timeout: 15000 });
+    return cleanText(`${meta.title || ''}\n${meta.description || ''}\n${html}`, 4000);
   }
 }
 
@@ -78,7 +78,7 @@ async function summarize(article, text) {
   const prompt = `Produce a JSON object with summaries in 4 languages: en, he, es, ar. For each language provide: title (max 70 chars), executive_summary (2-3 short paragraphs), key_takeaways (3-5 strings), tags (3-7 strings), category_slug (one of: ${validCategories.join(', ')}; use "other" when nothing fits), subcategory_slug (pick the single best match for the chosen category from these options: ${Object.entries(subByCat).map(([c, ss]) => `${c}: ${ss.join(', ')}`).join('; ') || 'none'}; use null if unsure), ${isVideo ? 'video_story (a clear, modest narrative retelling of what happens in the video or movie — plot, characters, key scenes — 3-5 short paragraphs; if the content is not a narrative video use null), ' : ''}seo_slug (URL-safe lowercase ASCII, max 70 chars), seo_meta_description (max 155 chars). At the top level also provide: "family_safe" (boolean — false if the content contains sexually explicit, graphic violence, hate or otherwise non-family-safe material), "spoken_language" (the main language actually spoken in the video/audio as a full language name, e.g. "English"; null if unknown). Return ONLY valid JSON in the exact shape {"family_safe":true,"spoken_language":"...","en":{...},"he":{...},"es":{...},"ar":{...}}.\n\nArticle metadata:\n${JSON.stringify(article.raw_metadata || {})}\n\nArticle text:\n${text}`;
 
   let response;
-  for (let attempt = 1; attempt <= 3; attempt++) {
+  for (let attempt = 1; attempt <= 2; attempt++) {
     try {
       response = await _http({
         method: 'POST',
@@ -89,15 +89,15 @@ async function summarize(article, text) {
           generationConfig: { responseMimeType: 'application/json', temperature: 0.25 },
         },
         responseFormat: 'json',
-        timeout: 90000,
+        timeout: 45000,
       });
       break;
     } catch (error) {
-      if (attempt === 3) {
+      if (attempt === 2) {
         error.transient = /429|500|502|503|504|UNAVAILABLE|RESOURCE_EXHAUSTED|timed out/i.test(error.message || '');
         throw error;
       }
-      await new Promise((resolve) => setTimeout(resolve, attempt * 20000));
+      await new Promise((resolve) => setTimeout(resolve, attempt * 5000));
     }
   }
 
@@ -120,29 +120,9 @@ async function summarize(article, text) {
 
 async function generateImage(article, title) {
   if (article.featured_image_url) return article.featured_image_url;
-  try {
-    const prompt = `flat editorial illustration, news thumbnail, minimal, ${String(title || 'technology news').slice(0, 200)}`;
-    const img = await _http({
-      method: 'GET',
-      url: `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1200&height=675&nologo=true&seed=${article.id.replace(/-/g, '').slice(0, 12)}`,
-      timeout: 90000,
-      binary: true,
-    });
-    const buf = Buffer.from(img);
-    if (buf.length < 5000) return null;
-    const path = `${article.id}.jpg`;
-    await _http({
-      method: 'POST',
-      url: `${SUPABASE_URL}/storage/v1/object/article-images/${path}`,
-      headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'Content-Type': 'image/jpeg', 'x-upsert': 'true' },
-      body: buf,
-      timeout: 60000,
-    });
-    return `${SUPABASE_URL}/storage/v1/object/public/article-images/${path}`;
-  } catch (e) {
-    await logStep(article.id, article.source_id, 'publish', 'skipped', `image generation skipped: ${e.message}`);
-    return null;
-  }
+  const prompt = `flat editorial illustration, news thumbnail, minimal, ${String(title || 'technology news').slice(0, 120)}`;
+  const seed = article.id.replace(/-/g, '').slice(0, 12);
+  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1200&height=675&nologo=true&seed=${seed}`;
 }
 
 for (const article of articles || []) {

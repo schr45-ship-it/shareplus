@@ -70,7 +70,7 @@ function workflow(name, intervalUnit, interval, code, webhookPath) {
 const files = [
   ['rss-ingestion-v3.json', workflow('ai-shareplus: RSS Ingestion (v3)', 'minutes', 30, fs.readFileSync(path.join(codeDir, 'rss.js'), 'utf8'), 'shareplus-rss-v3')],
   ['youtube-ingestion-v3.json', workflow('ai-shareplus: YouTube Ingestion (v3)', 'hours', 1, fs.readFileSync(path.join(codeDir, 'youtube.js'), 'utf8'), 'shareplus-youtube-v3')],
-  ['ai-processing-v3.json', workflow('ai-shareplus: AI Summarize & Translate (v3)', 'minutes', 5, fs.readFileSync(path.join(codeDir, 'ai.js'), 'utf8'), 'shareplus-ai-v3')],
+  ['ai-processing-v3.json', workflow('ai-shareplus: AI Summarize & Translate (v3)', 'minutes', 2, fs.readFileSync(path.join(codeDir, 'ai.js'), 'utf8'), 'shareplus-ai-v3')],
 ];
 
 for (const [file, data] of files) {
