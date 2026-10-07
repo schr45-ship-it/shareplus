@@ -106,7 +106,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql STABLE;
 
--- get_article_by_slug
+-- get_article_by_slug (drop needed: earlier version returns youtube_video_id)
+DROP FUNCTION IF EXISTS get_article_by_slug(VARCHAR(5), TEXT);
 CREATE OR REPLACE FUNCTION get_article_by_slug(
   p_language VARCHAR(5),
   p_slug TEXT
@@ -129,7 +130,8 @@ RETURNS TABLE (
   category_name JSONB,
   author TEXT,
   video_duration_seconds INT,
-  available_languages VARCHAR(5)[]
+  available_languages VARCHAR(5)[],
+  youtube_video_id TEXT
 ) AS $$
 BEGIN
   RETURN QUERY
@@ -156,7 +158,8 @@ BEGIN
       FROM article_translations at2
       WHERE at2.article_id = a.id
       ORDER BY at2.language
-    ) AS available_languages
+    ) AS available_languages,
+    a.raw_metadata->>'youtube_video_id' AS youtube_video_id
   FROM article_translations at
   JOIN articles a ON a.id = at.article_id
   LEFT JOIN categories c ON c.id = a.category_id
