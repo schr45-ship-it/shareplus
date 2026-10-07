@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 type Msg = { role: "user" | "model"; text: string };
 type SavedSession = { id: string; topic: string; updated: number };
+type CommunitySession = { id: string; topic: string; locale: string; updated_at: string; messages: number };
 
 const STORAGE_KEY = "havruta_sessions";
 
@@ -26,6 +27,7 @@ const texts: Record<
     errGeneric: string;
     errRate: string;
     recent: string;
+    community: string;
     greeting: (topic: string) => string;
   }
 > = {
@@ -50,7 +52,8 @@ const texts: Record<
     micNotSupported: "הדפדפן לא תומך בהקלטה",
     errGeneric: "משהו השתבש. נסה שוב.",
     errRate: "הגעת למגבלת ההודעות לשעה. נסה שוב מאוחר יותר.",
-    recent: "דיונים אחרונים",
+    recent: "הדיונים שלי",
+    community: "דיונים אחרונים בקהילה",
     greeting: (topic) =>
       `שלום! אני החברותא שלך 📖 בחרת ללמוד על **${topic}**. איך תרצה שנתחיל את הלימוד?`,
   },
@@ -75,7 +78,8 @@ const texts: Record<
     micNotSupported: "Your browser does not support speech input",
     errGeneric: "Something went wrong. Try again.",
     errRate: "You reached the hourly message limit. Try again later.",
-    recent: "Recent discussions",
+    recent: "My discussions",
+    community: "Recent community discussions",
     greeting: (topic) =>
       `Shalom! I'm your havruta 📖 You chose to study **${topic}**. How would you like to begin?`,
   },
@@ -100,7 +104,8 @@ const texts: Record<
     micNotSupported: "Tu navegador no admite entrada de voz",
     errGeneric: "Algo salió mal. Inténtalo de nuevo.",
     errRate: "Alcanzaste el límite de mensajes por hora.",
-    recent: "Discusiones recientes",
+    recent: "Mis discusiones",
+    community: "Discusiones recientes de la comunidad",
     greeting: (topic) =>
       `¡Shalom! Soy tu javruta 📖 Elegiste estudiar **${topic}**. ¿Cómo quieres comenzar?`,
   },
@@ -125,7 +130,8 @@ const texts: Record<
     micNotSupported: "متصفحك لا يدعم الإدخال الصوتي",
     errGeneric: "حدث خطأ ما. حاول مجددًا.",
     errRate: "وصلت إلى حد الرسائل في الساعة.",
-    recent: "نقاشات أخيرة",
+    recent: "نقاشاتي",
+    community: "نقاشات المجتمع الأخيرة",
     greeting: (topic) =>
       `شالوم! أنا شريكك في الدراسة 📖 اخترت دراسة **${topic}**. كيف تريد أن نبدأ؟`,
   },
@@ -168,11 +174,16 @@ export function HavrutaChat({ locale }: { locale: string }) {
   const [error, setError] = useState<string | null>(null);
   const [listening, setListening] = useState(false);
   const [recent, setRecent] = useState<SavedSession[]>([]);
+  const [community, setCommunity] = useState<CommunitySession[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<{ stop: () => void } | null>(null);
 
   useEffect(() => {
     setRecent(loadSaved());
+    fetch("/api/havruta?list=recent")
+      .then((r) => r.json())
+      .then((j) => setCommunity(Array.isArray(j.sessions) ? j.sessions : []))
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -355,6 +366,25 @@ export function HavrutaChat({ locale }: { locale: string }) {
               </div>
             </div>
           )}
+
+          {community.length > 0 && (
+            <div className="mt-4 border-t border-amber-100 pt-4">
+              <p className="mb-2 text-xs font-medium text-zinc-500">{t.community}</p>
+              <div className="space-y-2">
+                {community.map((s) => (
+                  <button
+                    key={s.id}
+                    onClick={() => resume(s.id, s.topic)}
+                    disabled={loading}
+                    className="flex w-full items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-start text-xs text-zinc-700 hover:border-amber-400 hover:bg-amber-50 disabled:opacity-50"
+                  >
+                    <span className="truncate font-medium">💬 {s.topic}</span>
+                    <span className="shrink-0 text-zinc-400">{s.messages} ✉</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -372,6 +402,10 @@ export function HavrutaChat({ locale }: { locale: string }) {
             setMessages([]);
             setError(null);
             setRecent(loadSaved());
+            fetch("/api/havruta?list=recent")
+              .then((r) => r.json())
+              .then((j) => setCommunity(Array.isArray(j.sessions) ? j.sessions : []))
+              .catch(() => {});
           }}
           className="text-xs text-amber-700 hover:underline"
         >

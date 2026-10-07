@@ -195,6 +195,30 @@ export async function GET(req: NextRequest) {
   if (!SUPABASE_URL || !SERVICE_KEY) {
     return NextResponse.json({ error: "not_configured" }, { status: 500 });
   }
+
+  // Public list of recent discussions for the community board
+  if (req.nextUrl.searchParams.get("list") === "recent") {
+    try {
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/havruta_sessions?select=id,topic,locale,updated_at,havruta_messages(count)&order=updated_at.desc&limit=12`,
+        { headers: dbHeaders, next: { revalidate: 60 } },
+      );
+      const rows = await res.json();
+      const sessions = (Array.isArray(rows) ? rows : []).map(
+        (s: { id: string; topic: string; locale: string; updated_at: string; havruta_messages?: { count: number }[] }) => ({
+          id: s.id,
+          topic: s.topic,
+          locale: s.locale,
+          updated_at: s.updated_at,
+          messages: s.havruta_messages?.[0]?.count ?? 0,
+        }),
+      );
+      return NextResponse.json({ sessions });
+    } catch {
+      return NextResponse.json({ sessions: [] });
+    }
+  }
+
   const id = req.nextUrl.searchParams.get("session") ?? "";
   if (!/^[0-9a-f-]{36}$/.test(id)) {
     return NextResponse.json({ error: "invalid" }, { status: 400 });
