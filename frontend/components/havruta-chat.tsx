@@ -3,6 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 
 type Msg = { role: "user" | "model"; text: string };
+type SavedSession = { id: string; topic: string; updated: number };
+
+const STORAGE_KEY = "havruta_sessions";
 
 const texts: Record<
   string,
@@ -10,6 +13,8 @@ const texts: Record<
     title: string;
     intro: string;
     topicPlaceholder: string;
+    sourceLabel: string;
+    sourcePlaceholder: string;
     startBtn: string;
     suggestions: string[];
     inputPlaceholder: string;
@@ -20,12 +25,16 @@ const texts: Record<
     micNotSupported: string;
     errGeneric: string;
     errRate: string;
+    recent: string;
+    greeting: (topic: string) => string;
   }
 > = {
   he: {
     title: "חברותא AI",
     intro: "בחר נושא או טקסט — פסוק, משנה, מאמר — והתחל דיון לימודי אמיתי. החברותא יקשה, יעודד ויעמיק איתך.",
     topicPlaceholder: "לדוגמה: בראשית פרק א׳ פסוקים ג׳–ד׳, או: מסכת ברכות דף ב׳",
+    sourceLabel: "מקור / טקסט (לא חובה)",
+    sourcePlaceholder: "אפשר להדביק כאן את הטקסט שרוצים ללמוד — פסוקים, מקורות, או קטע ממאמר...",
     startBtn: "התחל לימוד",
     suggestions: [
       "בראשית פרק א׳ פסוקים ג׳–ד׳",
@@ -41,11 +50,16 @@ const texts: Record<
     micNotSupported: "הדפדפן לא תומך בהקלטה",
     errGeneric: "משהו השתבש. נסה שוב.",
     errRate: "הגעת למגבלת ההודעות לשעה. נסה שוב מאוחר יותר.",
+    recent: "דיונים אחרונים",
+    greeting: (topic) =>
+      `שלום! אני החברותא שלך 📖 בחרת ללמוד על **${topic}**. איך תרצה שנתחיל את הלימוד?`,
   },
   en: {
     title: "Havruta AI",
     intro: "Choose a topic or text — a verse, a Mishnah, an article — and start a real study discussion. Your study partner will challenge, encourage, and go deeper with you.",
     topicPlaceholder: "e.g. Genesis ch. 1 verses 3–4, or: Berakhot 2a",
+    sourceLabel: "Source text (optional)",
+    sourcePlaceholder: "You can paste the text you want to study — verses, sources, or a passage from an article...",
     startBtn: "Start learning",
     suggestions: [
       "Genesis ch. 1 verses 3–4",
@@ -61,11 +75,16 @@ const texts: Record<
     micNotSupported: "Your browser does not support speech input",
     errGeneric: "Something went wrong. Try again.",
     errRate: "You reached the hourly message limit. Try again later.",
+    recent: "Recent discussions",
+    greeting: (topic) =>
+      `Shalom! I'm your havruta 📖 You chose to study **${topic}**. How would you like to begin?`,
   },
   es: {
     title: "Javruta AI",
     intro: "Elige un tema o texto — un versículo, una Mishná, un artículo — y comienza una verdadera discusión de estudio.",
     topicPlaceholder: "p. ej. Génesis cap. 1 versículos 3–4",
+    sourceLabel: "Texto fuente (opcional)",
+    sourcePlaceholder: "Puedes pegar aquí el texto que quieres estudiar...",
     startBtn: "Empezar a estudiar",
     suggestions: [
       "Génesis cap. 1 versículos 3–4",
@@ -81,11 +100,16 @@ const texts: Record<
     micNotSupported: "Tu navegador no admite entrada de voz",
     errGeneric: "Algo salió mal. Inténtalo de nuevo.",
     errRate: "Alcanzaste el límite de mensajes por hora.",
+    recent: "Discusiones recientes",
+    greeting: (topic) =>
+      `¡Shalom! Soy tu javruta 📖 Elegiste estudiar **${topic}**. ¿Cómo quieres comenzar?`,
   },
   ar: {
     title: "حَبْروتا AI",
     intro: "اختر موضوعًا أو نصًا — آية، مِشناه، مقال — وابدأ نقاشًا تعليميًا حقيقيًا.",
     topicPlaceholder: "مثال: سفر التكوين الإصحاح 1 الآيات 3–4",
+    sourceLabel: "النص المصدر (اختياري)",
+    sourcePlaceholder: "يمكنك لصق النص الذي تريد دراسته هنا...",
     startBtn: "ابدأ الدراسة",
     suggestions: [
       "سفر التكوين الإصحاح 1 الآيات 3–4",
@@ -101,6 +125,9 @@ const texts: Record<
     micNotSupported: "متصفحك لا يدعم الإدخال الصوتي",
     errGeneric: "حدث خطأ ما. حاول مجددًا.",
     errRate: "وصلت إلى حد الرسائل في الساعة.",
+    recent: "نقاشات أخيرة",
+    greeting: (topic) =>
+      `شالوم! أنا شريكك في الدراسة 📖 اخترت دراسة **${topic}**. كيف تريد أن نبدأ؟`,
   },
 };
 
@@ -111,23 +138,82 @@ const SPEECH_LANG: Record<string, string> = {
   ar: "ar-SA",
 };
 
+function loadSaved(): SavedSession[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr.filter((s) => s?.id && s?.topic) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveSession(sid: string, topic: string) {
+  try {
+    const list = loadSaved().filter((s) => s.id !== sid);
+    list.unshift({ id: sid, topic, updated: Date.now() });
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(list.slice(0, 10)));
+  } catch {}
+}
+
 export function HavrutaChat({ locale }: { locale: string }) {
   const t = texts[locale] ?? texts.he;
   const [topic, setTopic] = useState("");
+  const [source, setSource] = useState("");
   const [started, setStarted] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [listening, setListening] = useState(false);
+  const [recent, setRecent] = useState<SavedSession[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<{ stop: () => void } | null>(null);
+
+  useEffect(() => {
+    setRecent(loadSaved());
+  }, []);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
   useEffect(() => () => recognitionRef.current?.stop(), []);
+
+  function begin(topicText: string, sourceText: string) {
+    setTopic(topicText);
+    setSource(sourceText);
+    setSessionId(null);
+    setMessages([{ role: "model", text: t.greeting(topicText) }]);
+    setStarted(true);
+    setError(null);
+  }
+
+  async function resume(sid: string, sTopic: string) {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/havruta?session=${sid}`);
+      const json = await res.json();
+      if (json.session) {
+        setTopic(json.session.topic || sTopic);
+        setSource(json.session.source_text || "");
+        setSessionId(sid);
+        setMessages(
+          Array.isArray(json.messages) && json.messages.length
+            ? json.messages
+            : [{ role: "model", text: t.greeting(json.session.topic || sTopic) }],
+        );
+        setStarted(true);
+      } else {
+        setError(t.errGeneric);
+      }
+    } catch {
+      setError(t.errGeneric);
+    }
+    setLoading(false);
+  }
 
   async function send(text?: string) {
     const content = (text ?? input).trim();
@@ -141,13 +227,23 @@ export function HavrutaChat({ locale }: { locale: string }) {
       const res = await fetch("/api/havruta", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topic, messages: next, locale }),
+        body: JSON.stringify({
+          topic,
+          source,
+          messages: next,
+          locale,
+          sessionId: sessionId ?? undefined,
+        }),
       });
       const json = await res.json();
       if (res.status === 429) {
         setError(t.errRate);
       } else if (json.reply) {
         setMessages([...next, { role: "model", text: json.reply }]);
+        if (json.sessionId && json.sessionId !== sessionId) {
+          setSessionId(json.sessionId);
+        }
+        if (json.sessionId) saveSession(json.sessionId, topic);
       } else {
         setError(t.errGeneric);
       }
@@ -199,19 +295,31 @@ export function HavrutaChat({ locale }: { locale: string }) {
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              if (topic.trim()) setStarted(true);
+              if (topic.trim()) begin(topic.trim(), source.trim());
             }}
-            className="flex flex-col gap-3 sm:flex-row"
+            className="flex flex-col gap-3"
           >
             <input
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
               placeholder={t.topicPlaceholder}
-              className="flex-1 rounded-xl border border-zinc-300 px-4 py-3 text-sm focus:border-amber-400 focus:outline-none"
+              className="w-full rounded-xl border border-zinc-300 px-4 py-3 text-sm focus:border-amber-400 focus:outline-none"
             />
+            <div>
+              <label className="mb-1 block text-xs font-medium text-zinc-500">
+                {t.sourceLabel}
+              </label>
+              <textarea
+                value={source}
+                onChange={(e) => setSource(e.target.value)}
+                placeholder={t.sourcePlaceholder}
+                rows={3}
+                className="w-full resize-none rounded-xl border border-zinc-300 px-4 py-3 text-sm focus:border-amber-400 focus:outline-none"
+              />
+            </div>
             <button
               type="submit"
-              disabled={!topic.trim()}
+              disabled={!topic.trim() || loading}
               className="rounded-xl bg-amber-600 px-6 py-3 text-sm font-semibold text-white hover:bg-amber-700 disabled:opacity-40"
             >
               {t.startBtn}
@@ -222,16 +330,31 @@ export function HavrutaChat({ locale }: { locale: string }) {
             {t.suggestions.map((s) => (
               <button
                 key={s}
-                onClick={() => {
-                  setTopic(s);
-                  setStarted(true);
-                }}
+                onClick={() => begin(s, "")}
                 className="rounded-full border border-amber-200 bg-white px-4 py-2 text-xs text-zinc-700 hover:border-amber-400 hover:bg-amber-50"
               >
                 {s}
               </button>
             ))}
           </div>
+
+          {recent.length > 0 && (
+            <div className="mt-6 border-t border-amber-100 pt-4">
+              <p className="mb-2 text-xs font-medium text-zinc-500">{t.recent}</p>
+              <div className="flex flex-wrap gap-2">
+                {recent.map((s) => (
+                  <button
+                    key={s.id}
+                    onClick={() => resume(s.id, s.topic)}
+                    disabled={loading}
+                    className="max-w-56 truncate rounded-full border border-zinc-200 bg-white px-4 py-2 text-xs text-zinc-600 hover:border-amber-400 hover:bg-amber-50 disabled:opacity-50"
+                  >
+                    💬 {s.topic}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -248,6 +371,7 @@ export function HavrutaChat({ locale }: { locale: string }) {
             setStarted(false);
             setMessages([]);
             setError(null);
+            setRecent(loadSaved());
           }}
           className="text-xs text-amber-700 hover:underline"
         >
@@ -256,9 +380,6 @@ export function HavrutaChat({ locale }: { locale: string }) {
       </div>
 
       <div className="min-h-64 space-y-4 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
-        {messages.length === 0 && !loading && (
-          <p className="py-10 text-center text-sm text-zinc-400">{t.inputPlaceholder}</p>
-        )}
         {messages.map((m, i) => (
           <div key={i} className={`flex ${m.role === "user" ? "justify-start" : "justify-end"}`}>
             <div
