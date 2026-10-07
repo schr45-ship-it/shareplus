@@ -1220,12 +1220,19 @@ export default function AdminPage() {
             </tr>
           </thead>
           <tbody>
-            {(articleSearchResults.length > 0
-              ? articleSearchResults
-              : data.recent_articles
-                  .filter(matchesFilter)
-                  .slice((artPage - 1) * ART_PAGE_SIZE, artPage * ART_PAGE_SIZE)
-            ).map((a) => (
+            {articleSearch.trim() && articleSearchResults.length === 0 && !searching ? (
+              <tr>
+                <td colSpan={8} className="py-6 text-center text-sm text-zinc-500">
+                  לא נמצאו תוצאות לחיפוש „{articleSearch}”.
+                </td>
+              </tr>
+            ) : (
+              (articleSearchResults.length > 0
+                ? articleSearchResults
+                : data.recent_articles
+                    .filter(matchesFilter)
+                    .slice((artPage - 1) * ART_PAGE_SIZE, artPage * ART_PAGE_SIZE)
+              ).map((a) => (
               <tr key={a.id} className="border-b last:border-0">
                 <td className="py-2">
                   {a.youtube_video_id ? (
@@ -1357,7 +1364,7 @@ export default function AdminPage() {
                   </div>
                 </td>
               </tr>
-            ))}
+            )))}
           </tbody>
         </table></div>
         {(() => {
