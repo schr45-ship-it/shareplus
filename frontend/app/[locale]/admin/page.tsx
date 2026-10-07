@@ -180,6 +180,8 @@ export default function AdminPage() {
     language: "he",
   });
   const [editStatus, setEditStatus] = useState<string | null>(null);
+  const [imagePrompt, setImagePrompt] = useState("");
+  const [imageSeed, setImageSeed] = useState(0);
   const [newCat, setNewCat] = useState({ slug: "", en: "", he: "", es: "", ar: "" });
   const [articleTopic, setArticleTopic] = useState("");
   const [articleLanguage, setArticleLanguage] = useState("he");
@@ -1512,17 +1514,53 @@ export default function AdminPage() {
                 </label>
               </div>
 
-              <label className="block text-sm font-medium text-zinc-700">
-                כתובת תמונה ראשית
+              <div className="block text-sm font-medium text-zinc-700">
+                תמונה ראשית
                 <input
                   type="url"
                   value={editForm.imageUrl}
                   onChange={(e) => setEditForm({ ...editForm, imageUrl: e.target.value })}
                   placeholder="https://..."
-                  className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2"
+                  className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 font-normal"
                   dir="ltr"
                 />
-              </label>
+                <div className="mt-2 flex gap-2">
+                  <input
+                    value={imagePrompt}
+                    onChange={(e) => setImagePrompt(e.target.value)}
+                    placeholder="תאר מה תרצה בתמונה... (או השאר ריק לשימוש בכותרת)"
+                    className="flex-1 rounded-lg border border-zinc-300 px-3 py-2 text-xs font-normal"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const prompt = (imagePrompt.trim() || editForm.title || "editorial news illustration").trim();
+                      const seed = Math.floor(Math.random() * 100000);
+                      setImageSeed(seed);
+                      setEditForm({
+                        ...editForm,
+                        imageUrl: `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1200&height=675&nologo=true&seed=${seed}`,
+                      });
+                    }}
+                    className="rounded-lg bg-amber-600 px-3 py-2 text-xs font-semibold text-white hover:bg-amber-700"
+                  >
+                    צור תמונה 🎨
+                  </button>
+                </div>
+                {editForm.imageUrl && (
+                  <div className="mt-2">
+                    <img
+                      key={`${editForm.imageUrl}-${imageSeed}`}
+                      src={editForm.imageUrl}
+                      alt="תצוגה מקדימה"
+                      className="h-32 w-full rounded-lg border border-zinc-200 object-cover"
+                    />
+                    <p className="mt-1 text-[10px] font-normal text-zinc-400">
+                      תמונה חדשה נוצרת ברקע — ההצגה עשויה לקחת כמה שניות. שמור שינויים כדי להחיל.
+                    </p>
+                  </div>
+                )}
+              </div>
 
               {editStatus && (
                 <p className={`text-sm ${editStatus.startsWith("שגיאה") ? "text-red-700" : "text-green-700"}`}>
