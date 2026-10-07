@@ -814,6 +814,12 @@ export default function AdminPage() {
                   </a>
                 )}
                 <button
+                  onClick={() => openArticleEditor({ id: r.article_id })}
+                  className="rounded-md bg-amber-100 px-3 py-1.5 text-xs font-medium text-amber-800 hover:bg-amber-200"
+                >
+                  ערוך
+                </button>
+                <button
                   onClick={() => call("admin_resolve_report", { p_report: r.id }, r.id)}
                   disabled={busy === r.id}
                   className="rounded-md bg-zinc-100 px-3 py-1.5 text-xs font-medium hover:bg-zinc-200 disabled:opacity-50"
