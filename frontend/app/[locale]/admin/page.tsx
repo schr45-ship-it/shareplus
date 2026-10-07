@@ -7,6 +7,9 @@ import {
   adminBlockedTags,
   adminBlockTag,
   adminUnblockTag,
+  adminGetArticle,
+  adminUpdateArticle,
+  adminSearchArticles,
 } from "@/lib/supabase/queries";
 
 type Source = {
@@ -163,6 +166,20 @@ export default function AdminPage() {
   const [showBlockedTags, setShowBlockedTags] = useState(false);
   const [blockedTagStatus, setBlockedTagStatus] = useState<string | null>(null);
   const [imageEdits, setImageEdits] = useState<Record<string, string>>({});
+  const [articleSearch, setArticleSearch] = useState("");
+  const [articleSearchResults, setArticleSearchResults] = useState<any[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [editingArticle, setEditingArticle] = useState<any | null>(null);
+  const [editForm, setEditForm] = useState({
+    title: "",
+    body: "",
+    tags: "",
+    category: "",
+    imageUrl: "",
+    status: "",
+    language: "he",
+  });
+  const [editStatus, setEditStatus] = useState<string | null>(null);
   const [newCat, setNewCat] = useState({ slug: "", en: "", he: "", es: "", ar: "" });
   const [articleTopic, setArticleTopic] = useState("");
   const [articleLanguage, setArticleLanguage] = useState("he");
@@ -314,6 +331,66 @@ export default function AdminPage() {
       setArticleTopic("");
       setArticleRequestStatus("הבקשה נוספה לתור. הבוט ייצור ויפרסם את הכתבה אוטומטית.");
       await load(savedToken);
+    }
+    setBusy(null);
+  }
+
+  async function searchAdminArticles(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!savedToken || articleSearch.trim().length < 2) return;
+    setSearching(true);
+    const results = await adminSearchArticles(savedToken, articleSearch.trim());
+    setArticleSearchResults(results);
+    setSearching(false);
+  }
+
+  async function openArticleEditor(article: any) {
+    if (!savedToken) return;
+    setEditingArticle(article);
+    setEditStatus(null);
+    const details = await adminGetArticle(savedToken, article.id, "he");
+    if (details) {
+      setEditForm({
+        title: String(details.title || ""),
+        body: String(details.body || ""),
+        tags: Array.isArray(details.tags) ? details.tags.join(", ") : "",
+        category: String(details.category_slug || ""),
+        imageUrl: String(details.featured_image_url || ""),
+        status: String(details.status || ""),
+        language: String(details.language || "he"),
+      });
+    } else {
+      setEditStatus("לא ניתן לטעון את הכתבה לעריכה.");
+    }
+  }
+
+  async function saveArticleEdit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!savedToken || !editingArticle) return;
+    setBusy("edit-article");
+    setEditStatus(null);
+    const result = await adminUpdateArticle(savedToken, editingArticle.id, {
+      language: editForm.language,
+      title: editForm.title.trim(),
+      body: editForm.body.trim(),
+      tags: editForm.tags
+        .split(",")
+        .map((tag) => tag.trim())
+        .filter(Boolean)
+        .slice(0, 12),
+      category_slug: editForm.category.trim() || null,
+      image_url: editForm.imageUrl.trim() || null,
+      status: editForm.status.trim() || null,
+    });
+    if (result.success) {
+      setEditStatus("הכתבה נשמרה בהצלחה.");
+      await load(savedToken);
+      if (articleSearch.trim()) {
+        const results = await adminSearchArticles(savedToken, articleSearch.trim());
+        setArticleSearchResults(results);
+      }
+    } else {
+      setEditStatus(`שגיאה: ${result.error || "לא ניתן היה לשמור את הכתבה."}`);
     }
     setBusy(null);
   }
@@ -1092,8 +1169,34 @@ export default function AdminPage() {
 
       {/* Recent articles */}
       <section className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
-        <div className="mb-3 flex items-center justify-between">
+        <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="font-semibold">כתבות אחרונות</h2>
+          <form onSubmit={searchAdminArticles} className="flex gap-2">
+            <input
+              type="search"
+              value={articleSearch}
+              onChange={(e) => setArticleSearch(e.target.value)}
+              placeholder="חיפוש לפי כותרת, slug או מקור..."
+              minLength={2}
+              className="w-full rounded-lg border border-zinc-300 px-3 py-1.5 text-sm sm:w-72"
+            />
+            <button
+              type="submit"
+              disabled={searching || articleSearch.trim().length < 2}
+              className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            >
+              {searching ? "מחפש..." : "חפש"}
+            </button>
+            {articleSearchResults.length > 0 && (
+              <button
+                type="button"
+                onClick={() => { setArticleSearch(""); setArticleSearchResults([]); }}
+                className="rounded-lg border border-zinc-300 px-3 py-1.5 text-sm hover:bg-zinc-50"
+              >
+                נקה
+              </button>
+            )}
+          </form>
           {filter !== "all" && (
             <button
               onClick={() => { setFilter("all"); setArtPage(1); }}
@@ -1117,10 +1220,12 @@ export default function AdminPage() {
             </tr>
           </thead>
           <tbody>
-            {data.recent_articles
-              .filter(matchesFilter)
-              .slice((artPage - 1) * ART_PAGE_SIZE, artPage * ART_PAGE_SIZE)
-              .map((a) => (
+            {(articleSearchResults.length > 0
+              ? articleSearchResults
+              : data.recent_articles
+                  .filter(matchesFilter)
+                  .slice((artPage - 1) * ART_PAGE_SIZE, artPage * ART_PAGE_SIZE)
+            ).map((a) => (
               <tr key={a.id} className="border-b last:border-0">
                 <td className="py-2">
                   {a.youtube_video_id ? (
@@ -1242,6 +1347,13 @@ export default function AdminPage() {
                         </button>
                       </form>
                     )}
+                    <button
+                      onClick={() => openArticleEditor(a)}
+                      disabled={busy === `edit-${a.id}`}
+                      className="text-[11px] text-blue-600 hover:underline disabled:opacity-50"
+                    >
+                      ערוך כתבה
+                    </button>
                   </div>
                 </td>
               </tr>
@@ -1249,6 +1361,7 @@ export default function AdminPage() {
           </tbody>
         </table></div>
         {(() => {
+          if (articleSearchResults.length > 0) return null;
           const total = data.recent_articles.filter(matchesFilter).length;
           const pages = Math.ceil(total / ART_PAGE_SIZE);
           if (pages <= 1) return null;
@@ -1275,6 +1388,146 @@ export default function AdminPage() {
           );
         })()}
       </section>
+
+      {/* Article editor modal */}
+      {editingArticle && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setEditingArticle(null);
+          }}
+        >
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl" dir="rtl">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-bold">עריכת כתבה</h2>
+              <button
+                onClick={() => setEditingArticle(null)}
+                className="rounded-lg bg-zinc-100 px-3 py-1 text-sm hover:bg-zinc-200"
+              >
+                סגור
+              </button>
+            </div>
+
+            <form onSubmit={saveArticleEdit} className="space-y-4">
+              <label className="block text-sm font-medium text-zinc-700">
+                שפה
+                <select
+                  value={editForm.language}
+                  onChange={(e) => setEditForm({ ...editForm, language: e.target.value })}
+                  className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2"
+                >
+                  <option value="he">עברית</option>
+                  <option value="en">English</option>
+                  <option value="es">Español</option>
+                  <option value="ar">العربية</option>
+                </select>
+              </label>
+
+              <label className="block text-sm font-medium text-zinc-700">
+                כותרת
+                <input
+                  value={editForm.title}
+                  onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                  required
+                  minLength={3}
+                  maxLength={180}
+                  className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2"
+                />
+              </label>
+
+              <label className="block text-sm font-medium text-zinc-700">
+                תוכן
+                <textarea
+                  value={editForm.body}
+                  onChange={(e) => setEditForm({ ...editForm, body: e.target.value })}
+                  required
+                  minLength={20}
+                  rows={12}
+                  className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 leading-relaxed"
+                />
+              </label>
+
+              <label className="block text-sm font-medium text-zinc-700">
+                תגיות (מופרדות בפסיקים)
+                <input
+                  value={editForm.tags}
+                  onChange={(e) => setEditForm({ ...editForm, tags: e.target.value })}
+                  placeholder="לדוגמה: מדע, פיזיקה, נובל"
+                  className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2"
+                />
+              </label>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="block text-sm font-medium text-zinc-700">
+                  קטגוריה
+                  <select
+                    value={editForm.category}
+                    onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
+                    className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2"
+                  >
+                    <option value="">ללא שינוי</option>
+                    {data?.categories.map((category) => (
+                      <option key={category.id} value={category.slug}>
+                        {categoryLabel(category.name_json, category.slug, "he")}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="block text-sm font-medium text-zinc-700">
+                  סטטוס
+                  <select
+                    value={editForm.status}
+                    onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
+                    className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2"
+                  >
+                    <option value="">ללא שינוי</option>
+                    <option value="published">מפורסם</option>
+                    <option value="archived">בארכיון</option>
+                    <option value="pending">בתור</option>
+                    <option value="rejected">נדחה</option>
+                  </select>
+                </label>
+              </div>
+
+              <label className="block text-sm font-medium text-zinc-700">
+                כתובת תמונה ראשית
+                <input
+                  type="url"
+                  value={editForm.imageUrl}
+                  onChange={(e) => setEditForm({ ...editForm, imageUrl: e.target.value })}
+                  placeholder="https://..."
+                  className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2"
+                  dir="ltr"
+                />
+              </label>
+
+              {editStatus && (
+                <p className={`text-sm ${editStatus.startsWith("שגיאה") ? "text-red-700" : "text-green-700"}`}>
+                  {editStatus}
+                </p>
+              )}
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="submit"
+                  disabled={busy === "edit-article"}
+                  className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {busy === "edit-article" ? "שומר..." : "שמור שינויים"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditingArticle(null)}
+                  className="rounded-lg border border-zinc-300 px-5 py-2.5 text-sm hover:bg-zinc-50"
+                >
+                  ביטול
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

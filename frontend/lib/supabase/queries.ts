@@ -239,6 +239,72 @@ export async function adminBlockTag(
   return { success: true };
 }
 
+export async function adminGetArticle(
+  token: string,
+  articleId: string,
+  language = "he",
+): Promise<Record<string, unknown> | null> {
+  const { data, error } = await (supabaseBuild.rpc as any)("admin_get_article", {
+    p_token: token,
+    p_article_id: articleId,
+    p_language: language,
+  });
+  if (error) {
+    console.error("adminGetArticle error:", error);
+    return null;
+  }
+  return data ?? null;
+}
+
+export async function adminUpdateArticle(
+  token: string,
+  articleId: string,
+  fields: {
+    language: string;
+    title: string;
+    body: string;
+    tags: string[];
+    category_slug?: string | null;
+    image_url?: string | null;
+    status?: string | null;
+  },
+): Promise<{ success: boolean; error?: string }> {
+  const { error } = await (supabaseBuild.rpc as any)("admin_update_article", {
+    p_token: token,
+    p_article_id: articleId,
+    p_language: fields.language,
+    p_title: fields.title,
+    p_body: fields.body,
+    p_tags: fields.tags,
+    p_category_slug: fields.category_slug ?? null,
+    p_image_url: fields.image_url ?? null,
+    p_status: fields.status ?? null,
+  });
+  if (error) {
+    console.error("adminUpdateArticle error:", error);
+    return { success: false, error: error.message || "שגיאה בעדכון הכתבה" };
+  }
+  return { success: true };
+}
+
+export async function adminSearchArticles(
+  token: string,
+  query: string,
+  options: { limit?: number; offset?: number } = {},
+): Promise<Record<string, unknown>[]> {
+  const { data, error } = await (supabaseBuild.rpc as any)("admin_search_articles", {
+    p_token: token,
+    p_query: query.trim(),
+    p_limit: options.limit ?? 50,
+    p_offset: options.offset ?? 0,
+  });
+  if (error) {
+    console.error("adminSearchArticles error:", error);
+    return [];
+  }
+  return (data ?? []) as Record<string, unknown>[];
+}
+
 export async function adminUnblockTag(
   token: string,
   tag: string,
