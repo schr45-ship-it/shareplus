@@ -222,7 +222,11 @@ export async function adminBlockedTags(token: string): Promise<{ tag: string; re
   return (data ?? []) as { tag: string; reason: string | null; created_at: string }[];
 }
 
-export async function adminBlockTag(token: string, tag: string, reason?: string): Promise<boolean> {
+export async function adminBlockTag(
+  token: string,
+  tag: string,
+  reason?: string,
+): Promise<{ success: boolean; error?: string }> {
   const { error } = await (supabaseBuild.rpc as any)("admin_block_tag", {
     p_token: token,
     p_tag: tag.trim(),
@@ -230,18 +234,21 @@ export async function adminBlockTag(token: string, tag: string, reason?: string)
   });
   if (error) {
     console.error("adminBlockTag error:", error);
-    return false;
+    return { success: false, error: error.message || "שגיאה בחסימת תגית" };
   }
-  return true;
+  return { success: true };
 }
 
-export async function adminUnblockTag(token: string, tag: string): Promise<boolean> {
+export async function adminUnblockTag(
+  token: string,
+  tag: string,
+): Promise<{ success: boolean; error?: string }> {
   const { error } = await (supabaseBuild.rpc as any)("admin_unblock_tag", { p_token: token, p_tag: tag });
   if (error) {
     console.error("adminUnblockTag error:", error);
-    return false;
+    return { success: false, error: error.message || "שגיאה בהסרת חסימה" };
   }
-  return true;
+  return { success: true };
 }
 
 export async function getCategories(language: string): Promise<Category[]> {

@@ -765,15 +765,15 @@ export default function AdminPage() {
                 if (!savedToken || !blockedTagInput.trim()) return;
                 setBusy("block-tag");
                 setBlockedTagStatus(null);
-                const ok = await adminBlockTag(savedToken, blockedTagInput.trim(), blockedTagReason.trim() || undefined);
-                if (ok) {
+                const result = await adminBlockTag(savedToken, blockedTagInput.trim(), blockedTagReason.trim() || undefined);
+                if (result.success) {
                   setBlockedTagInput("");
                   setBlockedTagReason("");
                   setBlockedTagStatus("התגית נוספה לרשימת החסימה.");
                   const tags = await adminBlockedTags(savedToken);
                   setBlockedTags(tags);
                 } else {
-                  setBlockedTagStatus("שגיאה: לא ניתן היה לחסום את התגית.");
+                  setBlockedTagStatus(`שגיאה: ${result.error || "לא ניתן היה לחסום את התגית."} ודא שהרצת את supabase/migrations/015_block_tags.sql.`);
                 }
                 setBusy(null);
               }}
@@ -828,12 +828,12 @@ export default function AdminPage() {
                       onClick={async () => {
                         if (!savedToken) return;
                         setBusy(`unblock-${bt.tag}`);
-                        const ok = await adminUnblockTag(savedToken, bt.tag);
-                        if (ok) {
+                        const result = await adminUnblockTag(savedToken, bt.tag);
+                        if (result.success) {
                           const tags = await adminBlockedTags(savedToken);
                           setBlockedTags(tags);
                         } else {
-                          setBlockedTagStatus("שגיאה: לא ניתן היה להסיר את החסימה.");
+                          setBlockedTagStatus(`שגיאה: ${result.error || "לא ניתן היה להסיר את החסימה."}`);
                         }
                         setBusy(null);
                       }}
