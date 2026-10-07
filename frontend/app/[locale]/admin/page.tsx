@@ -162,6 +162,7 @@ export default function AdminPage() {
   const [blockedTagReason, setBlockedTagReason] = useState("");
   const [showBlockedTags, setShowBlockedTags] = useState(false);
   const [blockedTagStatus, setBlockedTagStatus] = useState<string | null>(null);
+  const [imageEdits, setImageEdits] = useState<Record<string, string>>({});
   const [newCat, setNewCat] = useState({ slug: "", en: "", he: "", es: "", ar: "" });
   const [articleTopic, setArticleTopic] = useState("");
   const [articleLanguage, setArticleLanguage] = useState("he");
@@ -1184,32 +1185,64 @@ export default function AdminPage() {
                 <td className="text-center">{a.views}</td>
                 <td className="text-center">{a.clicks}</td>
                 <td className="text-center">
-                  {a.status === "failed" && (
-                    <button
-                      onClick={() =>
-                        call("admin_set_article_status", {
-                          p_article: a.id,
-                          p_status: "pending",
-                        }, a.id)
-                      }
-                      className="text-xs text-blue-600 hover:underline"
-                    >
-                      נסה שוב
-                    </button>
-                  )}
-                  {a.status === "published" && (
-                    <button
-                      onClick={() =>
-                        call("admin_set_article_status", {
-                          p_article: a.id,
-                          p_status: "archived",
-                        }, a.id)
-                      }
-                      className="text-xs text-zinc-500 hover:underline"
-                    >
-                      הסר
-                    </button>
-                  )}
+                  <div className="flex flex-col items-center gap-1.5">
+                    {a.status === "failed" && (
+                      <button
+                        onClick={() =>
+                          call("admin_set_article_status", {
+                            p_article: a.id,
+                            p_status: "pending",
+                          }, a.id)
+                        }
+                        className="text-xs text-blue-600 hover:underline"
+                      >
+                        נסה שוב
+                      </button>
+                    )}
+                    {a.status === "published" && (
+                      <button
+                        onClick={() =>
+                          call("admin_set_article_status", {
+                            p_article: a.id,
+                            p_status: "archived",
+                          }, a.id)
+                        }
+                        className="text-xs text-zinc-500 hover:underline"
+                      >
+                        הסר
+                      </button>
+                    )}
+                    {a.status === "published" && !a.youtube_video_id && (
+                      <form
+                        onSubmit={async (e) => {
+                          e.preventDefault();
+                          const url = imageEdits[a.id]?.trim();
+                          if (!url || !savedToken) return;
+                          setBusy(`img-${a.id}`);
+                          await call("admin_set_article_image", { p_article: a.id, p_url: url }, `img-${a.id}`);
+                          setImageEdits((prev) => ({ ...prev, [a.id]: "" }));
+                          setBusy(null);
+                        }}
+                        className="flex flex-col items-center gap-1"
+                      >
+                        <input
+                          type="url"
+                          value={imageEdits[a.id] ?? ""}
+                          onChange={(e) => setImageEdits((prev) => ({ ...prev, [a.id]: e.target.value }))}
+                          placeholder="החלף תמונה (URL)"
+                          className="w-32 rounded-md border border-zinc-300 px-1.5 py-1 text-[11px]"
+                          dir="ltr"
+                        />
+                        <button
+                          type="submit"
+                          disabled={busy === `img-${a.id}` || !(imageEdits[a.id]?.trim())}
+                          className="text-[11px] text-blue-600 hover:underline disabled:opacity-50"
+                        >
+                          {busy === `img-${a.id}` ? "שומר..." : "עדכן תמונה"}
+                        </button>
+                      </form>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
