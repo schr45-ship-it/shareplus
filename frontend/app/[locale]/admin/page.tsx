@@ -339,8 +339,23 @@ export default function AdminPage() {
     e.preventDefault();
     if (!savedToken || articleSearch.trim().length < 2) return;
     setSearching(true);
-    const results = await adminSearchArticles(savedToken, articleSearch.trim());
-    setArticleSearchResults(results);
+    const query = articleSearch.trim().toLowerCase();
+    const { results, error } = await adminSearchArticles(savedToken, articleSearch.trim());
+    if (error) {
+      setError(`חיפוש נכשל: ${error}`);
+    }
+    if (results.length > 0) {
+      setArticleSearchResults(results);
+    } else {
+      // Fallback: search within the 500 recent articles client-side
+      const local = (data?.recent_articles ?? []).filter((a) => {
+        const title = (a.title_he ?? a.title_en ?? "").toLowerCase();
+        const slug = (a.slug_he ?? a.slug_en ?? "").toLowerCase();
+        const source = (a.source_url ?? "").toLowerCase();
+        return title.includes(query) || slug.includes(query) || source.includes(query) || a.id.toLowerCase().includes(query);
+      });
+      setArticleSearchResults(local);
+    }
     setSearching(false);
   }
 
@@ -386,7 +401,7 @@ export default function AdminPage() {
       setEditStatus("הכתבה נשמרה בהצלחה.");
       await load(savedToken);
       if (articleSearch.trim()) {
-        const results = await adminSearchArticles(savedToken, articleSearch.trim());
+        const { results } = await adminSearchArticles(savedToken, articleSearch.trim());
         setArticleSearchResults(results);
       }
     } else {

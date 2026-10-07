@@ -291,7 +291,7 @@ export async function adminSearchArticles(
   token: string,
   query: string,
   options: { limit?: number; offset?: number } = {},
-): Promise<Record<string, unknown>[]> {
+): Promise<{ results: Record<string, unknown>[]; error?: string }> {
   const { data, error } = await (supabaseBuild.rpc as any)("admin_search_articles", {
     p_token: token,
     p_query: query.trim(),
@@ -300,9 +300,9 @@ export async function adminSearchArticles(
   });
   if (error) {
     console.error("adminSearchArticles error:", error);
-    return [];
+    return { results: [], error: error.message || "שגיאה בחיפוש" };
   }
-  return (data ?? []) as Record<string, unknown>[];
+  return { results: (data ?? []) as Record<string, unknown>[] };
 }
 
 export async function adminUnblockTag(
