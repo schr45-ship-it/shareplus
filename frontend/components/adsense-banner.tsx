@@ -1,18 +1,17 @@
 "use client";
 
-import Script from "next/script";
-
 const ADSENSE_CLIENT_ID = process.env.NEXT_PUBLIC_ADSENSE_CLIENT_ID;
 
 export function AdSenseScript() {
   if (!ADSENSE_CLIENT_ID) return null;
 
+  // Plain <script> so it appears in the initial HTML — AdSense verification
+  // crawlers check the raw page source, not the hydrated DOM.
   return (
-    <Script
+    <script
       async
       src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADSENSE_CLIENT_ID}`}
       crossOrigin="anonymous"
-      strategy="afterInteractive"
     />
   );
 }
