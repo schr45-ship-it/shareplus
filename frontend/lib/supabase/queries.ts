@@ -184,35 +184,65 @@ export async function getGalleryArticles(
 
 export async function getCategoryCounts(language: string): Promise<Record<string, number>> {
   const counts: Record<string, number> = {};
-  const pageSize = 1000;
-  let offset = 0;
+  const { data, error } = await (supabaseBuild.rpc as any)("get_category_counts", {
+    p_language: language,
+  });
 
-  while (true) {
-    const { data, error } = await (supabaseBuild.from("articles") as any)
-      .select("category_id,categories!inner(slug),article_translations!inner(language)")
-      .eq("status", "published")
-      .eq("article_translations.language", language)
-      .range(offset, offset + pageSize - 1);
+  if (error) {
+    console.error("getCategoryCounts error:", error);
+    return counts;
+  }
 
-    if (error) {
-      console.error("getCategoryCounts error:", error);
-      return counts;
+  for (const row of (data ?? []) as Array<{ category_slug: string | null; published_count: number }>) {
+    if (row.category_slug) {
+      counts[row.category_slug] = Number(row.published_count);
     }
-
-    const rows = (data ?? []) as Array<{ categories?: { slug?: string } | null }>;
-    for (const row of rows) {
-      const slug = row.categories?.slug;
-      if (slug) counts[slug] = (counts[slug] ?? 0) + 1;
-    }
-
-    if (rows.length < pageSize) break;
-    offset += pageSize;
   }
 
   return counts;
 }
 
 export type Category = Database["public"]["Tables"]["categories"]["Row"];
+
+export async function getBlockedTags(): Promise<string[]> {
+  const { data, error } = await (supabaseBuild.from("blocked_tags").select("tag").order("tag") as any);
+  if (error) {
+    console.error("getBlockedTags error:", error);
+    return [];
+  }
+  return ((data ?? []) as { tag: string }[]).map((row) => row.tag);
+}
+
+export async function adminBlockedTags(token: string): Promise<{ tag: string; reason: string | null; created_at: string }[]> {
+  const { data, error } = await (supabaseBuild.rpc as any)("admin_blocked_tags", { p_token: token });
+  if (error) {
+    console.error("adminBlockedTags error:", error);
+    return [];
+  }
+  return (data ?? []) as { tag: string; reason: string | null; created_at: string }[];
+}
+
+export async function adminBlockTag(token: string, tag: string, reason?: string): Promise<boolean> {
+  const { error } = await (supabaseBuild.rpc as any)("admin_block_tag", {
+    p_token: token,
+    p_tag: tag.trim(),
+    p_reason: reason?.trim() || null,
+  });
+  if (error) {
+    console.error("adminBlockTag error:", error);
+    return false;
+  }
+  return true;
+}
+
+export async function adminUnblockTag(token: string, tag: string): Promise<boolean> {
+  const { error } = await (supabaseBuild.rpc as any)("admin_unblock_tag", { p_token: token, p_tag: tag });
+  if (error) {
+    console.error("adminUnblockTag error:", error);
+    return false;
+  }
+  return true;
+}
 
 export async function getCategories(language: string): Promise<Category[]> {
   const supabase = supabaseBuild;

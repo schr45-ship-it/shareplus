@@ -3,6 +3,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { articleImageUrl, categoryLabel } from "@/lib/site";
+import {
+  adminBlockedTags,
+  adminBlockTag,
+  adminUnblockTag,
+} from "@/lib/supabase/queries";
 
 type Source = {
   id: string;
@@ -152,6 +157,11 @@ export default function AdminPage() {
   const [messages, setMessages] = useState<any[]>([]);
   const [manualArticles, setManualArticles] = useState<ManualArticle[]>([]);
   const [showManualArticles, setShowManualArticles] = useState(true);
+  const [blockedTags, setBlockedTags] = useState<{ tag: string; reason: string | null; created_at: string }[]>([]);
+  const [blockedTagInput, setBlockedTagInput] = useState("");
+  const [blockedTagReason, setBlockedTagReason] = useState("");
+  const [showBlockedTags, setShowBlockedTags] = useState(false);
+  const [blockedTagStatus, setBlockedTagStatus] = useState<string | null>(null);
   const [newCat, setNewCat] = useState({ slug: "", en: "", he: "", es: "", ar: "" });
   const [articleTopic, setArticleTopic] = useState("");
   const [articleLanguage, setArticleLanguage] = useState("he");
@@ -205,6 +215,8 @@ export default function AdminPage() {
         p_limit: 100,
       });
       setManualArticles((requested as ManualArticle[]) ?? []);
+      const tags = await adminBlockedTags(t);
+      setBlockedTags(tags);
     },
     [supabase],
   );
@@ -725,6 +737,118 @@ export default function AdminPage() {
           </div>
         </section>
       )}
+
+      {/* Blocked tags */}
+      <section className="mb-8 overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm">
+        <button
+          type="button"
+          onClick={() => setShowBlockedTags((value) => !value)}
+          className="flex w-full items-center justify-between bg-red-50 p-5 text-right hover:bg-red-100"
+          aria-expanded={showBlockedTags}
+        >
+          <span className="font-semibold text-red-950">
+            תגיות חסומות ({blockedTags.length})
+          </span>
+          <span className="text-red-800">{showBlockedTags ? "▲" : "▼"}</span>
+        </button>
+
+        {showBlockedTags && (
+          <div className="border-t border-zinc-200 p-5 space-y-4">
+            <p className="text-sm text-zinc-600">
+              כתבות שמכילות תגית חסומה יוסתרו מדפי הבית, קטגוריות, חיפוש, גלריה, תגיות ומפת האתר. כתבות ישנות שנחסמו ייעלמו לאחר הרענון הבא.
+            </p>
+
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!savedToken || !blockedTagInput.trim()) return;
+                setBusy("block-tag");
+                setBlockedTagStatus(null);
+                const ok = await adminBlockTag(savedToken, blockedTagInput.trim(), blockedTagReason.trim() || undefined);
+                if (ok) {
+                  setBlockedTagInput("");
+                  setBlockedTagReason("");
+                  setBlockedTagStatus("התגית נוספה לרשימת החסימה.");
+                  const tags = await adminBlockedTags(savedToken);
+                  setBlockedTags(tags);
+                } else {
+                  setBlockedTagStatus("שגיאה: לא ניתן היה לחסום את התגית.");
+                }
+                setBusy(null);
+              }}
+              className="flex flex-wrap items-end gap-3"
+            >
+              <label className="flex-1 min-w-[160px] text-sm font-medium text-zinc-700">
+                תגית לחסימה
+                <input
+                  value={blockedTagInput}
+                  onChange={(e) => setBlockedTagInput(e.target.value)}
+                  placeholder="לדוגמה: פורנהאב"
+                  required
+                  className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 font-normal"
+                />
+              </label>
+              <label className="flex-[2] min-w-[200px] text-sm font-medium text-zinc-700">
+                סיבה (אופציונלי)
+                <input
+                  value={blockedTagReason}
+                  onChange={(e) => setBlockedTagReason(e.target.value)}
+                  placeholder="לדוגמה: תוכן פוגני"
+                  className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 font-normal"
+                />
+              </label>
+              <button
+                type="submit"
+                disabled={busy === "block-tag" || !blockedTagInput.trim()}
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                {busy === "block-tag" ? "מוסיף..." : "חסום תגית"}
+              </button>
+            </form>
+
+            {blockedTagStatus && (
+              <p className={`text-sm ${blockedTagStatus.startsWith("שגיאה") ? "text-red-700" : "text-green-700"}`}>
+                {blockedTagStatus}
+              </p>
+            )}
+
+            {blockedTags.length === 0 ? (
+              <p className="text-sm text-zinc-500">אין תגיות חסומות כרגע.</p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {blockedTags.map((bt) => (
+                  <span
+                    key={bt.tag}
+                    className="inline-flex items-center gap-2 rounded-full bg-red-100 px-3 py-1.5 text-sm text-red-900"
+                    title={bt.reason ?? ""}
+                  >
+                    {bt.tag}
+                    <button
+                      onClick={async () => {
+                        if (!savedToken) return;
+                        setBusy(`unblock-${bt.tag}`);
+                        const ok = await adminUnblockTag(savedToken, bt.tag);
+                        if (ok) {
+                          const tags = await adminBlockedTags(savedToken);
+                          setBlockedTags(tags);
+                        } else {
+                          setBlockedTagStatus("שגיאה: לא ניתן היה להסיר את החסימה.");
+                        }
+                        setBusy(null);
+                      }}
+                      disabled={busy === `unblock-${bt.tag}`}
+                      className="text-red-700 hover:text-red-950 disabled:opacity-50"
+                      aria-label={`הסר חסימה של ${bt.tag}`}
+                    >
+                      ✕
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </section>
 
       {/* Contact messages */}
       {messages.length > 0 && (
