@@ -4,9 +4,10 @@ import { useEffect, useRef, useState } from "react";
 
 type Msg = { role: "user" | "model"; text: string };
 type SavedSession = { id: string; topic: string; updated: number };
-type CommunitySession = { id: string; topic: string; locale: string; updated_at: string; messages: number };
+type CommunitySession = { id: string; topic: string; locale: string; author_name: string | null; updated_at: string; messages: number };
 
 const STORAGE_KEY = "havruta_sessions";
+const NAME_KEY = "havruta_name";
 
 const texts: Record<
   string,
@@ -16,6 +17,8 @@ const texts: Record<
     topicPlaceholder: string;
     sourceLabel: string;
     sourcePlaceholder: string;
+    namePlaceholder: string;
+    guest: string;
     startBtn: string;
     suggestions: string[];
     inputPlaceholder: string;
@@ -38,6 +41,8 @@ const texts: Record<
     topicPlaceholder: "לדוגמה: בראשית פרק א׳ פסוקים ג׳–ד׳, או: מסכת ברכות דף ב׳",
     sourceLabel: "מקור / טקסט (לא חובה)",
     sourcePlaceholder: "אפשר להדביק כאן את הטקסט שרוצים ללמוד — פסוקים, מקורות, או קטע ממאמר...",
+    namePlaceholder: "איך קוראים לך? (יופיע בדיון)",
+    guest: "אורח",
     startBtn: "התחל לימוד",
     suggestions: [
       "בראשית פרק א׳ פסוקים ג׳–ד׳",
@@ -64,6 +69,8 @@ const texts: Record<
     topicPlaceholder: "e.g. Genesis ch. 1 verses 3–4, or: Berakhot 2a",
     sourceLabel: "Source text (optional)",
     sourcePlaceholder: "You can paste the text you want to study — verses, sources, or a passage from an article...",
+    namePlaceholder: "What's your name? (shown in the discussion)",
+    guest: "Guest",
     startBtn: "Start learning",
     suggestions: [
       "Genesis ch. 1 verses 3–4",
@@ -91,6 +98,8 @@ const texts: Record<
     topicPlaceholder: "p. ej. Génesis cap. 1 versículos 3–4",
     sourceLabel: "Texto fuente (opcional)",
     sourcePlaceholder: "Puedes pegar aquí el texto que quieres estudiar...",
+    namePlaceholder: "¿Cómo te llamas? (aparecerá en la discusión)",
+    guest: "Invitado",
     startBtn: "Empezar a estudiar",
     suggestions: [
       "Génesis cap. 1 versículos 3–4",
@@ -118,6 +127,8 @@ const texts: Record<
     topicPlaceholder: "مثال: سفر التكوين الإصحاح 1 الآيات 3–4",
     sourceLabel: "النص المصدر (اختياري)",
     sourcePlaceholder: "يمكنك لصق النص الذي تريد دراسته هنا...",
+    namePlaceholder: "ما اسمك؟ (سيظهر في النقاش)",
+    guest: "ضيف",
     startBtn: "ابدأ الدراسة",
     suggestions: [
       "سفر التكوين الإصحاح 1 الآيات 3–4",
@@ -170,6 +181,7 @@ export function HavrutaChat({ locale }: { locale: string }) {
   const t = texts[locale] ?? texts.he;
   const [topic, setTopic] = useState("");
   const [source, setSource] = useState("");
+  const [authorName, setAuthorName] = useState("");
   const [started, setStarted] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Msg[]>([]);
@@ -184,6 +196,9 @@ export function HavrutaChat({ locale }: { locale: string }) {
 
   useEffect(() => {
     setRecent(loadSaved());
+    try {
+      setAuthorName(localStorage.getItem(NAME_KEY) ?? "");
+    } catch {}
     fetch("/api/havruta?list=recent")
       .then((r) => r.json())
       .then((j) => setCommunity(Array.isArray(j.sessions) ? j.sessions : []))
@@ -225,6 +240,7 @@ export function HavrutaChat({ locale }: { locale: string }) {
       if (json.session) {
         setTopic(json.session.topic || sTopic);
         setSource(json.session.source_text || "");
+        if (json.session.author_name) setAuthorName(json.session.author_name);
         setSessionId(sid);
         setMessages(
           Array.isArray(json.messages) && json.messages.length
@@ -259,6 +275,7 @@ export function HavrutaChat({ locale }: { locale: string }) {
           messages: next,
           locale,
           sessionId: sessionId ?? undefined,
+          authorName: authorName.trim() || undefined,
         }),
       });
       const json = await res.json();
@@ -325,6 +342,17 @@ export function HavrutaChat({ locale }: { locale: string }) {
             }}
             className="flex flex-col gap-3"
           >
+            <input
+              value={authorName}
+              onChange={(e) => {
+                setAuthorName(e.target.value);
+                try {
+                  localStorage.setItem(NAME_KEY, e.target.value);
+                } catch {}
+              }}
+              placeholder={t.namePlaceholder}
+              className="w-full rounded-xl border border-zinc-300 px-4 py-3 text-sm focus:border-amber-400 focus:outline-none"
+            />
             <input
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
@@ -394,7 +422,9 @@ export function HavrutaChat({ locale }: { locale: string }) {
                     className="flex w-full items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-start text-xs text-zinc-700 hover:border-amber-400 hover:bg-amber-50 disabled:opacity-50"
                   >
                     <span className="truncate font-medium">💬 {s.topic}</span>
-                    <span className="shrink-0 text-zinc-400">{s.messages} ✉</span>
+                    <span className="shrink-0 text-zinc-400">
+                      {s.author_name || t.guest} · {s.messages} ✉
+                    </span>
                   </button>
                 ))}
               </div>
@@ -416,6 +446,7 @@ export function HavrutaChat({ locale }: { locale: string }) {
         </button>
         <div className="min-w-0 flex-1 truncate text-center text-sm font-medium text-zinc-800">
           📖 <span className="font-bold">{t.title}</span> · {topic}
+          {authorName.trim() ? ` · ${authorName.trim()}` : ""}
         </div>
         <button
           onClick={goHome}

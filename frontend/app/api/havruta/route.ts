@@ -58,7 +58,7 @@ const dbHeaders = {
 
 async function persist(
   sessionId: string | null,
-  fields: { topic?: string; source?: string; locale?: string },
+  fields: { topic?: string; source?: string; locale?: string; author?: string },
   newMessages: { role: "user" | "model"; text: string }[],
 ): Promise<string | null> {
   if (!SUPABASE_URL || !SERVICE_KEY) return null;
@@ -72,6 +72,7 @@ async function persist(
           topic: fields.topic,
           source_text: fields.source || null,
           locale: fields.locale || "he",
+          author_name: fields.author || null,
         }),
       });
       const rows = await res.json();
@@ -117,6 +118,7 @@ export async function POST(req: NextRequest) {
     messages?: Msg[];
     locale?: string;
     sessionId?: string;
+    authorName?: string;
   };
   try {
     body = await req.json();
@@ -127,6 +129,7 @@ export async function POST(req: NextRequest) {
   const topic = String(body.topic || "").trim().slice(0, MAX_TOPIC_LEN);
   const source = String(body.source || "").trim().slice(0, MAX_SOURCE_LEN);
   const locale = ["he", "en", "es", "ar"].includes(body.locale ?? "") ? body.locale! : "he";
+  const authorName = String(body.authorName || "").trim().slice(0, 80);
   const sessionId =
     typeof body.sessionId === "string" && /^[0-9a-f-]{36}$/.test(body.sessionId)
       ? body.sessionId
@@ -176,7 +179,7 @@ export async function POST(req: NextRequest) {
       if (reply) {
         const sid = await persist(
           sessionId,
-          { topic, source, locale },
+          { topic, source, locale, author: authorName },
           sessionId
             ? [messages[messages.length - 1] as { role: "user" | "model"; text: string }, { role: "model", text: reply }]
             : [...messages as { role: "user" | "model"; text: string }[], { role: "model", text: reply }],
@@ -200,15 +203,16 @@ export async function GET(req: NextRequest) {
   if (req.nextUrl.searchParams.get("list") === "recent") {
     try {
       const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/havruta_sessions?select=id,topic,locale,updated_at,havruta_messages(count)&order=updated_at.desc&limit=12`,
+        `${SUPABASE_URL}/rest/v1/havruta_sessions?select=id,topic,locale,author_name,updated_at,havruta_messages(count)&order=updated_at.desc&limit=12`,
         { headers: dbHeaders, next: { revalidate: 60 } },
       );
       const rows = await res.json();
       const sessions = (Array.isArray(rows) ? rows : []).map(
-        (s: { id: string; topic: string; locale: string; updated_at: string; havruta_messages?: { count: number }[] }) => ({
+        (s: { id: string; topic: string; locale: string; author_name: string | null; updated_at: string; havruta_messages?: { count: number }[] }) => ({
           id: s.id,
           topic: s.topic,
           locale: s.locale,
+          author_name: s.author_name,
           updated_at: s.updated_at,
           messages: s.havruta_messages?.[0]?.count ?? 0,
         }),
