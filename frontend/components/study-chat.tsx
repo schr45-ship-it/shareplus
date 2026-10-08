@@ -1039,32 +1039,58 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
           {tool !== "shadchan" && community.length > 0 && (
             <div className="mt-4 border-t border-amber-100 pt-4">
               <p className="mb-2 text-xs font-medium text-zinc-500">{t.community}</p>
-              <div className="space-y-2">
-                {community.map((s) => (
-                  <div key={s.id} className="flex items-center gap-1">
-                    <button
-                      onClick={() => setJoinPrompt(s)}
-                      disabled={loading}
-                      className="flex w-full items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-start text-xs text-zinc-700 hover:border-amber-400 hover:bg-amber-50 disabled:opacity-50"
-                    >
-                      <span className="truncate font-medium">
-                        {s.parent_session_id ? "🌿" : "💬"} {s.topic}
-                      </span>
-                      <span className="shrink-0 text-zinc-400">
-                        {s.author_name || t.guest} · {s.messages} ✉
-                      </span>
-                    </button>
-                    {isAdmin && (
-                      <button
-                        onClick={() => deleteSession(s.id)}
-                        title={adminTxt.del}
-                        className="shrink-0 rounded-lg border border-red-200 bg-white px-2 py-2 text-xs text-red-500 hover:bg-red-50"
+              <div className="space-y-1.5">
+                {(() => {
+                  const kids = (pid: string) =>
+                    community.filter((c) => c.parent_session_id === pid);
+                  const roots = community.filter(
+                    (s) =>
+                      !s.parent_session_id ||
+                      !community.some((p) => p.id === s.parent_session_id),
+                  );
+                  const renderRow = (
+                    s: CommunitySession,
+                    depth: number,
+                  ): React.ReactNode => (
+                    <Fragment key={s.id}>
+                      <div
+                        className="flex items-center gap-1"
+                        style={{ marginInlineStart: depth * 18 }}
                       >
-                        🗑️
-                      </button>
-                    )}
-                  </div>
-                ))}
+                        {depth > 0 && (
+                          <span className="shrink-0 text-xs text-emerald-400">↳</span>
+                        )}
+                        <button
+                          onClick={() => setJoinPrompt(s)}
+                          disabled={loading}
+                          className={`flex w-full items-center justify-between gap-3 rounded-xl border px-4 py-2.5 text-start text-xs text-zinc-700 disabled:opacity-50 ${
+                            depth === 0
+                              ? "border-zinc-200 bg-white hover:border-amber-400 hover:bg-amber-50"
+                              : "border-emerald-100 bg-emerald-50/40 hover:border-emerald-300 hover:bg-emerald-50"
+                          }`}
+                        >
+                          <span className="truncate font-medium">
+                            {depth > 0 || s.parent_session_id ? "🌿" : "💬"} {s.topic}
+                          </span>
+                          <span className="shrink-0 text-zinc-400">
+                            {s.author_name || t.guest} · {s.messages} ✉
+                          </span>
+                        </button>
+                        {isAdmin && (
+                          <button
+                            onClick={() => deleteSession(s.id)}
+                            title={adminTxt.del}
+                            className="shrink-0 rounded-lg border border-red-200 bg-white px-2 py-2 text-xs text-red-500 hover:bg-red-50"
+                          >
+                            🗑️
+                          </button>
+                        )}
+                      </div>
+                      {kids(s.id).map((k) => renderRow(k, depth + 1))}
+                    </Fragment>
+                  );
+                  return roots.map((s) => renderRow(s, 0));
+                })()}
               </div>
             </div>
           )}
