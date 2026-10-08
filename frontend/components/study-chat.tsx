@@ -415,6 +415,7 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
   const [forkIdx, setForkIdx] = useState<number | null>(null);
   const [forkTopic, setForkTopic] = useState("");
   const [forkStartIdx, setForkStartIdx] = useState<number | null>(null);
+  const [forkDir, setForkDir] = useState("");
   const [showTree, setShowTree] = useState(false);
   const [treeData, setTreeData] = useState<{ current: string; nodes: LinkedSession[] } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -548,6 +549,7 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
     const ctx = messages.slice(0, idx + 1);
     setMessages(ctx);
     setForkStartIdx(ctx.length);
+    setForkDir(direction || topic);
     setParent({ id: sessionId, topic });
     setSessionId(null);
     if (direction) setTopic(direction);
@@ -654,6 +656,7 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
     setParent(null);
     setChildren([]);
     setForkStartIdx(null);
+    setForkDir("");
     setRecent(loadSaved(storageKey));
     fetch(`/api/havruta?list=recent&tool=${tool}`)
       .then((r) => r.json())
@@ -668,6 +671,7 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
     setParent(null);
     setChildren([]);
     setForkStartIdx(null);
+    setForkDir("");
     setMessages([{ role: "model", text: t.greeting(topicText) }]);
     setStarted(true);
     setError(null);
@@ -689,6 +693,7 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
         setParent(json.parent ?? null);
         setChildren(Array.isArray(json.children) ? json.children : []);
         setForkStartIdx(null);
+        setForkDir("");
         setSessionId(sid);
         setMessages(
           Array.isArray(json.messages) && json.messages.length
@@ -1239,12 +1244,19 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
             </div>
           </div>
           {forkStartIdx !== null && i + 1 === forkStartIdx && (
-            <div className="flex items-center gap-3 py-1">
-              <div className="h-px flex-1 bg-emerald-200" />
-              <span className="shrink-0 text-[11px] font-medium text-emerald-700">
-                🌿 {t.forkTitle}
-              </span>
-              <div className="h-px flex-1 bg-emerald-200" />
+            <div className="py-1">
+              <div className="flex items-center gap-3">
+                <div className="h-px flex-1 bg-emerald-200" />
+                <span className="shrink-0 text-[11px] font-medium text-emerald-700">
+                  🌿 {t.forkTitle}
+                </span>
+                <div className="h-px flex-1 bg-emerald-200" />
+              </div>
+              {forkDir && (
+                <p className="mt-1 text-center text-[11px] font-medium text-emerald-600">
+                  ⤵ {forkDir}
+                </p>
+              )}
             </div>
           )}
           </Fragment>
