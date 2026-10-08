@@ -507,6 +507,8 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
     setMessages(next);
     setInput("");
     setPendingImage(null);
+    recognitionRef.current?.stop();
+    setListening(false);
     setError(null);
     setLoading(true);
     try {
