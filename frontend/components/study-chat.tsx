@@ -356,6 +356,7 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
   const [joinPrompt, setJoinPrompt] = useState<CommunitySession | null>(null);
   const [showShare, setShowShare] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
+  const [speakingIdx, setSpeakingIdx] = useState<number | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<{ stop: () => void } | null>(null);
 
@@ -377,7 +378,31 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
-  useEffect(() => () => recognitionRef.current?.stop(), []);
+  useEffect(() => () => {
+    recognitionRef.current?.stop();
+    try {
+      window.speechSynthesis?.cancel();
+    } catch {}
+  }, []);
+
+  function speak(idx: number, text: string) {
+    try {
+      const synth = window.speechSynthesis;
+      if (!synth) return;
+      if (speakingIdx === idx) {
+        synth.cancel();
+        setSpeakingIdx(null);
+        return;
+      }
+      synth.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = SPEECH_LANG[locale] ?? "he-IL";
+      u.onend = () => setSpeakingIdx(null);
+      u.onerror = () => setSpeakingIdx(null);
+      setSpeakingIdx(idx);
+      synth.speak(u);
+    } catch {}
+  }
 
   const pagePath = tool === "teacher" ? "teacher" : "havruta";
   const shareUrl =
@@ -395,6 +420,10 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
   }
 
   function goHome() {
+    try {
+      window.speechSynthesis?.cancel();
+    } catch {}
+    setSpeakingIdx(null);
     setStarted(false);
     setMessages([]);
     setError(null);
@@ -775,6 +804,16 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
                 </div>
               )}
               {m.text}
+              <button
+                type="button"
+                onClick={() => speak(i, m.text)}
+                title={speakingIdx === i ? "⏹" : "🔊"}
+                className={`mt-1.5 block text-[11px] transition-opacity ${
+                  m.role === "model" ? "text-amber-100" : "text-zinc-400"
+                } ${speakingIdx === i ? "opacity-100" : "opacity-50 hover:opacity-100"}`}
+              >
+                {speakingIdx === i ? "⏹" : "🔊"}
+              </button>
             </div>
           </div>
         ))}
