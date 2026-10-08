@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 type Msg = { id?: string; role: "user" | "model"; text: string; author?: string; image?: string };
 type SavedSession = { id: string; topic: string; updated: number };
 type CommunitySession = { id: string; topic: string; locale: string; author_name: string | null; updated_at: string; parent_session_id?: string | null; messages: number };
-type LinkedSession = { id: string; topic: string; author_name?: string | null };
+type LinkedSession = { id: string; topic: string; author_name?: string | null; parent_session_id?: string | null };
 
 const NAME_KEY = "havruta_name";
 
@@ -51,6 +51,8 @@ const texts: Record<
     forkBtn: string;
     forkedFrom: string;
     forks: string;
+    tree: string;
+    treeTitle: string;
   }
 > = {
   he: {
@@ -94,6 +96,8 @@ const texts: Record<
     forkBtn: "התחל הסתעפות",
     forkedFrom: "נצלב מ",
     forks: "הסתעפויות מהדיון",
+    tree: "מפת דיון",
+    treeTitle: "עץ הדיון",
     greeting: (topic) =>
       `שלום! אני החברותא שלך 📖 בחרת ללמוד על **${topic}**. איך תרצה שנתחיל את הלימוד?`,
   },
@@ -139,6 +143,8 @@ const texts: Record<
     forkBtn: "Start branch",
     forkedFrom: "Branched from",
     forks: "Branches from this discussion",
+    tree: "Discussion map",
+    treeTitle: "Discussion tree",
     greeting: (topic) =>
       `Shalom! I'm your havruta 📖 You chose to study **${topic}**. How would you like to begin?`,
   },
@@ -184,6 +190,8 @@ const texts: Record<
     forkBtn: "Iniciar rama",
     forkedFrom: "Ramificado de",
     forks: "Ramas de esta discusión",
+    tree: "Mapa de discusión",
+    treeTitle: "Árbol de discusión",
     greeting: (topic) =>
       `¡Shalom! Soy tu javruta 📖 Elegiste estudiar **${topic}**. ¿Cómo quieres comenzar?`,
   },
@@ -229,6 +237,8 @@ const texts: Record<
     forkBtn: "ابدأ التفريع",
     forkedFrom: "متفرع من",
     forks: "تفرعات هذا النقاش",
+    tree: "خريطة النقاش",
+    treeTitle: "شجرة النقاش",
     greeting: (topic) =>
       `شالوم! أنا شريكك في الدراسة 📖 اخترت دراسة **${topic}**. كيف تريد أن نبدأ؟`,
   },
@@ -404,6 +414,8 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
   const [children, setChildren] = useState<LinkedSession[]>([]);
   const [forkIdx, setForkIdx] = useState<number | null>(null);
   const [forkTopic, setForkTopic] = useState("");
+  const [showTree, setShowTree] = useState(false);
+  const [treeData, setTreeData] = useState<{ current: string; nodes: LinkedSession[] } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<{ stop: () => void } | null>(null);
@@ -543,6 +555,49 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
     setError(null);
     // If the fork point ends on a user message, the partner should answer it
     if (ctx[ctx.length - 1]?.role === "user") requestReply(ctx);
+  }
+
+  async function openTree() {
+    if (!sessionId) return;
+    setShowTree(true);
+    setTreeData(null);
+    try {
+      const res = await fetch(`/api/havruta?tree=${sessionId}`);
+      const json = await res.json();
+      if (Array.isArray(json.nodes)) {
+        setTreeData({ current: json.current, nodes: json.nodes });
+      }
+    } catch {}
+  }
+
+  function renderTreeNode(node: LinkedSession, depth: number): React.ReactNode {
+    const kids = treeData?.nodes.filter((n) => n.parent_session_id === node.id) ?? [];
+    const isCurrent = node.id === treeData?.current;
+    return (
+      <div key={node.id}>
+        <button
+          onClick={() => {
+            setShowTree(false);
+            if (!isCurrent) resume(node.id, node.topic);
+          }}
+          style={{ paddingInlineStart: depth * 20 }}
+          className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-start text-xs ${
+            isCurrent
+              ? "bg-amber-100 font-bold text-amber-900"
+              : "text-zinc-700 hover:bg-emerald-50"
+          }`}
+        >
+          <span className={isCurrent ? "text-amber-600" : "text-emerald-500"}>
+            {depth === 0 ? "🌳" : "🌿"}
+          </span>
+          <span className="truncate">{node.topic}</span>
+          {node.author_name && (
+            <span className="shrink-0 text-[10px] text-zinc-400">· {node.author_name}</span>
+          )}
+        </button>
+        {kids.map((k) => renderTreeNode(k, depth + 1))}
+      </div>
+    );
   }
 
   // Admin: regenerate the model reply at idx using the conversation up to that point
@@ -1029,6 +1084,15 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
           {authorName.trim() ? ` · ${authorName.trim()}` : ""}
         </div>
         <div className="flex items-center gap-2">
+          {sessionId && tool !== "shadchan" && (
+            <button
+              onClick={openTree}
+              title={t.tree}
+              className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-medium text-amber-800 hover:bg-amber-100"
+            >
+              🌳
+            </button>
+          )}
           <div className="relative">
             <button
               onClick={() => setShowShare((v) => !v)}
@@ -1271,6 +1335,36 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
           {t.send}
         </button>
       </form>
+
+      {showTree && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowTree(false);
+          }}
+        >
+          <div className="flex max-h-[80vh] w-full max-w-md flex-col rounded-2xl border border-emerald-200 bg-white p-5 shadow-xl">
+            <h3 className="mb-3 text-lg font-bold text-zinc-900">🌳 {t.treeTitle}</h3>
+            <div className="flex-1 overflow-y-auto">
+              {!treeData ? (
+                <p className="py-6 text-center text-sm text-zinc-400">{t.thinking}</p>
+              ) : (
+                (() => {
+                  const root =
+                    treeData.nodes.find((n) => !n.parent_session_id) ?? treeData.nodes[0];
+                  return root ? renderTreeNode(root, 0) : null;
+                })()
+              )}
+            </div>
+            <button
+              onClick={() => setShowTree(false)}
+              className="mt-4 rounded-xl border border-zinc-200 px-4 py-2.5 text-sm text-zinc-600 hover:bg-zinc-50"
+            >
+              {t.back}
+            </button>
+          </div>
+        </div>
+      )}
 
       {forkIdx !== null && (
         <div

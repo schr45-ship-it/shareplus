@@ -343,6 +343,58 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // Full fork tree: climb to the root, then collect all descendants
+  const treeId = req.nextUrl.searchParams.get("tree") ?? "";
+  if (treeId) {
+    if (!/^[0-9a-f-]{36}$/.test(treeId)) {
+      return NextResponse.json({ error: "invalid" }, { status: 400 });
+    }
+    try {
+      // Climb to the root (max 10 levels as a safety net)
+      let rootId = treeId;
+      let cursor: string | null = treeId;
+      for (let depth = 0; depth < 10 && cursor; depth++) {
+        const r = await fetch(
+          `${SUPABASE_URL}/rest/v1/havruta_sessions?id=eq.${cursor}&select=id,parent_session_id`,
+          { headers: dbHeaders },
+        );
+        const rows: { id: string; parent_session_id: string | null }[] = await r.json();
+        const s = Array.isArray(rows) ? rows[0] : null;
+        if (!s) return NextResponse.json({ error: "not_found" }, { status: 404 });
+        rootId = s.id;
+        cursor = s.parent_session_id;
+      }
+
+      // BFS down the tree
+      const rootRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/havruta_sessions?id=eq.${rootId}&select=id,topic,author_name,parent_session_id,updated_at`,
+        { headers: dbHeaders },
+      );
+      const rootRows = await rootRes.json();
+      const root = Array.isArray(rootRows) ? rootRows[0] : null;
+      if (!root) return NextResponse.json({ error: "not_found" }, { status: 404 });
+
+      const nodes: unknown[] = [root];
+      let frontier = [rootId];
+      while (frontier.length && nodes.length < 200) {
+        const ids = frontier.join(",");
+        const r = await fetch(
+          `${SUPABASE_URL}/rest/v1/havruta_sessions?parent_session_id=in.(${ids})&select=id,topic,author_name,parent_session_id,updated_at&order=created_at.asc`,
+          { headers: dbHeaders },
+        );
+        const rows: { id: string }[] = await r.json();
+        frontier = [];
+        for (const row of Array.isArray(rows) ? rows : []) {
+          nodes.push(row);
+          frontier.push(row.id);
+        }
+      }
+      return NextResponse.json({ current: treeId, root: rootId, nodes });
+    } catch {
+      return NextResponse.json({ error: "failed" }, { status: 500 });
+    }
+  }
+
   const id = req.nextUrl.searchParams.get("session") ?? "";
   if (!/^[0-9a-f-]{36}$/.test(id)) {
     return NextResponse.json({ error: "invalid" }, { status: 400 });
