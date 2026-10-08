@@ -359,6 +359,9 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
   const [speakingIdx, setSpeakingIdx] = useState<number | null>(null);
   const [pendingImage, setPendingImage] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [editingIdx, setEditingIdx] = useState<number | null>(null);
+  const [editDraft, setEditDraft] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<{ stop: () => void } | null>(null);
@@ -424,11 +427,11 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
   }
 
   const adminTxt = {
-    he: { del: "מחק דיון", confirmDel: "למחוק את הדיון לצמיתות?", edit: "ערוך הודעה", promptEdit: "ערוך את ההודעה:" },
-    en: { del: "Delete discussion", confirmDel: "Delete this discussion permanently?", edit: "Edit message", promptEdit: "Edit the message:" },
-    es: { del: "Eliminar discusión", confirmDel: "¿Eliminar esta discusión permanentemente?", edit: "Editar mensaje", promptEdit: "Editar el mensaje:" },
-    ar: { del: "حذف النقاش", confirmDel: "حذف هذا النقاش نهائيًا؟", edit: "تحرير الرسالة", promptEdit: "حرر الرسالة:" },
-  }[locale] ?? { del: "Delete discussion", confirmDel: "Delete this discussion permanently?", edit: "Edit message", promptEdit: "Edit the message:" };
+    he: { del: "מחק דיון", confirmDel: "למחוק את הדיון לצמיתות?", edit: "ערוך הודעה", promptEdit: "ערוך את ההודעה:", save: "שמור" },
+    en: { del: "Delete discussion", confirmDel: "Delete this discussion permanently?", edit: "Edit message", promptEdit: "Edit the message:", save: "Save" },
+    es: { del: "Eliminar discusión", confirmDel: "¿Eliminar esta discusión permanentemente?", edit: "Editar mensaje", promptEdit: "Editar el mensaje:", save: "Guardar" },
+    ar: { del: "حذف النقاش", confirmDel: "حذف هذا النقاش نهائيًا؟", edit: "تحرير الرسالة", promptEdit: "حرر الرسالة:", save: "حفظ" },
+  }[locale] ?? { del: "Delete discussion", confirmDel: "Delete this discussion permanently?", edit: "Edit message", promptEdit: "Edit the message:", save: "Save" };
 
   function adminHeaders(): HeadersInit {
     try {
@@ -457,20 +460,30 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
     } catch {}
   }
 
-  async function editMessage(idx: number) {
+  function openEdit(idx: number) {
     const m = messages[idx];
     if (!m?.id) return;
-    const next = window.prompt(adminTxt.promptEdit, m.text);
-    if (next === null || !next.trim()) return;
+    setEditDraft(m.text);
+    setEditingIdx(idx);
+  }
+
+  async function saveEdit() {
+    const idx = editingIdx;
+    const m = idx === null ? null : messages[idx];
+    if (!m?.id || !editDraft.trim() || editSaving) return;
+    setEditSaving(true);
     try {
       const res = await fetch("/api/havruta", {
         method: "PATCH",
         headers: { "Content-Type": "application/json", ...adminHeaders() },
-        body: JSON.stringify({ id: m.id, content: next.trim() }),
+        body: JSON.stringify({ id: m.id, content: editDraft.trim() }),
       });
-      if (!res.ok) return;
-      setMessages((prev) => prev.map((mm, i) => (i === idx ? { ...mm, text: next.trim() } : mm)));
+      if (res.ok) {
+        setMessages((prev) => prev.map((mm, i) => (i === idx ? { ...mm, text: editDraft.trim() } : mm)));
+        setEditingIdx(null);
+      }
     } catch {}
+    setEditSaving(false);
   }
 
   function goHome() {
@@ -968,7 +981,7 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
                 {isAdmin && m.id && (
                   <button
                     type="button"
-                    onClick={() => editMessage(i)}
+                    onClick={() => openEdit(i)}
                     title={adminTxt.edit}
                     className={`text-[11px] transition-opacity opacity-50 hover:opacity-100 ${
                       m.role === "model" ? "text-amber-100" : "text-zinc-400"
@@ -1066,6 +1079,41 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
           {t.send}
         </button>
       </form>
+
+      {editingIdx !== null && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setEditingIdx(null);
+          }}
+        >
+          <div className="flex max-h-[85vh] w-full max-w-xl flex-col rounded-2xl border border-amber-200 bg-white p-5 shadow-xl">
+            <h3 className="mb-3 text-lg font-bold text-zinc-900">✏️ {adminTxt.edit}</h3>
+            <textarea
+              autoFocus
+              value={editDraft}
+              onChange={(e) => setEditDraft(e.target.value)}
+              rows={12}
+              className="min-h-48 w-full flex-1 resize-y rounded-xl border border-zinc-300 px-4 py-3 text-sm leading-relaxed focus:border-amber-400 focus:outline-none"
+            />
+            <div className="mt-4 flex gap-2">
+              <button
+                onClick={saveEdit}
+                disabled={editSaving || !editDraft.trim()}
+                className="flex-1 rounded-xl bg-amber-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-amber-700 disabled:opacity-40"
+              >
+                {adminTxt.save}
+              </button>
+              <button
+                onClick={() => setEditingIdx(null)}
+                className="rounded-xl border border-zinc-200 px-4 py-2.5 text-sm text-zinc-600 hover:bg-zinc-50"
+              >
+                {t.back}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
