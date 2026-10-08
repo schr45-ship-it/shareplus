@@ -105,7 +105,7 @@ async function uploadChatImage(dataUrl: string): Promise<string | null> {
 
 async function persist(
   sessionId: string | null,
-  fields: { topic?: string; source?: string; locale?: string; author?: string; tool?: string; mode?: string },
+  fields: { topic?: string; source?: string; locale?: string; author?: string; tool?: string; mode?: string; parent?: string },
   newMessages: { role: "user" | "model"; text: string; image?: string }[],
 ): Promise<{ sid: string | null; ids: string[] } | null> {
   if (!SUPABASE_URL || !SERVICE_KEY) return null;
@@ -122,6 +122,7 @@ async function persist(
           author_name: fields.author || null,
           tool: fields.tool || "havruta",
           study_mode: fields.mode || "deep",
+          parent_session_id: fields.parent || null,
         }),
       });
       const rows = await res.json();
@@ -192,6 +193,7 @@ export async function POST(req: NextRequest) {
     regen?: boolean;
     targetMessageId?: string;
     mode?: string;
+    parentSessionId?: string;
   };
   try {
     body = await req.json();
@@ -207,6 +209,10 @@ export async function POST(req: NextRequest) {
   const mode = ["pshat", "deep", "commentators"].includes(body.mode ?? "")
     ? body.mode!
     : "deep";
+  const parentSessionId =
+    typeof body.parentSessionId === "string" && /^[0-9a-f-]{36}$/.test(body.parentSessionId)
+      ? body.parentSessionId
+      : null;
   const sessionId =
     typeof body.sessionId === "string" && /^[0-9a-f-]{36}$/.test(body.sessionId)
       ? body.sessionId
@@ -283,7 +289,7 @@ export async function POST(req: NextRequest) {
         }
         const persisted = await persist(
           sessionId,
-          { topic, source, locale, author: authorName, tool, mode },
+          { topic, source, locale, author: authorName, tool, mode, parent: parentSessionId ?? undefined },
           sessionId
             ? [messages[messages.length - 1] as { role: "user" | "model"; text: string; image?: string }, { role: "model", text: reply }]
             : [...messages as { role: "user" | "model"; text: string; image?: string }[], { role: "model", text: reply }],
@@ -316,17 +322,18 @@ export async function GET(req: NextRequest) {
       : `&tool=in.(havruta,teacher)`;
     try {
       const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/havruta_sessions?select=id,topic,locale,author_name,updated_at,havruta_messages(count)&order=updated_at.desc&limit=12${toolFilter}`,
+        `${SUPABASE_URL}/rest/v1/havruta_sessions?select=id,topic,locale,author_name,updated_at,parent_session_id,havruta_messages(count)&order=updated_at.desc&limit=12${toolFilter}`,
         { headers: dbHeaders, next: { revalidate: 60 } },
       );
       const rows = await res.json();
       const sessions = (Array.isArray(rows) ? rows : []).map(
-        (s: { id: string; topic: string; locale: string; author_name: string | null; updated_at: string; havruta_messages?: { count: number }[] }) => ({
+        (s: { id: string; topic: string; locale: string; author_name: string | null; updated_at: string; parent_session_id: string | null; havruta_messages?: { count: number }[] }) => ({
           id: s.id,
           topic: s.topic,
           locale: s.locale,
           author_name: s.author_name,
           updated_at: s.updated_at,
+          parent_session_id: s.parent_session_id,
           messages: s.havruta_messages?.[0]?.count ?? 0,
         }),
       );
@@ -341,12 +348,16 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "invalid" }, { status: 400 });
   }
   try {
-    const [sRes, mRes] = await Promise.all([
+    const [sRes, mRes, cRes] = await Promise.all([
       fetch(`${SUPABASE_URL}/rest/v1/havruta_sessions?id=eq.${id}&select=*`, {
         headers: dbHeaders,
       }),
       fetch(
         `${SUPABASE_URL}/rest/v1/havruta_messages?session_id=eq.${id}&select=id,role,content,author_name,image_url,created_at&order=created_at.asc`,
+        { headers: dbHeaders },
+      ),
+      fetch(
+        `${SUPABASE_URL}/rest/v1/havruta_sessions?parent_session_id=eq.${id}&select=id,topic,author_name,updated_at&order=updated_at.desc`,
         { headers: dbHeaders },
       ),
     ]);
@@ -363,7 +374,24 @@ export async function GET(req: NextRequest) {
         image: r.image_url ?? undefined,
       }),
     );
-    return NextResponse.json({ session, messages });
+    let parent = null;
+    if (session.parent_session_id) {
+      try {
+        const pr = await fetch(
+          `${SUPABASE_URL}/rest/v1/havruta_sessions?id=eq.${session.parent_session_id}&select=id,topic`,
+          { headers: dbHeaders },
+        );
+        const prows = await pr.json();
+        parent = Array.isArray(prows) ? (prows[0] ?? null) : null;
+      } catch {}
+    }
+    const children = await cRes.json().catch(() => []);
+    return NextResponse.json({
+      session,
+      messages,
+      parent,
+      children: Array.isArray(children) ? children : [],
+    });
   } catch {
     return NextResponse.json({ error: "failed" }, { status: 500 });
   }

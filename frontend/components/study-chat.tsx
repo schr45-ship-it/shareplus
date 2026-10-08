@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from "react";
 
 type Msg = { id?: string; role: "user" | "model"; text: string; author?: string; image?: string };
 type SavedSession = { id: string; topic: string; updated: number };
-type CommunitySession = { id: string; topic: string; locale: string; author_name: string | null; updated_at: string; messages: number };
+type CommunitySession = { id: string; topic: string; locale: string; author_name: string | null; updated_at: string; parent_session_id?: string | null; messages: number };
+type LinkedSession = { id: string; topic: string; author_name?: string | null };
 
 const NAME_KEY = "havruta_name";
 
@@ -44,6 +45,12 @@ const texts: Record<
     embed: string;
     copied: string;
     modes: { deep: string; pshat: string; commentators: string };
+    fork: string;
+    forkTitle: string;
+    forkPrompt: string;
+    forkBtn: string;
+    forkedFrom: string;
+    forks: string;
   }
 > = {
   he: {
@@ -81,6 +88,12 @@ const texts: Record<
     embed: "העתק קוד הטמעה",
     copied: "הועתק!",
     modes: { deep: "למידה עמוקה", pshat: "פשט בלבד", commentators: "מפרשים" },
+    fork: "התפצל מכאן",
+    forkTitle: "הסתעפות מהדיון",
+    forkPrompt: "מה הכיוון החדש? (אופציונלי)",
+    forkBtn: "התחל הסתעפות",
+    forkedFrom: "נצלב מ",
+    forks: "הסתעפויות מהדיון",
     greeting: (topic) =>
       `שלום! אני החברותא שלך 📖 בחרת ללמוד על **${topic}**. איך תרצה שנתחיל את הלימוד?`,
   },
@@ -120,6 +133,12 @@ const texts: Record<
     embed: "Copy embed code",
     copied: "Copied!",
     modes: { deep: "Deep learning", pshat: "Plain meaning only", commentators: "Commentators" },
+    fork: "Branch from here",
+    forkTitle: "Fork this discussion",
+    forkPrompt: "What's the new direction? (optional)",
+    forkBtn: "Start branch",
+    forkedFrom: "Branched from",
+    forks: "Branches from this discussion",
     greeting: (topic) =>
       `Shalom! I'm your havruta 📖 You chose to study **${topic}**. How would you like to begin?`,
   },
@@ -159,6 +178,12 @@ const texts: Record<
     embed: "Copiar código de inserción",
     copied: "¡Copiado!",
     modes: { deep: "Estudio profundo", pshat: "Solo sentido simple", commentators: "Comentaristas" },
+    fork: "Ramificar desde aquí",
+    forkTitle: "Ramificar esta discusión",
+    forkPrompt: "¿Cuál es la nueva dirección? (opcional)",
+    forkBtn: "Iniciar rama",
+    forkedFrom: "Ramificado de",
+    forks: "Ramas de esta discusión",
     greeting: (topic) =>
       `¡Shalom! Soy tu javruta 📖 Elegiste estudiar **${topic}**. ¿Cómo quieres comenzar?`,
   },
@@ -198,6 +223,12 @@ const texts: Record<
     embed: "نسخ كود التضمين",
     copied: "تم النسخ!",
     modes: { deep: "دراسة معمقة", pshat: "المعنى البسيط فقط", commentators: "المفسرون" },
+    fork: "تفرّع من هنا",
+    forkTitle: "تفريع هذا النقاش",
+    forkPrompt: "ما الاتجاه الجديد؟ (اختياري)",
+    forkBtn: "ابدأ التفريع",
+    forkedFrom: "متفرع من",
+    forks: "تفرعات هذا النقاش",
     greeting: (topic) =>
       `شالوم! أنا شريكك في الدراسة 📖 اخترت دراسة **${topic}**. كيف تريد أن نبدأ؟`,
   },
@@ -369,6 +400,10 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
   const [editSaving, setEditSaving] = useState(false);
   const [regenIdx, setRegenIdx] = useState<number | null>(null);
   const [mode, setMode] = useState<"deep" | "pshat" | "commentators">("deep");
+  const [parent, setParent] = useState<LinkedSession | null>(null);
+  const [children, setChildren] = useState<LinkedSession[]>([]);
+  const [forkIdx, setForkIdx] = useState<number | null>(null);
+  const [forkTopic, setForkTopic] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<{ stop: () => void } | null>(null);
@@ -493,6 +528,20 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
     setEditSaving(false);
   }
 
+  // Fork: continue the discussion from message idx in a new direction
+  function startFork(idx: number) {
+    if (!sessionId) return;
+    const direction = forkTopic.trim();
+    setMessages((prev) => prev.slice(0, idx + 1));
+    setParent({ id: sessionId, topic });
+    setSessionId(null);
+    if (direction) setTopic(direction);
+    setChildren([]);
+    setForkIdx(null);
+    setForkTopic("");
+    setError(null);
+  }
+
   // Admin: regenerate the model reply at idx using the conversation up to that point
   async function regenerate(idx: number) {
     const target = messages[idx];
@@ -542,6 +591,8 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
     setStarted(false);
     setMessages([]);
     setError(null);
+    setParent(null);
+    setChildren([]);
     setRecent(loadSaved(storageKey));
     fetch(`/api/havruta?list=recent&tool=${tool}`)
       .then((r) => r.json())
@@ -553,6 +604,8 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
     setTopic(topicText);
     setSource(sourceText);
     setSessionId(null);
+    setParent(null);
+    setChildren([]);
     setMessages([{ role: "model", text: t.greeting(topicText) }]);
     setStarted(true);
     setError(null);
@@ -571,6 +624,8 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
         if (["deep", "pshat", "commentators"].includes(json.session.study_mode)) {
           setMode(json.session.study_mode);
         }
+        setParent(json.parent ?? null);
+        setChildren(Array.isArray(json.children) ? json.children : []);
         setSessionId(sid);
         setMessages(
           Array.isArray(json.messages) && json.messages.length
@@ -640,6 +695,7 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
           authorName: authorName.trim() || undefined,
           tool,
           mode,
+          parentSessionId: !sessionId && parent ? parent.id : undefined,
         }),
       });
       const json = await res.json();
@@ -868,7 +924,9 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
                       disabled={loading}
                       className="flex w-full items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-start text-xs text-zinc-700 hover:border-amber-400 hover:bg-amber-50 disabled:opacity-50"
                     >
-                      <span className="truncate font-medium">💬 {s.topic}</span>
+                      <span className="truncate font-medium">
+                        {s.parent_session_id ? "🌿" : "💬"} {s.topic}
+                      </span>
                       <span className="shrink-0 text-zinc-400">
                         {s.author_name || t.guest} · {s.messages} ✉
                       </span>
@@ -1015,6 +1073,15 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
         </div>
       </div>
 
+      {parent && (
+        <button
+          onClick={() => resume(parent.id, parent.topic)}
+          className="mb-3 self-start rounded-lg border border-amber-200 bg-white px-3 py-1.5 text-xs text-amber-800 hover:bg-amber-50"
+        >
+          🌿 {t.forkedFrom}: <span className="font-medium">{parent.topic}</span>
+        </button>
+      )}
+
       {modeChips && <div className="mb-3">{modeChips}</div>}
 
       <div className="min-h-64 space-y-4 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
@@ -1078,6 +1145,18 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
                     {regenIdx === i ? "⏳" : "🔄"}
                   </button>
                 )}
+                {sessionId && tool !== "shadchan" && (
+                  <button
+                    type="button"
+                    onClick={() => setForkIdx(i)}
+                    title={t.fork}
+                    className={`text-[11px] transition-opacity opacity-50 hover:opacity-100 ${
+                      m.role === "model" ? "text-amber-100" : "text-zinc-400"
+                    }`}
+                  >
+                    🌿
+                  </button>
+                )}
               </span>
               )}
             </div>
@@ -1093,6 +1172,24 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
         {error && <p className="text-center text-sm text-red-600">{error}</p>}
         <div ref={bottomRef} />
       </div>
+
+      {children.length > 0 && (
+        <div className="mt-3">
+          <p className="mb-1.5 text-xs font-medium text-zinc-500">🌿 {t.forks}</p>
+          <div className="flex flex-wrap gap-2">
+            {children.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => resume(c.id, c.topic)}
+                className="max-w-56 truncate rounded-full border border-emerald-200 bg-white px-4 py-2 text-xs text-zinc-600 hover:border-emerald-400 hover:bg-emerald-50"
+              >
+                💬 {c.topic}
+                {c.author_name ? ` · ${c.author_name}` : ""}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {pendingImage && (
         <div className="mt-3 flex items-center gap-2">
@@ -1167,6 +1264,49 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
           {t.send}
         </button>
       </form>
+
+      {forkIdx !== null && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setForkIdx(null);
+          }}
+        >
+          <div className="w-full max-w-sm rounded-2xl border border-emerald-200 bg-white p-6 shadow-xl">
+            <h3 className="mb-1 text-lg font-bold text-zinc-900">🌿 {t.forkTitle}</h3>
+            <p className="mb-4 text-xs leading-relaxed text-zinc-500">
+              {t.forkPrompt}
+            </p>
+            <input
+              autoFocus
+              value={forkTopic}
+              onChange={(e) => setForkTopic(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  startFork(forkIdx);
+                }
+              }}
+              placeholder={topic}
+              className="mb-4 w-full rounded-xl border border-zinc-300 px-4 py-3 text-sm focus:border-emerald-400 focus:outline-none"
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={() => startFork(forkIdx)}
+                className="flex-1 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700"
+              >
+                {t.forkBtn}
+              </button>
+              <button
+                onClick={() => setForkIdx(null)}
+                className="rounded-xl border border-zinc-200 px-4 py-2.5 text-sm text-zinc-600 hover:bg-zinc-50"
+              >
+                {t.back}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {editingIdx !== null && (
         <div
