@@ -34,6 +34,7 @@ const texts: Record<
     community: string;
     joinTitle: string;
     joinBtn: string;
+    loggedAs: (name: string) => string;
     greeting: (topic: string) => string;
   }
 > = {
@@ -60,10 +61,11 @@ const texts: Record<
     micNotSupported: "הדפדפן לא תומך בהקלטה",
     errGeneric: "משהו השתבש. נסה שוב.",
     errRate: "הגעת למגבלת ההודעות לשעה. נסה שוב מאוחר יותר.",
-    recent: "הדיונים שלי",
+    recent: "הדיונים שלך",
     community: "דיונים אחרונים בקהילה",
     joinTitle: "איך קוראים לך?",
     joinBtn: "הצטרף לדיון",
+    loggedAs: (name) => `השם המחובר כרגע: ${name}`,
     greeting: (topic) =>
       `שלום! אני החברותא שלך 📖 בחרת ללמוד על **${topic}**. איך תרצה שנתחיל את הלימוד?`,
   },
@@ -95,6 +97,7 @@ const texts: Record<
     community: "Recent community discussions",
     joinTitle: "What's your name?",
     joinBtn: "Join the discussion",
+    loggedAs: (name) => `Currently logged in as: ${name}`,
     greeting: (topic) =>
       `Shalom! I'm your havruta 📖 You chose to study **${topic}**. How would you like to begin?`,
   },
@@ -126,6 +129,7 @@ const texts: Record<
     community: "Discusiones recientes de la comunidad",
     joinTitle: "¿Cómo te llamas?",
     joinBtn: "Unirse a la discusión",
+    loggedAs: (name) => `Conectado como: ${name}`,
     greeting: (topic) =>
       `¡Shalom! Soy tu javruta 📖 Elegiste estudiar **${topic}**. ¿Cómo quieres comenzar?`,
   },
@@ -157,6 +161,7 @@ const texts: Record<
     community: "نقاشات المجتمع الأخيرة",
     joinTitle: "ما اسمك؟",
     joinBtn: "انضم إلى النقاش",
+    loggedAs: (name) => `الاسم الحالي: ${name}`,
     greeting: (topic) =>
       `شالوم! أنا شريكك في الدراسة 📖 اخترت دراسة **${topic}**. كيف تريد أن نبدأ؟`,
   },
@@ -424,8 +429,14 @@ export function HavrutaChat({ locale }: { locale: string }) {
             ))}
           </div>
 
+          {authorName.trim() && (
+            <p className="mt-5 border-t border-amber-100 pt-3 text-xs text-zinc-500">
+              👤 {t.loggedAs(authorName.trim())}
+            </p>
+          )}
+
           {recent.length > 0 && (
-            <div className="mt-6 border-t border-amber-100 pt-4">
+            <div className={authorName.trim() ? "mt-3" : "mt-6 border-t border-amber-100 pt-4"}>
               <p className="mb-2 text-xs font-medium text-zinc-500">{t.recent}</p>
               <div className="flex flex-wrap gap-2">
                 {recent.map((s) => (
