@@ -1399,7 +1399,8 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
         <button
           type="button"
           onClick={() => fileRef.current?.click()}
-          className="rounded-xl border border-zinc-300 bg-white px-3 py-3 text-lg hover:bg-zinc-50"
+          title="📷"
+          className="rounded-xl border-2 border-zinc-400 bg-white px-3.5 py-3 text-xl text-zinc-700 shadow-sm transition hover:border-amber-500 hover:bg-amber-50 active:scale-95"
         >
           📷
         </button>
@@ -1414,20 +1415,20 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
           }}
           placeholder={listening ? t.listening : t.inputPlaceholder}
           rows={2}
-          className={`flex-1 resize-none rounded-xl border px-4 py-3 text-sm focus:outline-none ${
+          className={`flex-1 resize-none rounded-xl border-2 px-4 py-3 text-sm shadow-sm focus:outline-none ${
             listening
               ? "border-red-400 bg-red-50 focus:border-red-500"
-              : "border-zinc-300 focus:border-amber-400"
+              : "border-zinc-400 focus:border-amber-500"
           }`}
         />
         <button
           type="button"
           onClick={startListening}
-          title={listening ? t.listening : undefined}
-          className={`rounded-xl border px-3 py-3 text-lg ${
+          title={listening ? t.listening : "🎤"}
+          className={`rounded-xl border-2 px-3.5 py-3 text-xl shadow-sm transition active:scale-95 ${
             listening
-              ? "border-red-300 bg-red-50"
-              : "border-zinc-300 bg-white hover:bg-zinc-50"
+              ? "border-red-400 bg-red-50 animate-pulse"
+              : "border-zinc-400 bg-white hover:border-amber-500 hover:bg-amber-50"
           }`}
         >
           {listening ? "🔴" : "🎤"}
@@ -1435,7 +1436,7 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
         <button
           type="submit"
           disabled={loading || (!input.trim() && !pendingImage)}
-          className="rounded-xl bg-amber-600 px-5 py-3 text-sm font-semibold text-white hover:bg-amber-700 disabled:opacity-40"
+          className="rounded-xl bg-amber-600 px-7 py-3 text-base font-bold text-white shadow-md transition hover:bg-amber-700 hover:shadow-lg active:scale-95 disabled:opacity-40 disabled:shadow-none"
         >
           {t.send}
         </button>
