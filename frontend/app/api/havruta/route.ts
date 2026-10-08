@@ -178,6 +178,8 @@ export async function POST(req: NextRequest) {
     sessionId?: string;
     authorName?: string;
     tool?: string;
+    regen?: boolean;
+    targetMessageId?: string;
   };
   try {
     body = await req.json();
@@ -194,6 +196,16 @@ export async function POST(req: NextRequest) {
     typeof body.sessionId === "string" && /^[0-9a-f-]{36}$/.test(body.sessionId)
       ? body.sessionId
       : null;
+  // Admin regeneration: replace an existing model reply instead of appending
+  const regenTarget =
+    body.regen === true &&
+    typeof body.targetMessageId === "string" &&
+    /^[0-9a-f-]{36}$/.test(body.targetMessageId)
+      ? body.targetMessageId
+      : null;
+  if (regenTarget && !(await adminAuthorized(req))) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
   const messages = (Array.isArray(body.messages) ? body.messages : [])
     .slice(-MAX_MESSAGES)
     .map((m) => {
@@ -245,6 +257,15 @@ export async function POST(req: NextRequest) {
           .join("")
           .trim() ?? "";
       if (reply) {
+        if (regenTarget) {
+          // Admin regen: overwrite the existing model message, don't persist new rows
+          await fetch(`${SUPABASE_URL}/rest/v1/havruta_messages?id=eq.${regenTarget}`, {
+            method: "PATCH",
+            headers: { ...dbHeaders, Prefer: "return=minimal" },
+            body: JSON.stringify({ content: reply }),
+          });
+          return NextResponse.json({ reply, sessionId });
+        }
         const persisted = await persist(
           sessionId,
           { topic, source, locale, author: authorName, tool },

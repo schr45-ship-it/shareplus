@@ -362,6 +362,7 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [editDraft, setEditDraft] = useState("");
   const [editSaving, setEditSaving] = useState(false);
+  const [regenIdx, setRegenIdx] = useState<number | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<{ stop: () => void } | null>(null);
@@ -427,11 +428,11 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
   }
 
   const adminTxt = {
-    he: { del: "מחק דיון", confirmDel: "למחוק את הדיון לצמיתות?", edit: "ערוך הודעה", promptEdit: "ערוך את ההודעה:", save: "שמור" },
-    en: { del: "Delete discussion", confirmDel: "Delete this discussion permanently?", edit: "Edit message", promptEdit: "Edit the message:", save: "Save" },
-    es: { del: "Eliminar discusión", confirmDel: "¿Eliminar esta discusión permanentemente?", edit: "Editar mensaje", promptEdit: "Editar el mensaje:", save: "Guardar" },
-    ar: { del: "حذف النقاش", confirmDel: "حذف هذا النقاش نهائيًا؟", edit: "تحرير الرسالة", promptEdit: "حرر الرسالة:", save: "حفظ" },
-  }[locale] ?? { del: "Delete discussion", confirmDel: "Delete this discussion permanently?", edit: "Edit message", promptEdit: "Edit the message:", save: "Save" };
+    he: { del: "מחק דיון", confirmDel: "למחוק את הדיון לצמיתות?", edit: "ערוך הודעה", promptEdit: "ערוך את ההודעה:", save: "שמור", regen: "הפק תשובה מחדש" },
+    en: { del: "Delete discussion", confirmDel: "Delete this discussion permanently?", edit: "Edit message", promptEdit: "Edit the message:", save: "Save", regen: "Regenerate reply" },
+    es: { del: "Eliminar discusión", confirmDel: "¿Eliminar esta discusión permanentemente?", edit: "Editar mensaje", promptEdit: "Editar el mensaje:", save: "Guardar", regen: "Regenerar respuesta" },
+    ar: { del: "حذف النقاش", confirmDel: "حذف هذا النقاش نهائيًا؟", edit: "تحرير الرسالة", promptEdit: "حرر الرسالة:", save: "حفظ", regen: "أعد توليد الرد" },
+  }[locale] ?? { del: "Delete discussion", confirmDel: "Delete this discussion permanently?", edit: "Edit message", promptEdit: "Edit the message:", save: "Save", regen: "Regenerate reply" };
 
   function adminHeaders(): HeadersInit {
     try {
@@ -484,6 +485,46 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
       }
     } catch {}
     setEditSaving(false);
+  }
+
+  // Admin: regenerate the model reply at idx using the conversation up to that point
+  async function regenerate(idx: number) {
+    const target = messages[idx];
+    if (
+      regenIdx !== null ||
+      !target?.id ||
+      target.role !== "model" ||
+      messages[idx - 1]?.role !== "user" ||
+      loading
+    )
+      return;
+    setRegenIdx(idx);
+    setError(null);
+    try {
+      const res = await fetch("/api/havruta", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...adminHeaders() },
+        body: JSON.stringify({
+          topic,
+          source,
+          locale,
+          tool,
+          sessionId: sessionId ?? undefined,
+          messages: messages.slice(0, idx),
+          regen: true,
+          targetMessageId: target.id,
+        }),
+      });
+      const json = await res.json();
+      if (json.reply) {
+        setMessages((prev) => prev.map((m, i) => (i === idx ? { ...m, text: json.reply } : m)));
+      } else {
+        setError(t.errGeneric);
+      }
+    } catch {
+      setError(t.errGeneric);
+    }
+    setRegenIdx(null);
   }
 
   function goHome() {
@@ -988,6 +1029,19 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
                     }`}
                   >
                     ✏️
+                  </button>
+                )}
+                {isAdmin && m.id && m.role === "model" && messages[i - 1]?.role === "user" && (
+                  <button
+                    type="button"
+                    onClick={() => regenerate(i)}
+                    disabled={regenIdx === i}
+                    title={adminTxt.regen}
+                    className={`text-[11px] transition-opacity opacity-50 hover:opacity-100 text-amber-100 ${
+                      regenIdx === i ? "animate-pulse opacity-100" : ""
+                    }`}
+                  >
+                    {regenIdx === i ? "⏳" : "🔄"}
                   </button>
                 )}
               </span>
