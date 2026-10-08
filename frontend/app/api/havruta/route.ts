@@ -38,8 +38,18 @@ const LANG_NAME: Record<string, string> = {
   ar: "Arabic",
 };
 
-function systemPrompt(locale: string, topic: string, source: string): string {
+function systemPrompt(tool: string, locale: string, topic: string, source: string): string {
   const lang = LANG_NAME[locale] ?? "Hebrew";
+  if (tool === "teacher") {
+    return [
+      "You are 'My Teacher' — a patient, expert private tutor who adapts to the student's level.",
+      "Teach step by step: explain concepts clearly, give examples and short exercises, check understanding by asking questions, correct mistakes kindly, and encourage progress. Don't just lecture — make it interactive.",
+      "Keep replies focused — usually 2–5 sentences plus a question or mini-exercise for the student.",
+      `Always respond in ${lang}.`,
+      topic ? `The student wants to learn: ${topic}` : "Ask the student what subject and level they'd like to start with.",
+      source ? `Material provided by the student:\n---\n${source}\n---` : "",
+    ].filter(Boolean).join("\n");
+  }
   return [
     "You are a Havruta — a wise, patient, and thought-provoking Jewish study partner.",
     "Your role is NOT to give dry, ready-made answers. You hold a real discussion: encourage good insights, raise challenges (kushyot) from classical commentators and general philosophy, ask questions that develop independent thinking, and help the learner go deeper into the text.",
@@ -58,7 +68,7 @@ const dbHeaders = {
 
 async function persist(
   sessionId: string | null,
-  fields: { topic?: string; source?: string; locale?: string; author?: string },
+  fields: { topic?: string; source?: string; locale?: string; author?: string; tool?: string },
   newMessages: { role: "user" | "model"; text: string }[],
 ): Promise<string | null> {
   if (!SUPABASE_URL || !SERVICE_KEY) return null;
@@ -73,6 +83,7 @@ async function persist(
           source_text: fields.source || null,
           locale: fields.locale || "he",
           author_name: fields.author || null,
+          tool: fields.tool || "havruta",
         }),
       });
       const rows = await res.json();
@@ -124,6 +135,7 @@ export async function POST(req: NextRequest) {
     locale?: string;
     sessionId?: string;
     authorName?: string;
+    tool?: string;
   };
   try {
     body = await req.json();
@@ -135,6 +147,7 @@ export async function POST(req: NextRequest) {
   const source = String(body.source || "").trim().slice(0, MAX_SOURCE_LEN);
   const locale = ["he", "en", "es", "ar"].includes(body.locale ?? "") ? body.locale! : "he";
   const authorName = String(body.authorName || "").trim().slice(0, 80);
+  const tool = ["havruta", "teacher"].includes(body.tool ?? "") ? body.tool! : "havruta";
   const sessionId =
     typeof body.sessionId === "string" && /^[0-9a-f-]{36}$/.test(body.sessionId)
       ? body.sessionId
@@ -167,7 +180,7 @@ export async function POST(req: NextRequest) {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            system_instruction: { parts: [{ text: systemPrompt(locale, topic, source) }] },
+            system_instruction: { parts: [{ text: systemPrompt(tool, locale, topic, source) }] },
             contents,
             generationConfig: { temperature: 0.7, maxOutputTokens: 1200 },
           }),
@@ -184,7 +197,7 @@ export async function POST(req: NextRequest) {
       if (reply) {
         const sid = await persist(
           sessionId,
-          { topic, source, locale, author: authorName },
+          { topic, source, locale, author: authorName, tool },
           sessionId
             ? [messages[messages.length - 1] as { role: "user" | "model"; text: string }, { role: "model", text: reply }]
             : [...messages as { role: "user" | "model"; text: string }[], { role: "model", text: reply }],
@@ -206,9 +219,12 @@ export async function GET(req: NextRequest) {
 
   // Public list of recent discussions for the community board
   if (req.nextUrl.searchParams.get("list") === "recent") {
+    const toolFilter = /^[a-z]+$/.test(req.nextUrl.searchParams.get("tool") ?? "")
+      ? `&tool=eq.${req.nextUrl.searchParams.get("tool")}`
+      : "";
     try {
       const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/havruta_sessions?select=id,topic,locale,author_name,updated_at,havruta_messages(count)&order=updated_at.desc&limit=12`,
+        `${SUPABASE_URL}/rest/v1/havruta_sessions?select=id,topic,locale,author_name,updated_at,havruta_messages(count)&order=updated_at.desc&limit=12${toolFilter}`,
         { headers: dbHeaders, next: { revalidate: 60 } },
       );
       const rows = await res.json();

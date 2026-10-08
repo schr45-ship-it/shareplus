@@ -6,8 +6,9 @@ type Msg = { role: "user" | "model"; text: string; author?: string };
 type SavedSession = { id: string; topic: string; updated: number };
 type CommunitySession = { id: string; topic: string; locale: string; author_name: string | null; updated_at: string; messages: number };
 
-const STORAGE_KEY = "havruta_sessions";
 const NAME_KEY = "havruta_name";
+
+export type StudyTool = "havruta" | "teacher";
 
 const texts: Record<
   string,
@@ -174,9 +175,9 @@ const SPEECH_LANG: Record<string, string> = {
   ar: "ar-SA",
 };
 
-function loadSaved(): SavedSession[] {
+function loadSaved(key: string): SavedSession[] {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(key);
     const arr = raw ? JSON.parse(raw) : [];
     return Array.isArray(arr) ? arr.filter((s) => s?.id && s?.topic) : [];
   } catch {
@@ -184,11 +185,11 @@ function loadSaved(): SavedSession[] {
   }
 }
 
-function saveSession(sid: string, topic: string) {
+function saveSession(key: string, sid: string, topic: string) {
   try {
-    const list = loadSaved().filter((s) => s.id !== sid);
+    const list = loadSaved(key).filter((s) => s.id !== sid);
     list.unshift({ id: sid, topic, updated: Date.now() });
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(list.slice(0, 10)));
+    localStorage.setItem(key, JSON.stringify(list.slice(0, 10)));
   } catch {}
 }
 
@@ -210,8 +211,76 @@ function authorColor(name: string): string {
   return AUTHOR_COLORS[h % AUTHOR_COLORS.length];
 }
 
-export function HavrutaChat({ locale }: { locale: string }) {
-  const t = texts[locale] ?? texts.he;
+const toolOverrides: Record<StudyTool, Partial<Record<string, Partial<(typeof texts)["he"]>>>> = {
+  havruta: {},
+  teacher: {
+    he: {
+      title: "המורה שלי AI",
+      intro: "בחר מקצוע או נושא — מתמטיקה, פיזיקה, תכנות, היסטוריה — והמורה ילמד אותך צעד אחר צעד, יבחן ויעודד.",
+      topicPlaceholder: "לדוגמה: מתמטיקה — פונקציות, או: פיזיקה — חוקי ניוטון",
+      suggestions: [
+        "מתמטיקה — פונקציות קוויות",
+        "פיזיקה — חוקי ניוטון",
+        "תכנות — משתנים ולולאות",
+        "אנגלית — דקדוק בסיסי",
+      ],
+      community: "שיעורים אחרונים בקהילה",
+      joinBtn: "הצטרף לשיעור",
+      greeting: (topic) =>
+        `שלום! אני המורה שלך 📚 בחרת ללמוד **${topic}**. מה הרמה שלך בנושא — מתחיל או מתקדם?`,
+    },
+    en: {
+      title: "My Teacher AI",
+      intro: "Choose a subject — math, physics, coding, history — and your teacher will guide you step by step, test and encourage you.",
+      topicPlaceholder: "e.g. Math — linear functions, or: Physics — Newton's laws",
+      suggestions: [
+        "Math — linear functions",
+        "Physics — Newton's laws",
+        "Coding — variables and loops",
+        "English — basic grammar",
+      ],
+      community: "Recent community lessons",
+      joinBtn: "Join the lesson",
+      greeting: (topic) =>
+        `Hello! I'm your teacher 📚 You chose to learn **${topic}**. What's your level — beginner or advanced?`,
+    },
+    es: {
+      title: "Mi Maestro AI",
+      intro: "Elige una materia — matemáticas, física, programación, historia — y tu maestro te guiará paso a paso.",
+      topicPlaceholder: "p. ej. Matemáticas — funciones lineales",
+      suggestions: [
+        "Matemáticas — funciones lineales",
+        "Física — leyes de Newton",
+        "Programación — variables y bucles",
+        "Inglés — gramática básica",
+      ],
+      community: "Lecciones recientes de la comunidad",
+      joinBtn: "Unirse a la lección",
+      greeting: (topic) =>
+        `¡Hola! Soy tu maestro 📚 Elegiste aprender **${topic}**. ¿Cuál es tu nivel — principiante o avanzado?`,
+    },
+    ar: {
+      title: "معلّمي AI",
+      intro: "اختر مادة — رياضيات، فيزياء، برمجة، تاريخ — وسيرشدك معلمك خطوة بخطوة.",
+      topicPlaceholder: "مثال: رياضيات — دوال خطية",
+      suggestions: [
+        "رياضيات — دوال خطية",
+        "فيزياء — قوانين نيوتن",
+        "برمجة — متغيرات وحلقات",
+        "إنجليزية — قواعد أساسية",
+      ],
+      community: "دروس المجتمع الأخيرة",
+      joinBtn: "انضم إلى الدرس",
+      greeting: (topic) =>
+        `مرحبًا! أنا معلمك 📚 اخترت تعلم **${topic}**. ما مستواك — مبتدئ أم متقدم؟`,
+    },
+  },
+};
+
+export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?: StudyTool }) {
+  const base = texts[locale] ?? texts.he;
+  const t = { ...base, ...(toolOverrides[tool]?.[locale] ?? toolOverrides[tool]?.he ?? {}) };
+  const storageKey = `study_sessions_${tool}`;
   const [topic, setTopic] = useState("");
   const [source, setSource] = useState("");
   const [authorName, setAuthorName] = useState("");
@@ -229,11 +298,11 @@ export function HavrutaChat({ locale }: { locale: string }) {
   const recognitionRef = useRef<{ stop: () => void } | null>(null);
 
   useEffect(() => {
-    setRecent(loadSaved());
+    setRecent(loadSaved(storageKey));
     try {
       setAuthorName(localStorage.getItem(NAME_KEY) ?? "");
     } catch {}
-    fetch("/api/havruta?list=recent")
+    fetch(`/api/havruta?list=recent&tool=${tool}`)
       .then((r) => r.json())
       .then((j) => setCommunity(Array.isArray(j.sessions) ? j.sessions : []))
       .catch(() => {});
@@ -249,8 +318,8 @@ export function HavrutaChat({ locale }: { locale: string }) {
     setStarted(false);
     setMessages([]);
     setError(null);
-    setRecent(loadSaved());
-    fetch("/api/havruta?list=recent")
+    setRecent(loadSaved(storageKey));
+    fetch(`/api/havruta?list=recent&tool=${tool}`)
       .then((r) => r.json())
       .then((j) => setCommunity(Array.isArray(j.sessions) ? j.sessions : []))
       .catch(() => {});
@@ -313,6 +382,7 @@ export function HavrutaChat({ locale }: { locale: string }) {
           locale,
           sessionId: sessionId ?? undefined,
           authorName: authorName.trim() || undefined,
+          tool,
         }),
       });
       const json = await res.json();
@@ -323,7 +393,7 @@ export function HavrutaChat({ locale }: { locale: string }) {
         if (json.sessionId && json.sessionId !== sessionId) {
           setSessionId(json.sessionId);
         }
-        if (json.sessionId) saveSession(json.sessionId, topic);
+        if (json.sessionId) saveSession(storageKey, json.sessionId, topic);
       } else {
         setError(t.errGeneric);
       }

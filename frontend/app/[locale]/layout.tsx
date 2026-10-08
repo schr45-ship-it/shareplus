@@ -13,6 +13,7 @@ import { GoogleAnalytics } from "@/components/google-analytics";
 import { AdSenseScript } from "@/components/adsense-banner";
 import { Footer } from "@/components/footer";
 import { CookieBanner } from "@/components/cookie-banner";
+import { ChromeGate } from "@/components/chrome-gate";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -78,10 +79,14 @@ export default async function LocaleLayout({ children, params }: Props) {
       <body className="min-h-full flex flex-col bg-white text-foreground">
         <LocaleDirection locale={locale}>
           <NextIntlClientProvider locale={locale} messages={messages}>
-            <Navbar />
-            <CategoryNav locale={locale} />
+            <ChromeGate>
+              <Navbar />
+              <CategoryNav locale={locale} />
+            </ChromeGate>
             <main className="flex-1">{children}</main>
-            <Footer locale={locale} />
+            <ChromeGate>
+              <Footer locale={locale} />
+            </ChromeGate>
             <CookieBanner locale={locale} />
           </NextIntlClientProvider>
         </LocaleDirection>
