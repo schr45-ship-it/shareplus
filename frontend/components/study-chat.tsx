@@ -37,6 +37,10 @@ const texts: Record<
     joinBtn: string;
     loggedAs: (name: string) => string;
     greeting: (topic: string) => string;
+    share: string;
+    copyLink: string;
+    embed: string;
+    copied: string;
   }
 > = {
   he: {
@@ -67,6 +71,10 @@ const texts: Record<
     joinTitle: "איך קוראים לך?",
     joinBtn: "הצטרף לדיון",
     loggedAs: (name) => `השם המחובר כרגע: ${name}`,
+    share: "שתף דיון",
+    copyLink: "העתק קישור",
+    embed: "העתק קוד הטמעה",
+    copied: "הועתק!",
     greeting: (topic) =>
       `שלום! אני החברותא שלך 📖 בחרת ללמוד על **${topic}**. איך תרצה שנתחיל את הלימוד?`,
   },
@@ -99,6 +107,10 @@ const texts: Record<
     joinTitle: "What's your name?",
     joinBtn: "Join the discussion",
     loggedAs: (name) => `Currently logged in as: ${name}`,
+    share: "Share discussion",
+    copyLink: "Copy link",
+    embed: "Copy embed code",
+    copied: "Copied!",
     greeting: (topic) =>
       `Shalom! I'm your havruta 📖 You chose to study **${topic}**. How would you like to begin?`,
   },
@@ -131,6 +143,10 @@ const texts: Record<
     joinTitle: "¿Cómo te llamas?",
     joinBtn: "Unirse a la discusión",
     loggedAs: (name) => `Conectado como: ${name}`,
+    share: "Compartir discusión",
+    copyLink: "Copiar enlace",
+    embed: "Copiar código de inserción",
+    copied: "¡Copiado!",
     greeting: (topic) =>
       `¡Shalom! Soy tu javruta 📖 Elegiste estudiar **${topic}**. ¿Cómo quieres comenzar?`,
   },
@@ -163,6 +179,10 @@ const texts: Record<
     joinTitle: "ما اسمك؟",
     joinBtn: "انضم إلى النقاش",
     loggedAs: (name) => `الاسم الحالي: ${name}`,
+    share: "مشاركة النقاش",
+    copyLink: "نسخ الرابط",
+    embed: "نسخ كود التضمين",
+    copied: "تم النسخ!",
     greeting: (topic) =>
       `شالوم! أنا شريكك في الدراسة 📖 اخترت دراسة **${topic}**. كيف تريد أن نبدأ؟`,
   },
@@ -294,6 +314,8 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
   const [recent, setRecent] = useState<SavedSession[]>([]);
   const [community, setCommunity] = useState<CommunitySession[]>([]);
   const [joinPrompt, setJoinPrompt] = useState<CommunitySession | null>(null);
+  const [showShare, setShowShare] = useState(false);
+  const [copied, setCopied] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<{ stop: () => void } | null>(null);
 
@@ -306,6 +328,9 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
       .then((r) => r.json())
       .then((j) => setCommunity(Array.isArray(j.sessions) ? j.sessions : []))
       .catch(() => {});
+    const shared = new URLSearchParams(window.location.search).get("s");
+    if (shared && /^[0-9a-f-]{36}$/.test(shared)) resume(shared, "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -313,6 +338,21 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
   }, [messages, loading]);
 
   useEffect(() => () => recognitionRef.current?.stop(), []);
+
+  const pagePath = tool === "teacher" ? "teacher" : "havruta";
+  const shareUrl =
+    typeof window !== "undefined"
+      ? `${window.location.origin}/${locale}/${pagePath}${sessionId ? `?s=${sessionId}` : ""}`
+      : "";
+  const embedCode = `<iframe src="${shareUrl}" width="100%" height="650" style="border:1px solid #e5e7eb;border-radius:12px" loading="lazy"></iframe>`;
+
+  async function copyText(text: string, key: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(key);
+      setTimeout(() => setCopied(null), 1600);
+    } catch {}
+  }
 
   function goHome() {
     setStarted(false);
@@ -613,12 +653,47 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
           📖 <span className="font-bold">{t.title}</span> · {topic}
           {authorName.trim() ? ` · ${authorName.trim()}` : ""}
         </div>
-        <button
-          onClick={goHome}
-          className="text-xs text-amber-700 hover:underline"
-        >
-          {t.newTopic}
-        </button>
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <button
+              onClick={() => setShowShare((v) => !v)}
+              title={t.share}
+              className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-medium text-amber-800 hover:bg-amber-100"
+            >
+              ⤴ {t.share}
+            </button>
+            {showShare && (
+              <div className="absolute end-0 top-full z-30 mt-1 w-52 rounded-xl border border-zinc-200 bg-white p-2 shadow-lg">
+                <a
+                  href={`https://wa.me/?text=${encodeURIComponent(`💬 ${topic}\n${shareUrl}`)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block rounded-lg px-3 py-2 text-xs text-zinc-700 hover:bg-amber-50"
+                >
+                  🟢 WhatsApp
+                </a>
+                <button
+                  onClick={() => copyText(shareUrl, "link")}
+                  className="block w-full rounded-lg px-3 py-2 text-start text-xs text-zinc-700 hover:bg-amber-50"
+                >
+                  {copied === "link" ? `✅ ${t.copied}` : `🔗 ${t.copyLink}`}
+                </button>
+                <button
+                  onClick={() => copyText(embedCode, "embed")}
+                  className="block w-full rounded-lg px-3 py-2 text-start text-xs text-zinc-700 hover:bg-amber-50"
+                >
+                  {copied === "embed" ? `✅ ${t.copied}` : `📐 ${t.embed}`}
+                </button>
+              </div>
+            )}
+          </div>
+          <button
+            onClick={goHome}
+            className="text-xs text-amber-700 hover:underline"
+          >
+            {t.newTopic}
+          </button>
+        </div>
       </div>
 
       <div className="min-h-64 space-y-4 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
