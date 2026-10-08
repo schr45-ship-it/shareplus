@@ -187,6 +187,24 @@ function saveSession(sid: string, topic: string) {
   } catch {}
 }
 
+// WhatsApp-style: consistent color per participant name
+const AUTHOR_COLORS = [
+  "text-emerald-600",
+  "text-sky-600",
+  "text-rose-600",
+  "text-violet-600",
+  "text-orange-600",
+  "text-teal-600",
+  "text-pink-600",
+  "text-indigo-600",
+];
+
+function authorColor(name: string): string {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  return AUTHOR_COLORS[h % AUTHOR_COLORS.length];
+}
+
 export function HavrutaChat({ locale }: { locale: string }) {
   const t = texts[locale] ?? texts.he;
   const [topic, setTopic] = useState("");
@@ -532,8 +550,10 @@ export function HavrutaChat({ locale }: { locale: string }) {
                   : "rounded-tr-sm bg-amber-600 text-white"
               }`}
             >
-              {m.role === "user" && m.author && (
-                <div className="mb-1 text-[10px] font-semibold text-amber-700">{m.author}</div>
+              {m.role === "user" && (
+                <div className={`mb-1 text-[11px] font-bold ${authorColor(m.author || t.guest)}`}>
+                  {m.author || t.guest}
+                </div>
               )}
               {m.text}
             </div>
