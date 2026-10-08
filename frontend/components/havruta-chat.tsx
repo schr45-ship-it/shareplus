@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-type Msg = { role: "user" | "model"; text: string };
+type Msg = { role: "user" | "model"; text: string; author?: string };
 type SavedSession = { id: string; topic: string; updated: number };
 type CommunitySession = { id: string; topic: string; locale: string; author_name: string | null; updated_at: string; messages: number };
 
@@ -32,6 +32,8 @@ const texts: Record<
     errRate: string;
     recent: string;
     community: string;
+    joinTitle: string;
+    joinBtn: string;
     greeting: (topic: string) => string;
   }
 > = {
@@ -60,6 +62,8 @@ const texts: Record<
     errRate: "הגעת למגבלת ההודעות לשעה. נסה שוב מאוחר יותר.",
     recent: "הדיונים שלי",
     community: "דיונים אחרונים בקהילה",
+    joinTitle: "איך קוראים לך?",
+    joinBtn: "הצטרף לדיון",
     greeting: (topic) =>
       `שלום! אני החברותא שלך 📖 בחרת ללמוד על **${topic}**. איך תרצה שנתחיל את הלימוד?`,
   },
@@ -89,6 +93,8 @@ const texts: Record<
     errRate: "You reached the hourly message limit. Try again later.",
     recent: "My discussions",
     community: "Recent community discussions",
+    joinTitle: "What's your name?",
+    joinBtn: "Join the discussion",
     greeting: (topic) =>
       `Shalom! I'm your havruta 📖 You chose to study **${topic}**. How would you like to begin?`,
   },
@@ -118,6 +124,8 @@ const texts: Record<
     errRate: "Alcanzaste el límite de mensajes por hora.",
     recent: "Mis discusiones",
     community: "Discusiones recientes de la comunidad",
+    joinTitle: "¿Cómo te llamas?",
+    joinBtn: "Unirse a la discusión",
     greeting: (topic) =>
       `¡Shalom! Soy tu javruta 📖 Elegiste estudiar **${topic}**. ¿Cómo quieres comenzar?`,
   },
@@ -147,6 +155,8 @@ const texts: Record<
     errRate: "وصلت إلى حد الرسائل في الساعة.",
     recent: "نقاشاتي",
     community: "نقاشات المجتمع الأخيرة",
+    joinTitle: "ما اسمك؟",
+    joinBtn: "انضم إلى النقاش",
     greeting: (topic) =>
       `شالوم! أنا شريكك في الدراسة 📖 اخترت دراسة **${topic}**. كيف تريد أن نبدأ؟`,
   },
@@ -191,6 +201,7 @@ export function HavrutaChat({ locale }: { locale: string }) {
   const [listening, setListening] = useState(false);
   const [recent, setRecent] = useState<SavedSession[]>([]);
   const [community, setCommunity] = useState<CommunitySession[]>([]);
+  const [joinPrompt, setJoinPrompt] = useState<CommunitySession | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<{ stop: () => void } | null>(null);
 
@@ -260,7 +271,10 @@ export function HavrutaChat({ locale }: { locale: string }) {
   async function send(text?: string) {
     const content = (text ?? input).trim();
     if (!content || loading) return;
-    const next: Msg[] = [...messages, { role: "user", text: content }];
+    const next: Msg[] = [
+      ...messages,
+      { role: "user", text: content, author: authorName.trim() || undefined },
+    ];
     setMessages(next);
     setInput("");
     setError(null);
@@ -417,7 +431,7 @@ export function HavrutaChat({ locale }: { locale: string }) {
                 {community.map((s) => (
                   <button
                     key={s.id}
-                    onClick={() => resume(s.id, s.topic)}
+                    onClick={() => setJoinPrompt(s)}
                     disabled={loading}
                     className="flex w-full items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-start text-xs text-zinc-700 hover:border-amber-400 hover:bg-amber-50 disabled:opacity-50"
                   >
@@ -431,6 +445,58 @@ export function HavrutaChat({ locale }: { locale: string }) {
             </div>
           )}
         </div>
+
+        {joinPrompt && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setJoinPrompt(null);
+            }}
+          >
+            <div className="w-full max-w-sm rounded-2xl border border-amber-200 bg-white p-6 shadow-xl">
+              <h3 className="mb-1 text-lg font-bold text-zinc-900">{t.joinTitle}</h3>
+              <p className="mb-4 truncate text-xs text-zinc-500">
+                💬 {joinPrompt.topic}
+              </p>
+              <input
+                autoFocus
+                value={authorName}
+                onChange={(e) => {
+                  setAuthorName(e.target.value);
+                  try {
+                    localStorage.setItem(NAME_KEY, e.target.value);
+                  } catch {}
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    resume(joinPrompt.id, joinPrompt.topic);
+                    setJoinPrompt(null);
+                  }
+                }}
+                placeholder={t.namePlaceholder}
+                className="mb-4 w-full rounded-xl border border-zinc-300 px-4 py-3 text-sm focus:border-amber-400 focus:outline-none"
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    resume(joinPrompt.id, joinPrompt.topic);
+                    setJoinPrompt(null);
+                  }}
+                  className="flex-1 rounded-xl bg-amber-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-amber-700"
+                >
+                  {t.joinBtn}
+                </button>
+                <button
+                  onClick={() => setJoinPrompt(null)}
+                  className="rounded-xl border border-zinc-200 px-4 py-2.5 text-sm text-zinc-600 hover:bg-zinc-50"
+                >
+                  {t.back}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -466,6 +532,9 @@ export function HavrutaChat({ locale }: { locale: string }) {
                   : "rounded-tr-sm bg-amber-600 text-white"
               }`}
             >
+              {m.role === "user" && m.author && (
+                <div className="mb-1 text-[10px] font-semibold text-amber-700">{m.author}</div>
+              )}
               {m.text}
             </div>
           </div>

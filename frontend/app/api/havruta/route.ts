@@ -86,7 +86,12 @@ async function persist(
         method: "POST",
         headers: { ...dbHeaders, Prefer: "return=minimal" },
         body: JSON.stringify(
-          newMessages.map((m) => ({ session_id: sid, role: m.role, content: m.text })),
+          newMessages.map((m) => ({
+            session_id: sid,
+            role: m.role,
+            content: m.text,
+            author_name: m.role === "user" ? fields.author || null : null,
+          })),
         ),
       });
       await fetch(
@@ -233,7 +238,7 @@ export async function GET(req: NextRequest) {
         headers: dbHeaders,
       }),
       fetch(
-        `${SUPABASE_URL}/rest/v1/havruta_messages?session_id=eq.${id}&select=role,content,created_at&order=created_at.asc`,
+        `${SUPABASE_URL}/rest/v1/havruta_messages?session_id=eq.${id}&select=role,content,author_name,created_at&order=created_at.asc`,
         { headers: dbHeaders },
       ),
     ]);
@@ -242,7 +247,11 @@ export async function GET(req: NextRequest) {
     if (!session) return NextResponse.json({ error: "not_found" }, { status: 404 });
     const rows = await mRes.json();
     const messages: Msg[] = (Array.isArray(rows) ? rows : []).map(
-      (r: { role: string; content: string }) => ({ role: r.role, text: r.content }),
+      (r: { role: string; content: string; author_name: string | null }) => ({
+        role: r.role,
+        text: r.content,
+        author: r.author_name ?? undefined,
+      }),
     );
     return NextResponse.json({ session, messages });
   } catch {
