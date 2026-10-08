@@ -281,15 +281,55 @@ const AUTHOR_COLORS = [
   "text-indigo-600",
 ];
 
-// Render **bold** markers as real bold (older messages contain them)
+// Light markdown: **bold**, *italic*
+function renderInline(text: string): React.ReactNode {
+  return text.split(/(\*\*[^*]+\*\*|\*[^*\n]+\*)/g).map((part, i) => {
+    if (part.length > 4 && part.startsWith("**") && part.endsWith("**"))
+      return <strong key={i}>{part.slice(2, -2)}</strong>;
+    if (part.length > 2 && part.startsWith("*") && part.endsWith("*"))
+      return <em key={i}>{part.slice(1, -1)}</em>;
+    return part;
+  });
+}
+
+// Block-level render: ## headers, bullets, numbered lists, paragraphs
 function renderText(text: string): React.ReactNode {
-  return text.split(/(\*\*[^*]+\*\*)/g).map((part, i) =>
-    part.length > 4 && part.startsWith("**") && part.endsWith("**") ? (
-      <strong key={i}>{part.slice(2, -2)}</strong>
-    ) : (
-      part
-    ),
-  );
+  return text.split("\n").map((line, i) => {
+    const t = line.trim();
+    if (!t) return <div key={i} className="h-1.5" />;
+    const h = t.match(/^(#{1,3})\s+(.*)/);
+    if (h) {
+      const cls = h[1].length === 1
+        ? "text-base font-bold"
+        : h[1].length === 2
+          ? "text-[15px] font-bold"
+          : "text-sm font-bold";
+      return (
+        <div key={i} className={`${cls} mt-1.5 opacity-95`}>
+          {renderInline(h[2])}
+        </div>
+      );
+    }
+    const bullet = t.match(/^[-•*]\s+(.*)/);
+    if (bullet) {
+      return (
+        <div key={i} className="flex gap-2 ps-1">
+          <span className="shrink-0">•</span>
+          <span className="flex-1">{renderInline(bullet[1])}</span>
+        </div>
+      );
+    }
+    const num = t.match(/^(\d+)[.)]\s+(.*)/);
+    if (num) {
+      return (
+        <div key={i} className="flex gap-2 ps-1">
+          <span className="shrink-0 font-semibold">{num[1]}.</span>
+          <span className="flex-1">{renderInline(num[2])}</span>
+        </div>
+      );
+    }
+    return <div key={i}>{renderInline(t)}</div>;
+  });
 }
 
 function authorColor(name: string): string {
@@ -469,7 +509,7 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
         return;
       }
       synth.cancel();
-      const u = new SpeechSynthesisUtterance(text);
+      const u = new SpeechSynthesisUtterance(text.replace(/[#*`]/g, ""));
       u.lang = SPEECH_LANG[locale] ?? "he-IL";
       u.onend = () => setSpeakingIdx(null);
       u.onerror = () => setSpeakingIdx(null);
