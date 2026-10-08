@@ -281,6 +281,17 @@ const AUTHOR_COLORS = [
   "text-indigo-600",
 ];
 
+// Render **bold** markers as real bold (older messages contain them)
+function renderText(text: string): React.ReactNode {
+  return text.split(/(\*\*[^*]+\*\*)/g).map((part, i) =>
+    part.length > 4 && part.startsWith("**") && part.endsWith("**") ? (
+      <strong key={i}>{part.slice(2, -2)}</strong>
+    ) : (
+      part
+    ),
+  );
+}
+
 function authorColor(name: string): string {
   let h = 0;
   for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
@@ -1188,7 +1199,7 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
                   className="mb-2 max-h-56 w-auto rounded-lg border border-black/10"
                 />
               )}
-              {m.text !== "[image]" && m.text}
+              {m.text !== "[image]" && renderText(m.text)}
               {m.text === "[image]" && !m.image && <span className="italic opacity-60">📷</span>}
               {m.text && m.text !== "[image]" && (
               <span className="mt-1.5 flex items-center gap-2">
