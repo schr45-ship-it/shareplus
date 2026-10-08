@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-type Msg = { role: "user" | "model"; text: string; author?: string; image?: string };
+type Msg = { id?: string; role: "user" | "model"; text: string; author?: string; image?: string };
 type SavedSession = { id: string; topic: string; updated: number };
 type CommunitySession = { id: string; topic: string; locale: string; author_name: string | null; updated_at: string; messages: number };
 
@@ -358,6 +358,7 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
   const [copied, setCopied] = useState<string | null>(null);
   const [speakingIdx, setSpeakingIdx] = useState<number | null>(null);
   const [pendingImage, setPendingImage] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<{ stop: () => void } | null>(null);
@@ -366,6 +367,7 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
     setRecent(loadSaved(storageKey));
     try {
       setAuthorName(localStorage.getItem(NAME_KEY) ?? "");
+      setIsAdmin(!!localStorage.getItem("admin_token"));
     } catch {}
     fetch(`/api/havruta?list=recent&tool=${tool}`)
       .then((r) => r.json())
@@ -418,6 +420,56 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
       await navigator.clipboard.writeText(text);
       setCopied(key);
       setTimeout(() => setCopied(null), 1600);
+    } catch {}
+  }
+
+  const adminTxt = {
+    he: { del: "מחק דיון", confirmDel: "למחוק את הדיון לצמיתות?", edit: "ערוך הודעה", promptEdit: "ערוך את ההודעה:" },
+    en: { del: "Delete discussion", confirmDel: "Delete this discussion permanently?", edit: "Edit message", promptEdit: "Edit the message:" },
+    es: { del: "Eliminar discusión", confirmDel: "¿Eliminar esta discusión permanentemente?", edit: "Editar mensaje", promptEdit: "Editar el mensaje:" },
+    ar: { del: "حذف النقاش", confirmDel: "حذف هذا النقاش نهائيًا؟", edit: "تحرير الرسالة", promptEdit: "حرر الرسالة:" },
+  }[locale] ?? { del: "Delete discussion", confirmDel: "Delete this discussion permanently?", edit: "Edit message", promptEdit: "Edit the message:" };
+
+  function adminHeaders(): HeadersInit {
+    try {
+      const token = localStorage.getItem("admin_token") ?? "";
+      return token ? { "x-admin-token": token } : {};
+    } catch {
+      return {};
+    }
+  }
+
+  async function deleteSession(sid: string) {
+    if (!window.confirm(adminTxt.confirmDel)) return;
+    try {
+      const res = await fetch(`/api/havruta?session=${sid}`, {
+        method: "DELETE",
+        headers: adminHeaders(),
+      });
+      if (!res.ok) return;
+      setCommunity((prev) => prev.filter((s) => s.id !== sid));
+      try {
+        const list = loadSaved(storageKey).filter((s) => s.id !== sid);
+        localStorage.setItem(storageKey, JSON.stringify(list));
+        setRecent(list);
+      } catch {}
+      if (sessionId === sid) goHome();
+    } catch {}
+  }
+
+  async function editMessage(idx: number) {
+    const m = messages[idx];
+    if (!m?.id) return;
+    const next = window.prompt(adminTxt.promptEdit, m.text);
+    if (next === null || !next.trim()) return;
+    try {
+      const res = await fetch("/api/havruta", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...adminHeaders() },
+        body: JSON.stringify({ id: m.id, content: next.trim() }),
+      });
+      if (!res.ok) return;
+      setMessages((prev) => prev.map((mm, i) => (i === idx ? { ...mm, text: next.trim() } : mm)));
     } catch {}
   }
 
@@ -571,7 +623,7 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
     const rec = new SR();
     rec.lang = SPEECH_LANG[locale] ?? "he-IL";
     rec.interimResults = true;
-    rec.continuous = true;
+    rec.continuous = false;
     const base = input ? `${input} ` : "";
     rec.onresult = (e) => {
       let finals = "";
@@ -684,14 +736,24 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
               <p className="mb-2 text-xs font-medium text-zinc-500">{t.recent}</p>
               <div className="flex flex-wrap gap-2">
                 {recent.map((s) => (
-                  <button
-                    key={s.id}
-                    onClick={() => resume(s.id, s.topic)}
-                    disabled={loading}
-                    className="max-w-56 truncate rounded-full border border-zinc-200 bg-white px-4 py-2 text-xs text-zinc-600 hover:border-amber-400 hover:bg-amber-50 disabled:opacity-50"
-                  >
-                    💬 {s.topic}
-                  </button>
+                  <div key={s.id} className="flex items-center">
+                    <button
+                      onClick={() => resume(s.id, s.topic)}
+                      disabled={loading}
+                      className="max-w-56 truncate rounded-full border border-zinc-200 bg-white px-4 py-2 text-xs text-zinc-600 hover:border-amber-400 hover:bg-amber-50 disabled:opacity-50"
+                    >
+                      💬 {s.topic}
+                    </button>
+                    {isAdmin && (
+                      <button
+                        onClick={() => deleteSession(s.id)}
+                        title={adminTxt.del}
+                        className="-ms-2 rounded-full px-1 text-xs text-zinc-400 hover:text-red-600"
+                      >
+                        🗑️
+                      </button>
+                    )}
+                  </div>
                 ))}
               </div>
             </div>
@@ -702,17 +764,27 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
               <p className="mb-2 text-xs font-medium text-zinc-500">{t.community}</p>
               <div className="space-y-2">
                 {community.map((s) => (
-                  <button
-                    key={s.id}
-                    onClick={() => setJoinPrompt(s)}
-                    disabled={loading}
-                    className="flex w-full items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-start text-xs text-zinc-700 hover:border-amber-400 hover:bg-amber-50 disabled:opacity-50"
-                  >
-                    <span className="truncate font-medium">💬 {s.topic}</span>
-                    <span className="shrink-0 text-zinc-400">
-                      {s.author_name || t.guest} · {s.messages} ✉
-                    </span>
-                  </button>
+                  <div key={s.id} className="flex items-center gap-1">
+                    <button
+                      onClick={() => setJoinPrompt(s)}
+                      disabled={loading}
+                      className="flex w-full items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-start text-xs text-zinc-700 hover:border-amber-400 hover:bg-amber-50 disabled:opacity-50"
+                    >
+                      <span className="truncate font-medium">💬 {s.topic}</span>
+                      <span className="shrink-0 text-zinc-400">
+                        {s.author_name || t.guest} · {s.messages} ✉
+                      </span>
+                    </button>
+                    {isAdmin && (
+                      <button
+                        onClick={() => deleteSession(s.id)}
+                        title={adminTxt.del}
+                        className="shrink-0 rounded-lg border border-red-200 bg-white px-2 py-2 text-xs text-red-500 hover:bg-red-50"
+                      >
+                        🗑️
+                      </button>
+                    )}
+                  </div>
                 ))}
               </div>
             </div>
@@ -833,6 +905,15 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
           >
             {t.newTopic}
           </button>
+          {isAdmin && sessionId && (
+            <button
+              onClick={() => deleteSession(sessionId)}
+              title={adminTxt.del}
+              className="rounded-lg border border-red-200 bg-white px-2 py-1.5 text-xs text-red-500 hover:bg-red-50"
+            >
+              🗑️
+            </button>
+          )}
         </div>
       </div>
 
@@ -861,16 +942,30 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
               {m.text !== "[image]" && m.text}
               {m.text === "[image]" && !m.image && <span className="italic opacity-60">📷</span>}
               {m.text && m.text !== "[image]" && (
-              <button
-                type="button"
-                onClick={() => speak(i, m.text)}
-                title={speakingIdx === i ? "⏹" : "🔊"}
-                className={`mt-1.5 block text-[11px] transition-opacity ${
-                  m.role === "model" ? "text-amber-100" : "text-zinc-400"
-                } ${speakingIdx === i ? "opacity-100" : "opacity-50 hover:opacity-100"}`}
-              >
-                {speakingIdx === i ? "⏹" : "🔊"}
-              </button>
+              <span className="mt-1.5 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => speak(i, m.text)}
+                  title={speakingIdx === i ? "⏹" : "🔊"}
+                  className={`text-[11px] transition-opacity ${
+                    m.role === "model" ? "text-amber-100" : "text-zinc-400"
+                  } ${speakingIdx === i ? "opacity-100" : "opacity-50 hover:opacity-100"}`}
+                >
+                  {speakingIdx === i ? "⏹" : "🔊"}
+                </button>
+                {isAdmin && m.id && (
+                  <button
+                    type="button"
+                    onClick={() => editMessage(i)}
+                    title={adminTxt.edit}
+                    className={`text-[11px] transition-opacity opacity-50 hover:opacity-100 ${
+                      m.role === "model" ? "text-amber-100" : "text-zinc-400"
+                    }`}
+                  >
+                    ✏️
+                  </button>
+                )}
+              </span>
               )}
             </div>
           </div>

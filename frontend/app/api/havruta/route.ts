@@ -152,7 +152,7 @@ async function persist(
   }
 }
 
-type Msg = { role: string; text: string; image?: string };
+type Msg = { id?: string; role: string; text: string; image?: string };
 
 function imageParts(image: string): { mime: string; data: string } | null {
   const m = /^data:(image\/[a-zA-Z+]+);base64,(.+)$/.exec(image);
@@ -301,7 +301,7 @@ export async function GET(req: NextRequest) {
         headers: dbHeaders,
       }),
       fetch(
-        `${SUPABASE_URL}/rest/v1/havruta_messages?session_id=eq.${id}&select=role,content,author_name,image_url,created_at&order=created_at.asc`,
+        `${SUPABASE_URL}/rest/v1/havruta_messages?session_id=eq.${id}&select=id,role,content,author_name,image_url,created_at&order=created_at.asc`,
         { headers: dbHeaders },
       ),
     ]);
@@ -310,7 +310,8 @@ export async function GET(req: NextRequest) {
     if (!session) return NextResponse.json({ error: "not_found" }, { status: 404 });
     const rows = await mRes.json();
     const messages: Msg[] = (Array.isArray(rows) ? rows : []).map(
-      (r: { role: string; content: string; author_name: string | null; image_url: string | null }) => ({
+      (r: { id: string; role: string; content: string; author_name: string | null; image_url: string | null }) => ({
+        id: r.id,
         role: r.role,
         text: r.content,
         author: r.author_name ?? undefined,
@@ -318,6 +319,71 @@ export async function GET(req: NextRequest) {
       }),
     );
     return NextResponse.json({ session, messages });
+  } catch {
+    return NextResponse.json({ error: "failed" }, { status: 500 });
+  }
+}
+
+async function adminAuthorized(req: NextRequest): Promise<boolean> {
+  const token = req.headers.get("x-admin-token") ?? "";
+  if (!token || !SUPABASE_URL || !SERVICE_KEY) return false;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/admin_check`, {
+      method: "POST",
+      headers: dbHeaders,
+      body: JSON.stringify({ p_token: token }),
+    });
+    return res.ok && (await res.json()) === true;
+  } catch {
+    return false;
+  }
+}
+
+// Admin: delete a discussion (messages cascade)
+export async function DELETE(req: NextRequest) {
+  if (!(await adminAuthorized(req))) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+  const id = req.nextUrl.searchParams.get("session") ?? "";
+  if (!/^[0-9a-f-]{36}$/.test(id)) {
+    return NextResponse.json({ error: "invalid id" }, { status: 400 });
+  }
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/havruta_sessions?id=eq.${id}`, {
+      method: "DELETE",
+      headers: dbHeaders,
+    });
+    if (!res.ok) return NextResponse.json({ error: "delete failed" }, { status: 500 });
+    return NextResponse.json({ ok: true });
+  } catch {
+    return NextResponse.json({ error: "failed" }, { status: 500 });
+  }
+}
+
+// Admin: edit a single message's content
+export async function PATCH(req: NextRequest) {
+  if (!(await adminAuthorized(req))) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+  let body: { id?: string; content?: string };
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "invalid" }, { status: 400 });
+  }
+  const id = String(body.id || "");
+  const content = String(body.content || "").trim().slice(0, MAX_MSG_LEN * 4);
+  if (!/^[0-9a-f-]{36}$/.test(id) || !content) {
+    return NextResponse.json({ error: "invalid" }, { status: 400 });
+  }
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/havruta_messages?id=eq.${id}`, {
+      method: "PATCH",
+      headers: { ...dbHeaders, Prefer: "return=minimal" },
+      body: JSON.stringify({ content }),
+    });
+    if (!res.ok) return NextResponse.json({ error: "update failed" }, { status: 500 });
+    return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json({ error: "failed" }, { status: 500 });
   }
