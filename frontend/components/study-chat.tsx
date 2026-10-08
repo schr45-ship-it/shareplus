@@ -581,7 +581,19 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
       if (res.status === 429) {
         setError(t.errRate);
       } else if (json.reply) {
-        setMessages([...next, { role: "model", text: json.reply }]);
+        const finalMsgs: Msg[] = [...next, { role: "model", text: json.reply }];
+        const ids: (string | undefined)[] = Array.isArray(json.messageIds) ? json.messageIds : [];
+        if (sessionId) {
+          // Existing session — only the last user message and the reply were persisted
+          if (ids[0]) finalMsgs[finalMsgs.length - 2].id = ids[0];
+          if (ids[1]) finalMsgs[finalMsgs.length - 1].id = ids[1];
+        } else {
+          // New session — every message was persisted in order
+          ids.forEach((id, i) => {
+            if (id && finalMsgs[i]) finalMsgs[i].id = id;
+          });
+        }
+        setMessages(finalMsgs);
         if (json.sessionId && json.sessionId !== sessionId) {
           setSessionId(json.sessionId);
         }

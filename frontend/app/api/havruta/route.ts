@@ -100,7 +100,7 @@ async function persist(
   sessionId: string | null,
   fields: { topic?: string; source?: string; locale?: string; author?: string; tool?: string },
   newMessages: { role: "user" | "model"; text: string; image?: string }[],
-): Promise<string | null> {
+): Promise<{ sid: string | null; ids: string[] } | null> {
   if (!SUPABASE_URL || !SERVICE_KEY) return null;
   try {
     let sid = sessionId;
@@ -122,6 +122,7 @@ async function persist(
     }
     if (!sid) return null;
 
+    const ids: string[] = [];
     if (newMessages.length) {
       const rows = await Promise.all(
         newMessages.map(async (m) => ({
@@ -132,11 +133,15 @@ async function persist(
           image_url: m.image ? await uploadChatImage(m.image) : null,
         })),
       );
-      await fetch(`${SUPABASE_URL}/rest/v1/havruta_messages`, {
+      const insRes = await fetch(`${SUPABASE_URL}/rest/v1/havruta_messages`, {
         method: "POST",
-        headers: { ...dbHeaders, Prefer: "return=minimal" },
+        headers: { ...dbHeaders, Prefer: "return=representation" },
         body: JSON.stringify(rows),
       });
+      const inserted = await insRes.json().catch(() => []);
+      if (Array.isArray(inserted)) {
+        for (const r of inserted) if (r?.id) ids.push(r.id);
+      }
       await fetch(
         `${SUPABASE_URL}/rest/v1/havruta_sessions?id=eq.${sid}`,
         {
@@ -146,7 +151,7 @@ async function persist(
         },
       );
     }
-    return sid;
+    return { sid, ids };
   } catch {
     return null;
   }
@@ -240,14 +245,18 @@ export async function POST(req: NextRequest) {
           .join("")
           .trim() ?? "";
       if (reply) {
-        const sid = await persist(
+        const persisted = await persist(
           sessionId,
           { topic, source, locale, author: authorName, tool },
           sessionId
             ? [messages[messages.length - 1] as { role: "user" | "model"; text: string; image?: string }, { role: "model", text: reply }]
             : [...messages as { role: "user" | "model"; text: string; image?: string }[], { role: "model", text: reply }],
         );
-        return NextResponse.json({ reply, sessionId: sid ?? sessionId });
+        return NextResponse.json({
+          reply,
+          sessionId: persisted?.sid ?? sessionId,
+          messageIds: persisted?.ids ?? [],
+        });
       }
     } catch {
       // try next model
