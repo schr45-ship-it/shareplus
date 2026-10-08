@@ -40,6 +40,18 @@ const LANG_NAME: Record<string, string> = {
 
 function systemPrompt(tool: string, locale: string, topic: string, source: string): string {
   const lang = LANG_NAME[locale] ?? "Hebrew";
+  if (tool === "shadchan") {
+    return [
+      "You are 'Shadchan AI' — a warm, insightful matchmaker conducting a personal interview.",
+      "Your job: get to know the person deeply through friendly conversation. Ask ONE focused question at a time — never a list of questions. Cover gradually: personality traits, hobbies and interests, family background, religiosity/observance level, culture/nationality, values, career and education, life aspirations, lifestyle, and what they're looking for in a partner.",
+      "Be curious and empathetic — react briefly to each answer, ask a natural follow-up, dig deeper on interesting points. React like a real conversation, not a questionnaire.",
+      "When you have gathered enough (usually after ~12–18 of their answers), tell them you're wrapping up and produce a structured final summary with two sections:",
+      "1) 'Your profile' — who they are: personality, values, background, lifestyle, what they seek in a partner.",
+      "2) 'What to check on the other side' — a concrete checklist: compatibility flags, questions to ask a potential match, qualities that fit them, and red flags worth noticing for this specific person.",
+      "If they shared their name, use it warmly. Keep replies short — a brief reaction plus one question.",
+      `Always respond in ${lang}.`,
+    ].filter(Boolean).join("\n");
+  }
   if (tool === "teacher") {
     return [
       "You are 'My Teacher' — a patient, expert private tutor who adapts to the student's level.",
@@ -147,7 +159,7 @@ export async function POST(req: NextRequest) {
   const source = String(body.source || "").trim().slice(0, MAX_SOURCE_LEN);
   const locale = ["he", "en", "es", "ar"].includes(body.locale ?? "") ? body.locale! : "he";
   const authorName = String(body.authorName || "").trim().slice(0, 80);
-  const tool = ["havruta", "teacher"].includes(body.tool ?? "") ? body.tool! : "havruta";
+  const tool = ["havruta", "teacher", "shadchan"].includes(body.tool ?? "") ? body.tool! : "havruta";
   const sessionId =
     typeof body.sessionId === "string" && /^[0-9a-f-]{36}$/.test(body.sessionId)
       ? body.sessionId
@@ -219,9 +231,11 @@ export async function GET(req: NextRequest) {
 
   // Public list of recent discussions for the community board
   if (req.nextUrl.searchParams.get("list") === "recent") {
-    const toolFilter = /^[a-z]+$/.test(req.nextUrl.searchParams.get("tool") ?? "")
-      ? `&tool=eq.${req.nextUrl.searchParams.get("tool")}`
-      : "";
+    // Shadchan sessions are private — never listed publicly
+    const raw = req.nextUrl.searchParams.get("tool") ?? "";
+    const toolFilter = ["havruta", "teacher"].includes(raw)
+      ? `&tool=eq.${raw}`
+      : `&tool=in.(havruta,teacher)`;
     try {
       const res = await fetch(
         `${SUPABASE_URL}/rest/v1/havruta_sessions?select=id,topic,locale,author_name,updated_at,havruta_messages(count)&order=updated_at.desc&limit=12${toolFilter}`,

@@ -8,7 +8,7 @@ type CommunitySession = { id: string; topic: string; locale: string; author_name
 
 const NAME_KEY = "havruta_name";
 
-export type StudyTool = "havruta" | "teacher";
+export type StudyTool = "havruta" | "teacher" | "shadchan";
 
 const texts: Record<
   string,
@@ -35,6 +35,8 @@ const texts: Record<
     community: string;
     joinTitle: string;
     joinBtn: string;
+    backToTools: string;
+    startInterview: string;
     loggedAs: (name: string) => string;
     greeting: (topic: string) => string;
     share: string;
@@ -70,6 +72,8 @@ const texts: Record<
     community: "דיונים אחרונים בקהילה",
     joinTitle: "איך קוראים לך?",
     joinBtn: "הצטרף לדיון",
+    backToTools: "כל הכלי AI",
+    startInterview: "התחל ראיון",
     loggedAs: (name) => `השם המחובר כרגע: ${name}`,
     share: "שתף דיון",
     copyLink: "העתק קישור",
@@ -106,6 +110,8 @@ const texts: Record<
     community: "Recent community discussions",
     joinTitle: "What's your name?",
     joinBtn: "Join the discussion",
+    backToTools: "All AI tools",
+    startInterview: "Start interview",
     loggedAs: (name) => `Currently logged in as: ${name}`,
     share: "Share discussion",
     copyLink: "Copy link",
@@ -142,6 +148,8 @@ const texts: Record<
     community: "Discusiones recientes de la comunidad",
     joinTitle: "¿Cómo te llamas?",
     joinBtn: "Unirse a la discusión",
+    backToTools: "Todas las herramientas AI",
+    startInterview: "Empezar entrevista",
     loggedAs: (name) => `Conectado como: ${name}`,
     share: "Compartir discusión",
     copyLink: "Copiar enlace",
@@ -178,6 +186,8 @@ const texts: Record<
     community: "نقاشات المجتمع الأخيرة",
     joinTitle: "ما اسمك؟",
     joinBtn: "انضم إلى النقاش",
+    backToTools: "كل أدوات AI",
+    startInterview: "ابدأ المقابلة",
     loggedAs: (name) => `الاسم الحالي: ${name}`,
     share: "مشاركة النقاش",
     copyLink: "نسخ الرابط",
@@ -293,6 +303,36 @@ const toolOverrides: Record<StudyTool, Partial<Record<string, Partial<(typeof te
       joinBtn: "انضم إلى الدرس",
       greeting: (topic) =>
         `مرحبًا! أنا معلمك 📚 اخترت تعلم **${topic}**. ما مستواك — مبتدئ أم متقدم؟`,
+    },
+  },
+  shadchan: {
+    he: {
+      title: "שדכן AI",
+      intro: "שיחת היכרות אישית — השדכן ישאל אותך שאלות על אישיות, תחביבים, רקע, ערכים ומה אתה מחפש, ולבסוף יסכם לך פרופיל ורשימת בדיקות לצד השני.",
+      inputPlaceholder: "ענה על שאלת השדכן...",
+      greeting: (topic) =>
+        `שלום! אני השדכן שלך 💞 נכיר אותך לעומק — אשאל שאלה אחת בכל פעם על אישיותך, תחביבים, רקע ומה אתה מחפש. נתחיל: ספר לי קצת על עצמך — מי אתה ומה חשוב לך בחיים?`,
+    },
+    en: {
+      title: "Shadchan AI",
+      intro: "A personal interview — the matchmaker asks about your personality, hobbies, background, values and what you're looking for, then summarizes your profile and what to check on the other side.",
+      inputPlaceholder: "Answer the matchmaker's question...",
+      greeting: () =>
+        `Hello! I'm your shadchan 💞 I'll get to know you deeply — one question at a time about personality, hobbies, background and what you're looking for. Let's start: tell me a bit about yourself — who are you and what matters most in your life?`,
+    },
+    es: {
+      title: "Shadchan AI",
+      intro: "Una entrevista personal — el casamentero pregunta sobre tu personalidad, pasatiempos, valores y lo que buscas, y luego resume tu perfil y qué revisar del otro lado.",
+      inputPlaceholder: "Responde la pregunta del casamentero...",
+      greeting: () =>
+        `¡Hola! Soy tu shadchan 💞 Te conoceré a fondo — una pregunta a la vez sobre tu personalidad, pasatiempos, trasfondo y lo que buscas. Empecemos: cuéntame un poco de ti — ¿quién eres y qué es lo más importante en tu vida?`,
+    },
+    ar: {
+      title: "شادخان AI",
+      intro: "مقابلة شخصية — الشادخان يسأل عن شخصيتك وهواياتك وخلفيتك وما تبحث عنه، ثم يلخص ملفك وما يجب فحصه في الطرف الآخر.",
+      inputPlaceholder: "أجب على سؤال الشادخان...",
+      greeting: () =>
+        `مرحبًا! أنا الشادخان 💞 سأتعرف عليك بعمق — سؤال واحد في كل مرة عن شخصيتك وهواياتك وما تبحث عنه. لنبدأ: أخبرني قليلًا عن نفسك — من أنت وما الأهم في حياتك؟`,
     },
   },
 };
@@ -474,18 +514,29 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
     rec.start();
   }
 
+  const backArrow = locale === "he" || locale === "ar" ? "→" : "←";
+
   if (!started) {
     return (
       <div className="mx-auto max-w-2xl">
+        <div className="mb-4">
+          <a href={`/${locale}/tools`} className="text-xs text-amber-700 hover:underline">
+            {backArrow} {t.backToTools}
+          </a>
+        </div>
         <div className="rounded-2xl border border-amber-200 bg-gradient-to-b from-amber-50 to-white p-8 shadow-sm">
-          <div className="mb-2 text-4xl">📖</div>
+          <div className="mb-2 text-4xl">{tool === "shadchan" ? "💞" : tool === "teacher" ? "🎓" : "📖"}</div>
           <h1 className="mb-3 text-3xl font-bold text-zinc-900">{t.title}</h1>
           <p className="mb-6 leading-relaxed text-zinc-600">{t.intro}</p>
 
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              if (topic.trim()) begin(topic.trim(), source.trim());
+              if (tool === "shadchan") {
+                begin(`${t.title}${authorName.trim() ? ` — ${authorName.trim()}` : ""}`, "");
+              } else if (topic.trim()) {
+                begin(topic.trim(), source.trim());
+              }
             }}
             className="flex flex-col gap-3"
           >
@@ -500,44 +551,50 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
               placeholder={t.namePlaceholder}
               className="w-full rounded-xl border border-zinc-300 px-4 py-3 text-sm focus:border-amber-400 focus:outline-none"
             />
-            <input
-              value={topic}
-              onChange={(e) => setTopic(e.target.value)}
-              placeholder={t.topicPlaceholder}
-              className="w-full rounded-xl border border-zinc-300 px-4 py-3 text-sm focus:border-amber-400 focus:outline-none"
-            />
-            <div>
-              <label className="mb-1 block text-xs font-medium text-zinc-500">
-                {t.sourceLabel}
-              </label>
-              <textarea
-                value={source}
-                onChange={(e) => setSource(e.target.value)}
-                placeholder={t.sourcePlaceholder}
-                rows={3}
-                className="w-full resize-none rounded-xl border border-zinc-300 px-4 py-3 text-sm focus:border-amber-400 focus:outline-none"
-              />
-            </div>
+            {tool !== "shadchan" && (
+              <>
+                <input
+                  value={topic}
+                  onChange={(e) => setTopic(e.target.value)}
+                  placeholder={t.topicPlaceholder}
+                  className="w-full rounded-xl border border-zinc-300 px-4 py-3 text-sm focus:border-amber-400 focus:outline-none"
+                />
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-zinc-500">
+                    {t.sourceLabel}
+                  </label>
+                  <textarea
+                    value={source}
+                    onChange={(e) => setSource(e.target.value)}
+                    placeholder={t.sourcePlaceholder}
+                    rows={3}
+                    className="w-full resize-none rounded-xl border border-zinc-300 px-4 py-3 text-sm focus:border-amber-400 focus:outline-none"
+                  />
+                </div>
+              </>
+            )}
             <button
               type="submit"
-              disabled={!topic.trim() || loading}
+              disabled={(tool !== "shadchan" && !topic.trim()) || loading}
               className="rounded-xl bg-amber-600 px-6 py-3 text-sm font-semibold text-white hover:bg-amber-700 disabled:opacity-40"
             >
-              {t.startBtn}
+              {tool === "shadchan" ? t.startInterview : t.startBtn}
             </button>
           </form>
 
-          <div className="mt-6 flex flex-wrap gap-2">
-            {t.suggestions.map((s) => (
-              <button
-                key={s}
-                onClick={() => begin(s, "")}
-                className="rounded-full border border-amber-200 bg-white px-4 py-2 text-xs text-zinc-700 hover:border-amber-400 hover:bg-amber-50"
-              >
-                {s}
-              </button>
-            ))}
-          </div>
+          {tool !== "shadchan" && (
+            <div className="mt-6 flex flex-wrap gap-2">
+              {t.suggestions.map((s) => (
+                <button
+                  key={s}
+                  onClick={() => begin(s, "")}
+                  className="rounded-full border border-amber-200 bg-white px-4 py-2 text-xs text-zinc-700 hover:border-amber-400 hover:bg-amber-50"
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          )}
 
           {authorName.trim() && (
             <p className="mt-5 border-t border-amber-100 pt-3 text-xs text-zinc-500">
@@ -563,7 +620,7 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
             </div>
           )}
 
-          {community.length > 0 && (
+          {tool !== "shadchan" && community.length > 0 && (
             <div className="mt-4 border-t border-amber-100 pt-4">
               <p className="mb-2 text-xs font-medium text-zinc-500">{t.community}</p>
               <div className="space-y-2">
@@ -642,6 +699,11 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col">
+      <div className="mb-3">
+        <a href={`/${locale}/tools`} className="text-xs text-amber-700 hover:underline">
+          {backArrow} {t.backToTools}
+        </a>
+      </div>
       <div className="mb-4 flex items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
         <button
           onClick={goHome}
@@ -650,7 +712,8 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
           {locale === "he" || locale === "ar" ? "→" : "←"} {t.back}
         </button>
         <div className="min-w-0 flex-1 truncate text-center text-sm font-medium text-zinc-800">
-          📖 <span className="font-bold">{t.title}</span> · {topic}
+          {tool === "shadchan" ? "💞" : tool === "teacher" ? "🎓" : "📖"}{" "}
+          <span className="font-bold">{t.title}</span> · {topic}
           {authorName.trim() ? ` · ${authorName.trim()}` : ""}
         </div>
         <div className="flex items-center gap-2">
