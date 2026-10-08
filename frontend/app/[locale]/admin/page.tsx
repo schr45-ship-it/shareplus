@@ -454,12 +454,20 @@ export default function AdminPage() {
     <main dir="rtl" className="mx-auto max-w-5xl px-4 py-10">
       <div className="mb-8 flex items-center justify-between">
         <h1 className="text-2xl font-bold">ניהול האתר</h1>
-        <button
-          onClick={() => load(savedToken)}
-          className="rounded-lg border border-zinc-300 px-3 py-1.5 text-sm hover:bg-zinc-50"
-        >
-          רענון
-        </button>
+        <div className="flex items-center gap-2">
+          <a
+            href="/he/admin/vault"
+            className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-sm font-medium text-amber-800 hover:bg-amber-100"
+          >
+            🔐 הכספת
+          </a>
+          <button
+            onClick={() => load(savedToken)}
+            className="rounded-lg border border-zinc-300 px-3 py-1.5 text-sm hover:bg-zinc-50"
+          >
+            רענון
+          </button>
+        </div>
       </div>
 
       {error && (
