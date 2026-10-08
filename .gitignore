@@ -38,3 +38,8 @@ wf.json
 ai-run*.json
 g-*.json
 g-body.json
+
+# Personal documents accidentally dropped into the repo
+*.docx
+*.pdf
+~$*

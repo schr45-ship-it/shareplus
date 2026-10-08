@@ -38,7 +38,7 @@ const LANG_NAME: Record<string, string> = {
   ar: "Arabic",
 };
 
-function systemPrompt(tool: string, locale: string, topic: string, source: string): string {
+function systemPrompt(tool: string, locale: string, topic: string, source: string, mode = "deep"): string {
   const lang = LANG_NAME[locale] ?? "Hebrew";
   if (tool === "shadchan") {
     return [
@@ -62,10 +62,17 @@ function systemPrompt(tool: string, locale: string, topic: string, source: strin
       source ? `Material provided by the student:\n---\n${source}\n---` : "",
     ].filter(Boolean).join("\n");
   }
+  const modeLine =
+    mode === "pshat"
+      ? "Study mode: PSHAT ONLY. Focus strictly on the plain meaning of the text — explain words, context and literal sense clearly and simply. Avoid conceptual analysis, philosophical digressions, and lengthy kushyot. Keep the warm havruta tone and check the learner's understanding with short questions."
+      : mode === "commentators"
+        ? "Study mode: COMMENTATORS. Center the discussion on the classical mefarshim (Rashi, Ramban, Ibn Ezra, Sforno, etc.). For each section bring the relevant commentators' interpretations, compare their approaches, note where they disagree, and ask the learner which reading they find compelling and why."
+        : "Study mode: DEEP LEARNING. Go beneath the surface: raise kushyot, do conceptual analysis, compare sources, and challenge assumptions.";
   return [
     "You are a Havruta — a wise, patient, and thought-provoking Jewish study partner.",
     "Your role is NOT to give dry, ready-made answers. You hold a real discussion: encourage good insights, raise challenges (kushyot) from classical commentators and general philosophy, ask questions that develop independent thinking, and help the learner go deeper into the text.",
     "Keep a warm, eye-level tone in the spirit of shared learning. Keep replies focused — usually 2–5 sentences, ending with a question or a point for the learner to consider.",
+    modeLine,
     `Always respond in ${lang}.`,
     topic ? `The learner is studying: ${topic}` : "The learner has not specified a text yet — help them choose or sharpen their topic.",
     source ? `Source text provided by the learner:\n---\n${source}\n---` : "",
@@ -98,7 +105,7 @@ async function uploadChatImage(dataUrl: string): Promise<string | null> {
 
 async function persist(
   sessionId: string | null,
-  fields: { topic?: string; source?: string; locale?: string; author?: string; tool?: string },
+  fields: { topic?: string; source?: string; locale?: string; author?: string; tool?: string; mode?: string },
   newMessages: { role: "user" | "model"; text: string; image?: string }[],
 ): Promise<{ sid: string | null; ids: string[] } | null> {
   if (!SUPABASE_URL || !SERVICE_KEY) return null;
@@ -114,6 +121,7 @@ async function persist(
           locale: fields.locale || "he",
           author_name: fields.author || null,
           tool: fields.tool || "havruta",
+          study_mode: fields.mode || "deep",
         }),
       });
       const rows = await res.json();
@@ -147,7 +155,10 @@ async function persist(
         {
           method: "PATCH",
           headers: { ...dbHeaders, Prefer: "return=minimal" },
-          body: JSON.stringify({ updated_at: new Date().toISOString() }),
+          body: JSON.stringify({
+            updated_at: new Date().toISOString(),
+            ...(fields.mode ? { study_mode: fields.mode } : {}),
+          }),
         },
       );
     }
@@ -180,6 +191,7 @@ export async function POST(req: NextRequest) {
     tool?: string;
     regen?: boolean;
     targetMessageId?: string;
+    mode?: string;
   };
   try {
     body = await req.json();
@@ -192,6 +204,9 @@ export async function POST(req: NextRequest) {
   const locale = ["he", "en", "es", "ar"].includes(body.locale ?? "") ? body.locale! : "he";
   const authorName = String(body.authorName || "").trim().slice(0, 80);
   const tool = ["havruta", "teacher", "shadchan"].includes(body.tool ?? "") ? body.tool! : "havruta";
+  const mode = ["pshat", "deep", "commentators"].includes(body.mode ?? "")
+    ? body.mode!
+    : "deep";
   const sessionId =
     typeof body.sessionId === "string" && /^[0-9a-f-]{36}$/.test(body.sessionId)
       ? body.sessionId
@@ -242,7 +257,7 @@ export async function POST(req: NextRequest) {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            system_instruction: { parts: [{ text: systemPrompt(tool, locale, topic, source) }] },
+            system_instruction: { parts: [{ text: systemPrompt(tool, locale, topic, source, mode) }] },
             contents,
             generationConfig: { temperature: 0.7, maxOutputTokens: 1200 },
           }),
@@ -268,7 +283,7 @@ export async function POST(req: NextRequest) {
         }
         const persisted = await persist(
           sessionId,
-          { topic, source, locale, author: authorName, tool },
+          { topic, source, locale, author: authorName, tool, mode },
           sessionId
             ? [messages[messages.length - 1] as { role: "user" | "model"; text: string; image?: string }, { role: "model", text: reply }]
             : [...messages as { role: "user" | "model"; text: string; image?: string }[], { role: "model", text: reply }],

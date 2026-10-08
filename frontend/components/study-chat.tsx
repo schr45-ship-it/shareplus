@@ -43,6 +43,7 @@ const texts: Record<
     copyLink: string;
     embed: string;
     copied: string;
+    modes: { deep: string; pshat: string; commentators: string };
   }
 > = {
   he: {
@@ -79,6 +80,7 @@ const texts: Record<
     copyLink: "העתק קישור",
     embed: "העתק קוד הטמעה",
     copied: "הועתק!",
+    modes: { deep: "למידה עמוקה", pshat: "פשט בלבד", commentators: "מפרשים" },
     greeting: (topic) =>
       `שלום! אני החברותא שלך 📖 בחרת ללמוד על **${topic}**. איך תרצה שנתחיל את הלימוד?`,
   },
@@ -117,6 +119,7 @@ const texts: Record<
     copyLink: "Copy link",
     embed: "Copy embed code",
     copied: "Copied!",
+    modes: { deep: "Deep learning", pshat: "Plain meaning only", commentators: "Commentators" },
     greeting: (topic) =>
       `Shalom! I'm your havruta 📖 You chose to study **${topic}**. How would you like to begin?`,
   },
@@ -155,6 +158,7 @@ const texts: Record<
     copyLink: "Copiar enlace",
     embed: "Copiar código de inserción",
     copied: "¡Copiado!",
+    modes: { deep: "Estudio profundo", pshat: "Solo sentido simple", commentators: "Comentaristas" },
     greeting: (topic) =>
       `¡Shalom! Soy tu javruta 📖 Elegiste estudiar **${topic}**. ¿Cómo quieres comenzar?`,
   },
@@ -193,6 +197,7 @@ const texts: Record<
     copyLink: "نسخ الرابط",
     embed: "نسخ كود التضمين",
     copied: "تم النسخ!",
+    modes: { deep: "دراسة معمقة", pshat: "المعنى البسيط فقط", commentators: "المفسرون" },
     greeting: (topic) =>
       `شالوم! أنا شريكك في الدراسة 📖 اخترت دراسة **${topic}**. كيف تريد أن نبدأ؟`,
   },
@@ -363,6 +368,7 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
   const [editDraft, setEditDraft] = useState("");
   const [editSaving, setEditSaving] = useState(false);
   const [regenIdx, setRegenIdx] = useState<number | null>(null);
+  const [mode, setMode] = useState<"deep" | "pshat" | "commentators">("deep");
   const fileRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<{ stop: () => void } | null>(null);
@@ -511,6 +517,7 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
           tool,
           sessionId: sessionId ?? undefined,
           messages: messages.slice(0, idx),
+          mode,
           regen: true,
           targetMessageId: target.id,
         }),
@@ -561,6 +568,9 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
         setTopic(json.session.topic || sTopic);
         setSource(json.session.source_text || "");
         if (json.session.author_name) setAuthorName(json.session.author_name);
+        if (["deep", "pshat", "commentators"].includes(json.session.study_mode)) {
+          setMode(json.session.study_mode);
+        }
         setSessionId(sid);
         setMessages(
           Array.isArray(json.messages) && json.messages.length
@@ -629,6 +639,7 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
           sessionId: sessionId ?? undefined,
           authorName: authorName.trim() || undefined,
           tool,
+          mode,
         }),
       });
       const json = await res.json();
@@ -711,6 +722,26 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
 
   const backArrow = locale === "he" || locale === "ar" ? "→" : "←";
 
+  const modeChips =
+    tool === "havruta" ? (
+      <div className="flex flex-wrap gap-2">
+        {(["deep", "pshat", "commentators"] as const).map((m) => (
+          <button
+            key={m}
+            type="button"
+            onClick={() => setMode(m)}
+            className={`rounded-full border px-4 py-1.5 text-xs font-medium transition-colors ${
+              mode === m
+                ? "border-amber-500 bg-amber-100 text-amber-800"
+                : "border-zinc-200 bg-white text-zinc-600 hover:border-amber-300"
+            }`}
+          >
+            {t.modes[m]}
+          </button>
+        ))}
+      </div>
+    ) : null;
+
   if (!started) {
     return (
       <div className="mx-auto max-w-2xl">
@@ -768,6 +799,7 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
                 </div>
               </>
             )}
+            {modeChips}
             <button
               type="submit"
               disabled={(tool !== "shadchan" && !topic.trim()) || loading}
@@ -982,6 +1014,8 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
           )}
         </div>
       </div>
+
+      {modeChips && <div className="mb-3">{modeChips}</div>}
 
       <div className="min-h-64 space-y-4 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
         {messages.map((m, i) => (
