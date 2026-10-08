@@ -22,6 +22,7 @@ const texts: Record<
     send: string;
     thinking: string;
     newTopic: string;
+    back: string;
     listening: string;
     micNotSupported: string;
     errGeneric: string;
@@ -47,6 +48,7 @@ const texts: Record<
     send: "שלח",
     thinking: "החברותא חושב...",
     newTopic: "נושא חדש",
+    back: "חזרה",
     listening: "מקשיב...",
     micNotSupported: "הדפדפן לא תומך בהקלטה",
     errGeneric: "משהו השתבש. נסה שוב.",
@@ -73,6 +75,7 @@ const texts: Record<
     send: "Send",
     thinking: "Your havruta is thinking...",
     newTopic: "New topic",
+    back: "Back",
     listening: "Listening...",
     micNotSupported: "Your browser does not support speech input",
     errGeneric: "Something went wrong. Try again.",
@@ -99,6 +102,7 @@ const texts: Record<
     send: "Enviar",
     thinking: "Tu javruta está pensando...",
     newTopic: "Nuevo tema",
+    back: "Volver",
     listening: "Escuchando...",
     micNotSupported: "Tu navegador no admite entrada de voz",
     errGeneric: "Algo salió mal. Inténtalo de nuevo.",
@@ -125,6 +129,7 @@ const texts: Record<
     send: "إرسال",
     thinking: "شريكك يفكر...",
     newTopic: "موضوع جديد",
+    back: "رجوع",
     listening: "أستمع...",
     micNotSupported: "متصفحك لا يدعم الإدخال الصوتي",
     errGeneric: "حدث خطأ ما. حاول مجددًا.",
@@ -190,6 +195,17 @@ export function HavrutaChat({ locale }: { locale: string }) {
   }, [messages, loading]);
 
   useEffect(() => () => recognitionRef.current?.stop(), []);
+
+  function goHome() {
+    setStarted(false);
+    setMessages([]);
+    setError(null);
+    setRecent(loadSaved());
+    fetch("/api/havruta?list=recent")
+      .then((r) => r.json())
+      .then((j) => setCommunity(Array.isArray(j.sessions) ? j.sessions : []))
+      .catch(() => {});
+  }
 
   function begin(topicText: string, sourceText: string) {
     setTopic(topicText);
@@ -391,21 +407,18 @@ export function HavrutaChat({ locale }: { locale: string }) {
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col">
-      <div className="mb-4 flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-        <div className="text-sm font-medium text-zinc-800">
+      <div className="mb-4 flex items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+        <button
+          onClick={goHome}
+          className="flex items-center gap-1.5 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-medium text-amber-800 hover:bg-amber-100"
+        >
+          {locale === "he" || locale === "ar" ? "→" : "←"} {t.back}
+        </button>
+        <div className="min-w-0 flex-1 truncate text-center text-sm font-medium text-zinc-800">
           📖 <span className="font-bold">{t.title}</span> · {topic}
         </div>
         <button
-          onClick={() => {
-            setStarted(false);
-            setMessages([]);
-            setError(null);
-            setRecent(loadSaved());
-            fetch("/api/havruta?list=recent")
-              .then((r) => r.json())
-              .then((j) => setCommunity(Array.isArray(j.sessions) ? j.sessions : []))
-              .catch(() => {});
-          }}
+          onClick={goHome}
           className="text-xs text-amber-700 hover:underline"
         >
           {t.newTopic}
