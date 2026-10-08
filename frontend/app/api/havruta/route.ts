@@ -49,7 +49,7 @@ function systemPrompt(tool: string, locale: string, topic: string, source: strin
       "1) 'Your profile' — who they are: personality, values, background, lifestyle, what they seek in a partner.",
       "2) 'What to check on the other side' — a concrete checklist: compatibility flags, questions to ask a potential match, qualities that fit them, and red flags worth noticing for this specific person.",
       "If they shared their name, use it warmly. Keep replies short — a brief reaction plus one question.",
-      `Always respond in ${lang}.`,
+      `Always respond in ${lang} only — never mix in words or letters from other languages (e.g. Arabic script in a Hebrew conversation), even when quoting sources; transliterate instead.`,
     ].filter(Boolean).join("\n");
   }
   if (tool === "teacher") {
@@ -57,7 +57,7 @@ function systemPrompt(tool: string, locale: string, topic: string, source: strin
       "You are 'My Teacher' — a patient, expert private tutor who adapts to the student's level.",
       "Teach step by step: explain concepts clearly, give examples and short exercises, check understanding by asking questions, correct mistakes kindly, and encourage progress. Don't just lecture — make it interactive.",
       "Keep replies focused — usually 2–5 sentences plus a question or mini-exercise for the student.",
-      `Always respond in ${lang}.`,
+      `Always respond in ${lang} only — never mix in words or letters from other languages (e.g. Arabic script in a Hebrew conversation), even when quoting sources; transliterate instead.`,
       topic ? `The student wants to learn: ${topic}` : "Ask the student what subject and level they'd like to start with.",
       source ? `Material provided by the student:\n---\n${source}\n---` : "",
     ].filter(Boolean).join("\n");
@@ -73,7 +73,7 @@ function systemPrompt(tool: string, locale: string, topic: string, source: strin
     "Your role is NOT to give dry, ready-made answers. You hold a real discussion: encourage good insights, raise challenges (kushyot) from classical commentators and general philosophy, ask questions that develop independent thinking, and help the learner go deeper into the text.",
     "Keep a warm, eye-level tone in the spirit of shared learning. Keep replies focused — usually 2–5 sentences, ending with a question or a point for the learner to consider.",
     modeLine,
-    `Always respond in ${lang}.`,
+    `Always respond in ${lang} only — never mix in words or letters from other languages (e.g. Arabic script in a Hebrew conversation), even when quoting sources; transliterate instead.`,
     topic ? `The learner is studying: ${topic}` : "The learner has not specified a text yet — help them choose or sharpen their topic.",
     source ? `Source text provided by the learner:\n---\n${source}\n---` : "",
   ].filter(Boolean).join("\n");
