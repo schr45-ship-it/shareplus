@@ -532,7 +532,8 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
   function startFork(idx: number) {
     if (!sessionId) return;
     const direction = forkTopic.trim();
-    setMessages((prev) => prev.slice(0, idx + 1));
+    const ctx = messages.slice(0, idx + 1);
+    setMessages(ctx);
     setParent({ id: sessionId, topic });
     setSessionId(null);
     if (direction) setTopic(direction);
@@ -540,6 +541,8 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
     setForkIdx(null);
     setForkTopic("");
     setError(null);
+    // If the fork point ends on a user message, the partner should answer it
+    if (ctx[ctx.length - 1]?.role === "user") requestReply(ctx);
   }
 
   // Admin: regenerate the model reply at idx using the conversation up to that point
@@ -680,6 +683,10 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
     setPendingImage(null);
     recognitionRef.current?.stop();
     setListening(false);
+    await requestReply(next);
+  }
+
+  async function requestReply(next: Msg[]) {
     setError(null);
     setLoading(true);
     try {
