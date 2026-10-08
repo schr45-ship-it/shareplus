@@ -542,12 +542,20 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
   }
 
   function startListening() {
+    if (listening) {
+      recognitionRef.current?.stop();
+      setListening(false);
+      return;
+    }
     const w = window as unknown as Record<string, unknown>;
     const SR = (w.SpeechRecognition ?? w.webkitSpeechRecognition) as
       | (new () => {
           lang: string;
           interimResults: boolean;
-          onresult: (e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void;
+          continuous: boolean;
+          onresult: (e: {
+            results: ArrayLike<{ isFinal: boolean; length: number; [i: number]: { transcript: string } }>;
+          }) => void;
           onend: () => void;
           onerror: () => void;
           start: () => void;
@@ -560,10 +568,19 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
     }
     const rec = new SR();
     rec.lang = SPEECH_LANG[locale] ?? "he-IL";
-    rec.interimResults = false;
+    rec.interimResults = true;
+    rec.continuous = true;
+    const base = input ? `${input} ` : "";
     rec.onresult = (e) => {
-      const transcript = e.results[0]?.[0]?.transcript ?? "";
-      if (transcript) setInput((prev) => (prev ? `${prev} ${transcript}` : transcript));
+      let finals = "";
+      let interim = "";
+      for (let i = 0; i < e.results.length; i++) {
+        const r = e.results[i];
+        const txt = r?.[0]?.transcript ?? "";
+        if (r?.isFinal) finals += txt;
+        else interim += txt;
+      }
+      setInput(base + finals + interim);
     };
     rec.onend = () => setListening(false);
     rec.onerror = () => setListening(false);
@@ -912,9 +929,13 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
               send();
             }
           }}
-          placeholder={t.inputPlaceholder}
+          placeholder={listening ? t.listening : t.inputPlaceholder}
           rows={2}
-          className="flex-1 resize-none rounded-xl border border-zinc-300 px-4 py-3 text-sm focus:border-amber-400 focus:outline-none"
+          className={`flex-1 resize-none rounded-xl border px-4 py-3 text-sm focus:outline-none ${
+            listening
+              ? "border-red-400 bg-red-50 focus:border-red-500"
+              : "border-zinc-300 focus:border-amber-400"
+          }`}
         />
         <button
           type="button"
