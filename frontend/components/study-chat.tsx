@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-type Msg = { role: "user" | "model"; text: string; author?: string };
+type Msg = { role: "user" | "model"; text: string; author?: string; image?: string };
 type SavedSession = { id: string; topic: string; updated: number };
 type CommunitySession = { id: string; topic: string; locale: string; author_name: string | null; updated_at: string; messages: number };
 
@@ -357,6 +357,8 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
   const [showShare, setShowShare] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
   const [speakingIdx, setSpeakingIdx] = useState<number | null>(null);
+  const [pendingImage, setPendingImage] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<{ stop: () => void } | null>(null);
 
@@ -469,15 +471,42 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
     setLoading(false);
   }
 
+  function onPickImage(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || !file.type.startsWith("image/")) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const max = 1024;
+        const scale = Math.min(1, max / Math.max(img.width, img.height));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        canvas.getContext("2d")?.drawImage(img, 0, 0, canvas.width, canvas.height);
+        setPendingImage(canvas.toDataURL("image/jpeg", 0.8));
+      };
+      img.src = String(reader.result);
+    };
+    reader.readAsDataURL(file);
+  }
+
   async function send(text?: string) {
     const content = (text ?? input).trim();
-    if (!content || loading) return;
+    if ((!content && !pendingImage) || loading) return;
     const next: Msg[] = [
       ...messages,
-      { role: "user", text: content, author: authorName.trim() || undefined },
+      {
+        role: "user",
+        text: content,
+        author: authorName.trim() || undefined,
+        image: pendingImage ?? undefined,
+      },
     ];
     setMessages(next);
     setInput("");
+    setPendingImage(null);
     setError(null);
     setLoading(true);
     try {
@@ -803,7 +832,16 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
                   {m.author || t.guest}
                 </div>
               )}
-              {m.text}
+              {m.image && (
+                <img
+                  src={m.image}
+                  alt=""
+                  className="mb-2 max-h-56 w-auto rounded-lg border border-black/10"
+                />
+              )}
+              {m.text !== "[image]" && m.text}
+              {m.text === "[image]" && !m.image && <span className="italic opacity-60">📷</span>}
+              {m.text && m.text !== "[image]" && (
               <button
                 type="button"
                 onClick={() => speak(i, m.text)}
@@ -814,6 +852,7 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
               >
                 {speakingIdx === i ? "⏹" : "🔊"}
               </button>
+              )}
             </div>
           </div>
         ))}
@@ -828,13 +867,42 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
         <div ref={bottomRef} />
       </div>
 
+      {pendingImage && (
+        <div className="mt-3 flex items-center gap-2">
+          <div className="relative">
+            <img src={pendingImage} alt="" className="h-16 w-16 rounded-lg border border-zinc-200 object-cover" />
+            <button
+              type="button"
+              onClick={() => setPendingImage(null)}
+              className="absolute -end-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-zinc-700 text-[10px] text-white hover:bg-zinc-900"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+
       <form
         onSubmit={(e) => {
           e.preventDefault();
           send();
         }}
-        className="mt-4 flex items-end gap-2"
+        className="mt-3 flex items-end gap-2"
       >
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={onPickImage}
+        />
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          className="rounded-xl border border-zinc-300 bg-white px-3 py-3 text-lg hover:bg-zinc-50"
+        >
+          📷
+        </button>
         <textarea
           value={input}
           onChange={(e) => setInput(e.target.value)}
@@ -862,7 +930,7 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
         </button>
         <button
           type="submit"
-          disabled={loading || !input.trim()}
+          disabled={loading || (!input.trim() && !pendingImage)}
           className="rounded-xl bg-amber-600 px-5 py-3 text-sm font-semibold text-white hover:bg-amber-700 disabled:opacity-40"
         >
           {t.send}

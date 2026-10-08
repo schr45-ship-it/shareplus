@@ -78,10 +78,28 @@ const dbHeaders = {
   "Content-Type": "application/json",
 };
 
+async function uploadChatImage(dataUrl: string): Promise<string | null> {
+  const m = /^data:(image\/[a-zA-Z+]+);base64,(.+)$/.exec(dataUrl);
+  if (!m || m[2].length > 4_500_000) return null;
+  const mime = m[1].toLowerCase();
+  const ext = mime.includes("png") ? "png" : mime.includes("webp") ? "webp" : mime.includes("gif") ? "gif" : "jpg";
+  const path = `chat/${crypto.randomUUID()}.${ext}`;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/storage/v1/object/article-images/${path}`, {
+      method: "POST",
+      headers: { ...dbHeaders, "Content-Type": mime, "x-upsert": "true" },
+      body: Buffer.from(m[2], "base64"),
+    });
+    return res.ok ? `${SUPABASE_URL}/storage/v1/object/public/article-images/${path}` : null;
+  } catch {
+    return null;
+  }
+}
+
 async function persist(
   sessionId: string | null,
   fields: { topic?: string; source?: string; locale?: string; author?: string; tool?: string },
-  newMessages: { role: "user" | "model"; text: string }[],
+  newMessages: { role: "user" | "model"; text: string; image?: string }[],
 ): Promise<string | null> {
   if (!SUPABASE_URL || !SERVICE_KEY) return null;
   try {
@@ -105,17 +123,19 @@ async function persist(
     if (!sid) return null;
 
     if (newMessages.length) {
+      const rows = await Promise.all(
+        newMessages.map(async (m) => ({
+          session_id: sid,
+          role: m.role,
+          content: m.text || "[image]",
+          author_name: m.role === "user" ? fields.author || null : null,
+          image_url: m.image ? await uploadChatImage(m.image) : null,
+        })),
+      );
       await fetch(`${SUPABASE_URL}/rest/v1/havruta_messages`, {
         method: "POST",
         headers: { ...dbHeaders, Prefer: "return=minimal" },
-        body: JSON.stringify(
-          newMessages.map((m) => ({
-            session_id: sid,
-            role: m.role,
-            content: m.text,
-            author_name: m.role === "user" ? fields.author || null : null,
-          })),
-        ),
+        body: JSON.stringify(rows),
       });
       await fetch(
         `${SUPABASE_URL}/rest/v1/havruta_sessions?id=eq.${sid}`,
@@ -132,7 +152,12 @@ async function persist(
   }
 }
 
-type Msg = { role: string; text: string };
+type Msg = { role: string; text: string; image?: string };
+
+function imageParts(image: string): { mime: string; data: string } | null {
+  const m = /^data:(image\/[a-zA-Z+]+);base64,(.+)$/.exec(image);
+  return m ? { mime: m[1], data: m[2] } : null;
+}
 
 export async function POST(req: NextRequest) {
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
@@ -166,11 +191,16 @@ export async function POST(req: NextRequest) {
       : null;
   const messages = (Array.isArray(body.messages) ? body.messages : [])
     .slice(-MAX_MESSAGES)
-    .map((m) => ({
-      role: m.role === "model" ? "model" : "user",
-      text: String(m.text || "").trim().slice(0, MAX_MSG_LEN),
-    }))
-    .filter((m) => m.text);
+    .map((m) => {
+      const img = typeof m.image === "string" && m.image.startsWith("data:image/") ? m.image : undefined;
+      const text = String(m.text || "").trim().slice(0, MAX_MSG_LEN);
+      return {
+        role: m.role === "model" ? "model" : "user",
+        text: text || (img || m.image ? "[image]" : ""),
+        image: img,
+      };
+    })
+    .filter((m) => m.text || m.image);
 
   if (!messages.length || messages[messages.length - 1].role !== "user") {
     return NextResponse.json({ error: "invalid" }, { status: 400 });
@@ -179,10 +209,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "not_configured" }, { status: 500 });
   }
 
-  const contents = messages.map((m) => ({
-    role: m.role,
-    parts: [{ text: m.text }],
-  }));
+  const contents = messages.map((m) => {
+    const img = m.image ? imageParts(m.image) : null;
+    const parts: Record<string, unknown>[] = [];
+    if (img) parts.push({ inline_data: { mime_type: img.mime, data: img.data } });
+    parts.push({ text: m.text || (img ? "Please look at this image and respond." : "") });
+    return { role: m.role, parts };
+  });
 
   for (const model of MODELS) {
     try {
@@ -211,8 +244,8 @@ export async function POST(req: NextRequest) {
           sessionId,
           { topic, source, locale, author: authorName, tool },
           sessionId
-            ? [messages[messages.length - 1] as { role: "user" | "model"; text: string }, { role: "model", text: reply }]
-            : [...messages as { role: "user" | "model"; text: string }[], { role: "model", text: reply }],
+            ? [messages[messages.length - 1] as { role: "user" | "model"; text: string; image?: string }, { role: "model", text: reply }]
+            : [...messages as { role: "user" | "model"; text: string; image?: string }[], { role: "model", text: reply }],
         );
         return NextResponse.json({ reply, sessionId: sid ?? sessionId });
       }
@@ -268,7 +301,7 @@ export async function GET(req: NextRequest) {
         headers: dbHeaders,
       }),
       fetch(
-        `${SUPABASE_URL}/rest/v1/havruta_messages?session_id=eq.${id}&select=role,content,author_name,created_at&order=created_at.asc`,
+        `${SUPABASE_URL}/rest/v1/havruta_messages?session_id=eq.${id}&select=role,content,author_name,image_url,created_at&order=created_at.asc`,
         { headers: dbHeaders },
       ),
     ]);
@@ -277,10 +310,11 @@ export async function GET(req: NextRequest) {
     if (!session) return NextResponse.json({ error: "not_found" }, { status: 404 });
     const rows = await mRes.json();
     const messages: Msg[] = (Array.isArray(rows) ? rows : []).map(
-      (r: { role: string; content: string; author_name: string | null }) => ({
+      (r: { role: string; content: string; author_name: string | null; image_url: string | null }) => ({
         role: r.role,
         text: r.content,
         author: r.author_name ?? undefined,
+        image: r.image_url ?? undefined,
       }),
     );
     return NextResponse.json({ session, messages });
