@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 
 type Msg = { id?: string; role: "user" | "model"; text: string; author?: string; image?: string };
 type SavedSession = { id: string; topic: string; updated: number };
@@ -414,6 +414,7 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
   const [children, setChildren] = useState<LinkedSession[]>([]);
   const [forkIdx, setForkIdx] = useState<number | null>(null);
   const [forkTopic, setForkTopic] = useState("");
+  const [forkStartIdx, setForkStartIdx] = useState<number | null>(null);
   const [showTree, setShowTree] = useState(false);
   const [treeData, setTreeData] = useState<{ current: string; nodes: LinkedSession[] } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -546,6 +547,7 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
     const direction = forkTopic.trim();
     const ctx = messages.slice(0, idx + 1);
     setMessages(ctx);
+    setForkStartIdx(ctx.length);
     setParent({ id: sessionId, topic });
     setSessionId(null);
     if (direction) setTopic(direction);
@@ -651,6 +653,7 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
     setError(null);
     setParent(null);
     setChildren([]);
+    setForkStartIdx(null);
     setRecent(loadSaved(storageKey));
     fetch(`/api/havruta?list=recent&tool=${tool}`)
       .then((r) => r.json())
@@ -664,6 +667,7 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
     setSessionId(null);
     setParent(null);
     setChildren([]);
+    setForkStartIdx(null);
     setMessages([{ role: "model", text: t.greeting(topicText) }]);
     setStarted(true);
     setError(null);
@@ -684,6 +688,7 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
         }
         setParent(json.parent ?? null);
         setChildren(Array.isArray(json.children) ? json.children : []);
+        setForkStartIdx(null);
         setSessionId(sid);
         setMessages(
           Array.isArray(json.messages) && json.messages.length
@@ -1157,7 +1162,8 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
 
       <div className="min-h-64 space-y-4 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
         {messages.map((m, i) => (
-          <div key={i} className={`flex ${m.role === "user" ? "justify-start" : "justify-end"}`}>
+          <Fragment key={i}>
+          <div className={`flex ${m.role === "user" ? "justify-start" : "justify-end"}`}>
             <div
               className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm leading-relaxed ${
                 m.role === "user"
@@ -1232,6 +1238,16 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
               )}
             </div>
           </div>
+          {forkStartIdx !== null && i + 1 === forkStartIdx && (
+            <div className="flex items-center gap-3 py-1">
+              <div className="h-px flex-1 bg-emerald-200" />
+              <span className="shrink-0 text-[11px] font-medium text-emerald-700">
+                🌿 {t.forkTitle}
+              </span>
+              <div className="h-px flex-1 bg-emerald-200" />
+            </div>
+          )}
+          </Fragment>
         ))}
         {loading && (
           <div className="flex justify-end">
