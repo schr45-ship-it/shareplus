@@ -24,9 +24,8 @@ export async function GET(request: NextRequest) {
       signal: AbortSignal.timeout(30000),
     });
     if (!response.ok || !response.body) {
-      return NextResponse.redirect(
-        new URL(`/api/og?title=${encodeURIComponent("SharePlus")}`, request.url),
-      );
+      // Pollinations may still be generating — let the browser fetch it directly
+      return NextResponse.redirect(url.toString(), 307);
     }
 
     return new NextResponse(response.body, {
@@ -37,8 +36,7 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch {
-    return NextResponse.redirect(
-      new URL(`/api/og?title=${encodeURIComponent("SharePlus")}`, request.url),
-    );
+    // Timeout/error — the browser has no 30s limit, send it to the source
+    return NextResponse.redirect(url.toString(), 307);
   }
 }

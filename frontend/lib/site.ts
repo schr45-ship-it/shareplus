@@ -47,12 +47,7 @@ export function articleImageUrl(url: string | null | undefined): string | null {
 }
 
 export function articleThumbnailUrl(url: string | null | undefined): string | null {
-  if (!url) return null;
-  if (url.startsWith("https://image.pollinations.ai/")) {
-    const thumbnail = new URL(url);
-    thumbnail.searchParams.set("width", "480");
-    thumbnail.searchParams.set("height", "270");
-    return `/api/generated-image?url=${encodeURIComponent(thumbnail.toString())}`;
-  }
+  // Keep the stored pollinations URL unchanged — different width/height params
+  // trigger a cold regeneration that often times out. The stored URL is warm.
   return articleImageUrl(url);
 }
