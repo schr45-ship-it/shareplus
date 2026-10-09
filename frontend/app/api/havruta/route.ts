@@ -108,7 +108,7 @@ async function uploadChatImage(dataUrl: string): Promise<string | null> {
 
 async function persist(
   sessionId: string | null,
-  fields: { topic?: string; source?: string; locale?: string; author?: string; tool?: string; mode?: string; parent?: string },
+  fields: { topic?: string; source?: string; locale?: string; author?: string; tool?: string; mode?: string; parent?: string; ownerKey?: string },
   newMessages: { role: "user" | "model"; text: string; image?: string }[],
 ): Promise<{ sid: string | null; ids: string[] } | null> {
   if (!SUPABASE_URL || !SERVICE_KEY) return null;
@@ -126,6 +126,7 @@ async function persist(
           tool: fields.tool || "havruta",
           study_mode: fields.mode || "deep",
           parent_session_id: fields.parent || null,
+          owner_key: fields.ownerKey || null,
         }),
       });
       const rows = await res.json();
@@ -197,6 +198,7 @@ export async function POST(req: NextRequest) {
     targetMessageId?: string;
     mode?: string;
     parentSessionId?: string;
+    ownerKey?: string;
   };
   try {
     body = await req.json();
@@ -220,6 +222,20 @@ export async function POST(req: NextRequest) {
     typeof body.sessionId === "string" && /^[0-9a-f-]{36}$/.test(body.sessionId)
       ? body.sessionId
       : null;
+  const ownerKey = String(body.ownerKey || "").trim().slice(0, 64);
+  // Forking from a locked discussion is blocked
+  if (parentSessionId && !sessionId) {
+    try {
+      const pr = await fetch(
+        `${SUPABASE_URL}/rest/v1/havruta_sessions?id=eq.${parentSessionId}&select=is_locked`,
+        { headers: dbHeaders },
+      );
+      const prows = await pr.json();
+      if (Array.isArray(prows) && prows[0]?.is_locked) {
+        return NextResponse.json({ error: "locked" }, { status: 403 });
+      }
+    } catch {}
+  }
   // Admin regeneration: replace an existing model reply instead of appending
   const regenTarget =
     body.regen === true &&
@@ -292,7 +308,7 @@ export async function POST(req: NextRequest) {
         }
         const persisted = await persist(
           sessionId,
-          { topic, source, locale, author: authorName, tool, mode, parent: parentSessionId ?? undefined },
+          { topic, source, locale, author: authorName, tool, mode, parent: parentSessionId ?? undefined, ownerKey },
           sessionId
             ? [messages[messages.length - 1] as { role: "user" | "model"; text: string; image?: string }, { role: "model", text: reply }]
             : [...messages as { role: "user" | "model"; text: string; image?: string }[], { role: "model", text: reply }],
@@ -325,18 +341,19 @@ export async function GET(req: NextRequest) {
       : `&tool=in.(havruta,teacher)`;
     try {
       const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/havruta_sessions?select=id,topic,locale,author_name,updated_at,parent_session_id,havruta_messages(count)&order=updated_at.desc&limit=12${toolFilter}`,
+        `${SUPABASE_URL}/rest/v1/havruta_sessions?select=id,topic,locale,author_name,updated_at,parent_session_id,is_locked,havruta_messages(count)&order=updated_at.desc&limit=12${toolFilter}`,
         { headers: dbHeaders, next: { revalidate: 60 } },
       );
       const rows = await res.json();
       const sessions = (Array.isArray(rows) ? rows : []).map(
-        (s: { id: string; topic: string; locale: string; author_name: string | null; updated_at: string; parent_session_id: string | null; havruta_messages?: { count: number }[] }) => ({
+        (s: { id: string; topic: string; locale: string; author_name: string | null; updated_at: string; parent_session_id: string | null; is_locked: boolean; havruta_messages?: { count: number }[] }) => ({
           id: s.id,
           topic: s.topic,
           locale: s.locale,
           author_name: s.author_name,
           updated_at: s.updated_at,
           parent_session_id: s.parent_session_id,
+          is_locked: s.is_locked,
           messages: s.havruta_messages?.[0]?.count ?? 0,
         }),
       );
@@ -488,16 +505,53 @@ export async function DELETE(req: NextRequest) {
   }
 }
 
-// Admin: edit a single message's content
+// Lock/unlock a discussion against forks (owner key or admin), or admin: edit a message
 export async function PATCH(req: NextRequest) {
-  if (!(await adminAuthorized(req))) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
-  let body: { id?: string; content?: string };
+  let body: { id?: string; content?: string; sessionId?: string; locked?: boolean; ownerKey?: string };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "invalid" }, { status: 400 });
+  }
+
+  const lockSid =
+    typeof body.sessionId === "string" && /^[0-9a-f-]{36}$/.test(body.sessionId)
+      ? body.sessionId
+      : null;
+  if (lockSid && typeof body.locked === "boolean") {
+    if (!SUPABASE_URL || !SERVICE_KEY) {
+      return NextResponse.json({ error: "not_configured" }, { status: 500 });
+    }
+    try {
+      const sRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/havruta_sessions?id=eq.${lockSid}&select=owner_key`,
+        { headers: dbHeaders },
+      );
+      const sRows = await sRes.json();
+      const row = Array.isArray(sRows) ? sRows[0] : null;
+      if (!row) return NextResponse.json({ error: "not_found" }, { status: 404 });
+      const isAdmin = await adminAuthorized(req);
+      const ownerKey = String(body.ownerKey || "").trim();
+      if (!isAdmin && (!ownerKey || !row.owner_key || row.owner_key !== ownerKey)) {
+        return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+      }
+      const up = await fetch(
+        `${SUPABASE_URL}/rest/v1/havruta_sessions?id=eq.${lockSid}`,
+        {
+          method: "PATCH",
+          headers: { ...dbHeaders, Prefer: "return=minimal" },
+          body: JSON.stringify({ is_locked: body.locked }),
+        },
+      );
+      if (!up.ok) return NextResponse.json({ error: "update failed" }, { status: 500 });
+      return NextResponse.json({ ok: true, locked: body.locked });
+    } catch {
+      return NextResponse.json({ error: "failed" }, { status: 500 });
+    }
+  }
+
+  if (!(await adminAuthorized(req))) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
   const id = String(body.id || "");
   const content = String(body.content || "").trim().slice(0, MAX_MSG_LEN * 4);

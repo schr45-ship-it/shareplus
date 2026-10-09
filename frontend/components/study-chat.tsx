@@ -4,10 +4,11 @@ import { Fragment, useEffect, useRef, useState } from "react";
 
 type Msg = { id?: string; role: "user" | "model"; text: string; author?: string; image?: string };
 type SavedSession = { id: string; topic: string; updated: number };
-type CommunitySession = { id: string; topic: string; locale: string; author_name: string | null; updated_at: string; parent_session_id?: string | null; messages: number };
+type CommunitySession = { id: string; topic: string; locale: string; author_name: string | null; updated_at: string; parent_session_id?: string | null; is_locked?: boolean; messages: number };
 type LinkedSession = { id: string; topic: string; author_name?: string | null; parent_session_id?: string | null };
 
 const NAME_KEY = "havruta_name";
+const OWNER_KEY = "havruta_owner_key";
 
 export type StudyTool = "havruta" | "teacher" | "shadchan";
 
@@ -53,6 +54,10 @@ const texts: Record<
     forks: string;
     tree: string;
     treeTitle: string;
+    lock: string;
+    unlock: string;
+    errLocked: string;
+    errNotOwner: string;
   }
 > = {
   he: {
@@ -98,6 +103,10 @@ const texts: Record<
     forks: "הסתעפויות מהדיון",
     tree: "מפת דיון",
     treeTitle: "עץ הדיון",
+    lock: "נעל מפני הסתעפויות",
+    unlock: "פתח להסתעפויות",
+    errLocked: "הדיון נעול — לא ניתן לפתוח ממנו הסתעפויות.",
+    errNotOwner: "רק יוצר הדיון או מנהל יכולים לנעול אותו.",
     greeting: (topic) =>
       `שלום! אני החברותא שלך 📖 בחרת ללמוד על **${topic}**. איך תרצה שנתחיל את הלימוד?`,
   },
@@ -145,6 +154,10 @@ const texts: Record<
     forks: "Branches from this discussion",
     tree: "Discussion map",
     treeTitle: "Discussion tree",
+    lock: "Lock against forks",
+    unlock: "Unlock for forks",
+    errLocked: "This discussion is locked — no branches can be started from it.",
+    errNotOwner: "Only the discussion creator or an admin can lock it.",
     greeting: (topic) =>
       `Shalom! I'm your havruta 📖 You chose to study **${topic}**. How would you like to begin?`,
   },
@@ -192,6 +205,10 @@ const texts: Record<
     forks: "Ramas de esta discusión",
     tree: "Mapa de discusión",
     treeTitle: "Árbol de discusión",
+    lock: "Bloquear ramificaciones",
+    unlock: "Permitir ramificaciones",
+    errLocked: "Esta discusión está bloqueada — no se pueden abrir ramas.",
+    errNotOwner: "Solo el creador de la discusión o un administrador puede bloquearla.",
     greeting: (topic) =>
       `¡Shalom! Soy tu javruta 📖 Elegiste estudiar **${topic}**. ¿Cómo quieres comenzar?`,
   },
@@ -239,6 +256,10 @@ const texts: Record<
     forks: "تفرعات هذا النقاش",
     tree: "خريطة النقاش",
     treeTitle: "شجرة النقاش",
+    lock: "قفل ضد التفرعات",
+    unlock: "فتح للتفرعات",
+    errLocked: "هذا النقاش مقفل — لا يمكن فتح تفرعات منه.",
+    errNotOwner: "فقط منشئ النقاش أو المشرف يمكنه قفله.",
     greeting: (topic) =>
       `شالوم! أنا شريكك في الدراسة 📖 اخترت دراسة **${topic}**. كيف تريد أن نبدأ؟`,
   },
@@ -469,6 +490,9 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
   const [forkDir, setForkDir] = useState("");
   const [showTree, setShowTree] = useState(false);
   const [treeData, setTreeData] = useState<{ current: string; nodes: LinkedSession[] } | null>(null);
+  const [ownerKey, setOwnerKey] = useState("");
+  const [isLocked, setIsLocked] = useState(false);
+  const [lockBusy, setLockBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<{ stop: () => void } | null>(null);
@@ -478,6 +502,12 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
     try {
       setAuthorName(localStorage.getItem(NAME_KEY) ?? "");
       setIsAdmin(!!localStorage.getItem("admin_token"));
+      let ok = localStorage.getItem(OWNER_KEY);
+      if (!ok) {
+        ok = crypto.randomUUID();
+        localStorage.setItem(OWNER_KEY, ok);
+      }
+      setOwnerKey(ok);
     } catch {}
     fetch(`/api/havruta?list=recent&tool=${tool}`)
       .then((r) => r.json())
@@ -549,6 +579,31 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
     }
   }
 
+  // Lock/unlock this discussion against forks — owner (browser key) or admin
+  async function toggleLock() {
+    if (!sessionId || lockBusy) return;
+    setLockBusy(true);
+    try {
+      const res = await fetch("/api/havruta", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...adminHeaders() },
+        body: JSON.stringify({ sessionId, locked: !isLocked, ownerKey }),
+      });
+      if (res.ok) {
+        const next = !isLocked;
+        setIsLocked(next);
+        setCommunity((prev) =>
+          prev.map((s) => (s.id === sessionId ? { ...s, is_locked: next } : s)),
+        );
+      } else {
+        setError(res.status === 401 ? t.errNotOwner : t.errGeneric);
+      }
+    } catch {
+      setError(t.errGeneric);
+    }
+    setLockBusy(false);
+  }
+
   async function deleteSession(sid: string) {
     if (!window.confirm(adminTxt.confirmDel)) return;
     try {
@@ -603,6 +658,7 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
     setForkDir(direction || topic);
     setParent({ id: sessionId, topic });
     setSessionId(null);
+    setIsLocked(false);
     if (direction) setTopic(direction);
     setChildren([]);
     setForkIdx(null);
@@ -708,6 +764,7 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
     setChildren([]);
     setForkStartIdx(null);
     setForkDir("");
+    setIsLocked(false);
     setRecent(loadSaved(storageKey));
     fetch(`/api/havruta?list=recent&tool=${tool}`)
       .then((r) => r.json())
@@ -723,6 +780,7 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
     setChildren([]);
     setForkStartIdx(null);
     setForkDir("");
+    setIsLocked(false);
     setMessages([{ role: "model", text: t.greeting(topicText) }]);
     setStarted(true);
     setError(null);
@@ -741,6 +799,7 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
         if (["deep", "pshat", "commentators"].includes(json.session.study_mode)) {
           setMode(json.session.study_mode);
         }
+        setIsLocked(!!json.session.is_locked);
         setParent(json.parent ?? null);
         setChildren(Array.isArray(json.children) ? json.children : []);
         setForkStartIdx(null);
@@ -818,12 +877,15 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
           authorName: authorName.trim() || undefined,
           tool,
           mode,
+          ownerKey,
           parentSessionId: !sessionId && parent ? parent.id : undefined,
         }),
       });
       const json = await res.json();
       if (res.status === 429) {
         setError(t.errRate);
+      } else if (res.status === 403 && json.error === "locked") {
+        setError(t.errLocked);
       } else if (json.reply) {
         const finalMsgs: Msg[] = [...next, { role: "model", text: json.reply }];
         const ids: (string | undefined)[] = Array.isArray(json.messageIds) ? json.messageIds : [];
@@ -1070,7 +1132,7 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
                           }`}
                         >
                           <span className="truncate font-medium">
-                            {depth > 0 || s.parent_session_id ? "🌿" : "💬"} {s.topic}
+                            {s.is_locked ? "🔒" : depth > 0 || s.parent_session_id ? "🌿" : "💬"} {s.topic}
                           </span>
                           <span className="shrink-0 text-zinc-400">
                             {s.author_name || t.guest} · {s.messages} ✉
@@ -1168,6 +1230,7 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
         <div className="min-w-0 flex-1 truncate text-center text-sm font-medium text-zinc-800">
           {tool === "shadchan" ? "💞" : tool === "teacher" ? "🎓" : "📖"}{" "}
           <span className="font-bold">{t.title}</span> · {topic}
+          {isLocked ? " 🔒" : ""}
           {authorName.trim() ? ` · ${authorName.trim()}` : ""}
         </div>
         <div className="flex items-center gap-2">
@@ -1180,6 +1243,22 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
               🌳
             </button>
           )}
+          {sessionId &&
+            tool !== "shadchan" &&
+            (isAdmin || recent.some((s) => s.id === sessionId)) && (
+              <button
+                onClick={toggleLock}
+                disabled={lockBusy}
+                title={isLocked ? t.unlock : t.lock}
+                className={`rounded-lg border px-3 py-1.5 text-xs font-medium disabled:opacity-50 ${
+                  isLocked
+                    ? "border-zinc-400 bg-zinc-200 text-zinc-700 hover:bg-zinc-300"
+                    : "border-amber-300 bg-white text-amber-800 hover:bg-amber-100"
+                }`}
+              >
+                {isLocked ? "🔒" : "🔓"}
+              </button>
+            )}
           <div className="relative">
             <button
               onClick={() => setShowShare((v) => !v)}
@@ -1304,7 +1383,7 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
                     {regenIdx === i ? "⏳" : "🔄"}
                   </button>
                 )}
-                {sessionId && tool !== "shadchan" && (
+                {sessionId && tool !== "shadchan" && !isLocked && (
                   <button
                     type="button"
                     onClick={() => setForkIdx(i)}
