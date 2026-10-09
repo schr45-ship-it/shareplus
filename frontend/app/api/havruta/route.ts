@@ -88,6 +88,29 @@ const dbHeaders = {
   "Content-Type": "application/json",
 };
 
+// Verify a Supabase user access token → { id, name, email } or null
+async function getAuthUser(
+  req: NextRequest,
+): Promise<{ id: string; name: string | null; email: string | null } | null> {
+  const token = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "").trim();
+  if (!token || !SUPABASE_URL || !SERVICE_KEY) return null;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return null;
+    const u = await res.json();
+    if (!u?.id) return null;
+    return {
+      id: String(u.id),
+      name: u.user_metadata?.full_name ?? u.user_metadata?.name ?? null,
+      email: u.email ?? null,
+    };
+  } catch {
+    return null;
+  }
+}
+
 async function uploadChatImage(dataUrl: string): Promise<string | null> {
   const m = /^data:(image\/[a-zA-Z+]+);base64,(.+)$/.exec(dataUrl);
   if (!m || m[2].length > 4_500_000) return null;
@@ -108,7 +131,7 @@ async function uploadChatImage(dataUrl: string): Promise<string | null> {
 
 async function persist(
   sessionId: string | null,
-  fields: { topic?: string; source?: string; locale?: string; author?: string; tool?: string; mode?: string; parent?: string; ownerKey?: string },
+  fields: { topic?: string; source?: string; locale?: string; author?: string; tool?: string; mode?: string; parent?: string; ownerKey?: string; userId?: string },
   newMessages: { role: "user" | "model"; text: string; image?: string }[],
 ): Promise<{ sid: string | null; ids: string[] } | null> {
   if (!SUPABASE_URL || !SERVICE_KEY) return null;
@@ -127,6 +150,7 @@ async function persist(
           study_mode: fields.mode || "deep",
           parent_session_id: fields.parent || null,
           owner_key: fields.ownerKey || null,
+          user_id: fields.userId || null,
         }),
       });
       const rows = await res.json();
@@ -206,10 +230,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "invalid" }, { status: 400 });
   }
 
+  const authUser = await getAuthUser(req);
   const topic = String(body.topic || "").trim().slice(0, MAX_TOPIC_LEN);
   const source = String(body.source || "").trim().slice(0, MAX_SOURCE_LEN);
   const locale = ["he", "en", "es", "ar"].includes(body.locale ?? "") ? body.locale! : "he";
-  const authorName = String(body.authorName || "").trim().slice(0, 80);
+  const authorName =
+    String(body.authorName || "").trim().slice(0, 80) ||
+    authUser?.name ||
+    authUser?.email?.split("@")[0] ||
+    "";
   const tool = ["havruta", "teacher", "shadchan"].includes(body.tool ?? "") ? body.tool! : "havruta";
   const mode = ["pshat", "deep", "commentators"].includes(body.mode ?? "")
     ? body.mode!
@@ -308,7 +337,7 @@ export async function POST(req: NextRequest) {
         }
         const persisted = await persist(
           sessionId,
-          { topic, source, locale, author: authorName, tool, mode, parent: parentSessionId ?? undefined, ownerKey },
+          { topic, source, locale, author: authorName, tool, mode, parent: parentSessionId ?? undefined, ownerKey, userId: authUser?.id },
           sessionId
             ? [messages[messages.length - 1] as { role: "user" | "model"; text: string; image?: string }, { role: "model", text: reply }]
             : [...messages as { role: "user" | "model"; text: string; image?: string }[], { role: "model", text: reply }],
@@ -330,6 +359,22 @@ export async function POST(req: NextRequest) {
 export async function GET(req: NextRequest) {
   if (!SUPABASE_URL || !SERVICE_KEY) {
     return NextResponse.json({ error: "not_configured" }, { status: 500 });
+  }
+
+  // Logged-in user's own discussions (cross-device "my discussions")
+  if (req.nextUrl.searchParams.get("mine") === "1") {
+    const u = await getAuthUser(req);
+    if (!u) return NextResponse.json({ sessions: [] });
+    try {
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/havruta_sessions?user_id=eq.${u.id}&select=id,topic,updated_at&order=updated_at.desc&limit=20`,
+        { headers: dbHeaders },
+      );
+      const rows = await res.json();
+      return NextResponse.json({ sessions: Array.isArray(rows) ? rows : [] });
+    } catch {
+      return NextResponse.json({ sessions: [] });
+    }
   }
 
   // Public list of recent discussions for the community board
@@ -524,7 +569,7 @@ export async function PATCH(req: NextRequest) {
     }
     try {
       const sRes = await fetch(
-        `${SUPABASE_URL}/rest/v1/havruta_sessions?id=eq.${lockSid}&select=owner_key`,
+        `${SUPABASE_URL}/rest/v1/havruta_sessions?id=eq.${lockSid}&select=owner_key,user_id`,
         { headers: dbHeaders },
       );
       const sRows = await sRes.json();
@@ -532,7 +577,11 @@ export async function PATCH(req: NextRequest) {
       if (!row) return NextResponse.json({ error: "not_found" }, { status: 404 });
       const isAdmin = await adminAuthorized(req);
       const ownerKey = String(body.ownerKey || "").trim();
-      if (!isAdmin && (!ownerKey || !row.owner_key || row.owner_key !== ownerKey)) {
+      const authUser = await getAuthUser(req);
+      const isOwner =
+        (!!ownerKey && !!row.owner_key && row.owner_key === ownerKey) ||
+        (!!authUser && !!row.user_id && row.user_id === authUser.id);
+      if (!isAdmin && !isOwner) {
         return NextResponse.json({ error: "unauthorized" }, { status: 401 });
       }
       const up = await fetch(

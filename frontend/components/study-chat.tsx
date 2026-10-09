@@ -1,6 +1,8 @@
 "use client";
 
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
+import type { User } from "@supabase/supabase-js";
 
 type Msg = { id?: string; role: "user" | "model"; text: string; author?: string; image?: string };
 type SavedSession = { id: string; topic: string; updated: number };
@@ -58,6 +60,14 @@ const texts: Record<
     unlock: string;
     errLocked: string;
     errNotOwner: string;
+    login: string;
+    logout: string;
+    loginTitle: string;
+    loginSub: string;
+    loginGoogle: string;
+    loginEmailPlaceholder: string;
+    loginSend: string;
+    loginSent: string;
   }
 > = {
   he: {
@@ -107,6 +117,14 @@ const texts: Record<
     unlock: "פתח להסתעפויות",
     errLocked: "הדיון נעול — לא ניתן לפתוח ממנו הסתעפויות.",
     errNotOwner: "רק יוצר הדיון או מנהל יכולים לנעול אותו.",
+    login: "התחבר",
+    logout: "התנתק",
+    loginTitle: "כניסה / הרשמה",
+    loginSub: "כניסה שומרת את הדיונים שלך בכל מכשיר, ממלאת את שמך אוטומטית, ונותנת לך שליטה על דיונים שיצרת.",
+    loginGoogle: "המשך עם Google",
+    loginEmailPlaceholder: "המייל שלך — נשלח לינק כניסה",
+    loginSend: "שלח לינק כניסה",
+    loginSent: "נשלח! בדוק את המייל ולחץ על הלינק.",
     greeting: (topic) =>
       `שלום! אני החברותא שלך 📖 בחרת ללמוד על **${topic}**. איך תרצה שנתחיל את הלימוד?`,
   },
@@ -158,6 +176,14 @@ const texts: Record<
     unlock: "Unlock for forks",
     errLocked: "This discussion is locked — no branches can be started from it.",
     errNotOwner: "Only the discussion creator or an admin can lock it.",
+    login: "Sign in",
+    logout: "Sign out",
+    loginTitle: "Sign in / Register",
+    loginSub: "Signing in syncs your discussions across devices, fills your name automatically, and lets you manage discussions you created.",
+    loginGoogle: "Continue with Google",
+    loginEmailPlaceholder: "Your email — we'll send a sign-in link",
+    loginSend: "Send sign-in link",
+    loginSent: "Sent! Check your email and click the link.",
     greeting: (topic) =>
       `Shalom! I'm your havruta 📖 You chose to study **${topic}**. How would you like to begin?`,
   },
@@ -209,6 +235,14 @@ const texts: Record<
     unlock: "Permitir ramificaciones",
     errLocked: "Esta discusión está bloqueada — no se pueden abrir ramas.",
     errNotOwner: "Solo el creador de la discusión o un administrador puede bloquearla.",
+    login: "Iniciar sesión",
+    logout: "Cerrar sesión",
+    loginTitle: "Entrar / Registrarse",
+    loginSub: "Al entrar, tus discusiones se sincronizan entre dispositivos, tu nombre se completa automáticamente y puedes gestionar tus discusiones.",
+    loginGoogle: "Continuar con Google",
+    loginEmailPlaceholder: "Tu email — te enviaremos un enlace",
+    loginSend: "Enviar enlace de acceso",
+    loginSent: "¡Enviado! Revisa tu email y haz clic en el enlace.",
     greeting: (topic) =>
       `¡Shalom! Soy tu javruta 📖 Elegiste estudiar **${topic}**. ¿Cómo quieres comenzar?`,
   },
@@ -260,6 +294,14 @@ const texts: Record<
     unlock: "فتح للتفرعات",
     errLocked: "هذا النقاش مقفل — لا يمكن فتح تفرعات منه.",
     errNotOwner: "فقط منشئ النقاش أو المشرف يمكنه قفله.",
+    login: "تسجيل الدخول",
+    logout: "تسجيل الخروج",
+    loginTitle: "دخول / تسجيل",
+    loginSub: "تسجيل الدخول يزامن نقاشاتك عبر الأجهزة، يملأ اسمك تلقائيًا، ويتيح لك إدارة نقاشاتك.",
+    loginGoogle: "المتابعة مع Google",
+    loginEmailPlaceholder: "بريدك الإلكتروني — سنرسل رابط دخول",
+    loginSend: "أرسل رابط الدخول",
+    loginSent: "تم الإرسال! تحقق من بريدك وانقر على الرابط.",
     greeting: (topic) =>
       `شالوم! أنا شريكك في الدراسة 📖 اخترت دراسة **${topic}**. كيف تريد أن نبدأ؟`,
   },
@@ -493,6 +535,13 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
   const [ownerKey, setOwnerKey] = useState("");
   const [isLocked, setIsLocked] = useState(false);
   const [lockBusy, setLockBusy] = useState(false);
+  const supabase = useMemo(() => createClient(), []);
+  const [user, setUser] = useState<User | null>(null);
+  const [accessToken, setAccessToken] = useState("");
+  const [showLogin, setShowLogin] = useState(false);
+  const [magicEmail, setMagicEmail] = useState("");
+  const [magicSent, setMagicSent] = useState(false);
+  const [loginBusy, setLoginBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<{ stop: () => void } | null>(null);
@@ -517,6 +566,59 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
     if (shared && /^[0-9a-f-]{36}$/.test(shared)) resume(shared, "");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Auth: keep session state in sync (also auto-exchanges OAuth ?code= on redirect)
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setUser(data.session?.user ?? null);
+      setAccessToken(data.session?.access_token ?? "");
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => {
+      setUser(s?.user ?? null);
+      setAccessToken(s?.access_token ?? "");
+    });
+    return () => sub.subscription.unsubscribe();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // On login: fill author name from profile; load my discussions from server
+  useEffect(() => {
+    if (user) {
+      const name =
+        user.user_metadata?.full_name ||
+        user.user_metadata?.name ||
+        user.email?.split("@")[0] ||
+        "";
+      if (name) {
+        setAuthorName(name);
+        try {
+          localStorage.setItem(NAME_KEY, name);
+        } catch {}
+      }
+    }
+    if (!accessToken) return;
+    fetch("/api/havruta?mine=1", {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+      .then((r) => r.json())
+      .then((j) => {
+        if (!Array.isArray(j.sessions)) return;
+        const mine: SavedSession[] = j.sessions.map(
+          (s: { id: string; topic: string; updated_at: string }) => ({
+            id: s.id,
+            topic: s.topic,
+            updated: Date.parse(s.updated_at) || 0,
+          }),
+        );
+        setRecent((prev) => {
+          const seen = new Set(prev.map((s) => s.id));
+          const merged = [...prev];
+          for (const s of mine) if (!seen.has(s.id)) merged.push(s);
+          return merged;
+        });
+      })
+      .catch(() => {});
+  }, [user, accessToken]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -579,6 +681,47 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
     }
   }
 
+  function authHeaders(): HeadersInit {
+    return accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
+  }
+
+  async function signInGoogle() {
+    setLoginBusy(true);
+    try {
+      await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo: window.location.href.split("?")[0] },
+      });
+    } catch {}
+    setLoginBusy(false);
+  }
+
+  async function sendMagicLink() {
+    const email = magicEmail.trim();
+    if (!email.includes("@") || loginBusy) return;
+    setLoginBusy(true);
+    try {
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: { emailRedirectTo: window.location.href.split("?")[0] },
+      });
+      if (!error) setMagicSent(true);
+      else setError(t.errGeneric);
+    } catch {
+      setError(t.errGeneric);
+    }
+    setLoginBusy(false);
+  }
+
+  async function signOut() {
+    try {
+      await supabase.auth.signOut();
+    } catch {}
+    setUser(null);
+    setAccessToken("");
+    setShowLogin(false);
+  }
+
   // Lock/unlock this discussion against forks — owner (browser key) or admin
   async function toggleLock() {
     if (!sessionId || lockBusy) return;
@@ -586,7 +729,7 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
     try {
       const res = await fetch("/api/havruta", {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", ...adminHeaders() },
+        headers: { "Content-Type": "application/json", ...adminHeaders(), ...authHeaders() },
         body: JSON.stringify({ sessionId, locked: !isLocked, ownerKey }),
       });
       if (res.ok) {
@@ -867,7 +1010,7 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
     try {
       const res = await fetch("/api/havruta", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({
           topic,
           source,
@@ -1064,14 +1207,55 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
             </div>
           )}
 
-          {authorName.trim() && (
-            <p className="mt-5 border-t border-amber-100 pt-3 text-xs text-zinc-500">
-              👤 {t.loggedAs(authorName.trim())}
-            </p>
-          )}
+          <div className="mt-5 flex items-center justify-between gap-2 border-t border-amber-100 pt-3 text-xs">
+            {user ? (
+              <>
+                <span className="flex min-w-0 items-center gap-2 text-zinc-600">
+                  {user.user_metadata?.avatar_url ? (
+                    <img
+                      src={String(user.user_metadata.avatar_url)}
+                      alt=""
+                      className="h-5 w-5 shrink-0 rounded-full"
+                    />
+                  ) : (
+                    <span>👤</span>
+                  )}
+                  <span className="truncate">
+                    {authorName.trim() || user.email}
+                  </span>
+                  <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-700">
+                    {t.login} ✓
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  onClick={signOut}
+                  className="shrink-0 text-zinc-400 hover:text-red-600 hover:underline"
+                >
+                  {t.logout}
+                </button>
+              </>
+            ) : (
+              <>
+                <span className="truncate text-zinc-500">
+                  {authorName.trim() ? `👤 ${t.loggedAs(authorName.trim())}` : ""}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowLogin(true);
+                    setMagicSent(false);
+                  }}
+                  className="shrink-0 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 font-medium text-blue-700 hover:bg-blue-100"
+                >
+                  🔐 {t.login}
+                </button>
+              </>
+            )}
+          </div>
 
           {recent.length > 0 && (
-            <div className={authorName.trim() ? "mt-3" : "mt-6 border-t border-amber-100 pt-4"}>
+            <div className="mt-3">
               <p className="mb-2 text-xs font-medium text-zinc-500">{t.recent}</p>
               <div className="flex flex-wrap gap-2">
                 {recent.map((s) => (
@@ -1206,6 +1390,72 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
                   {t.back}
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {showLogin && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setShowLogin(false);
+            }}
+          >
+            <div className="w-full max-w-sm rounded-2xl border border-amber-200 bg-white p-6 shadow-xl">
+              <h3 className="mb-1 text-lg font-bold text-zinc-900">{t.loginTitle}</h3>
+              <p className="mb-4 text-xs leading-relaxed text-zinc-500">{t.loginSub}</p>
+              <button
+                onClick={signInGoogle}
+                disabled={loginBusy}
+                className="mb-3 flex w-full items-center justify-center gap-2 rounded-xl border border-zinc-300 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" />
+                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                  <path fill="#FBBC05" d="M5.84 14.09a7.14 7.14 0 0 1 0-4.18v-2.9H2.18a11 11 0 0 0 0 9.88l3.66-2.8z" />
+                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+                </svg>
+                {t.loginGoogle}
+              </button>
+              <div className="mb-3 flex items-center gap-2">
+                <div className="h-px flex-1 bg-zinc-200" />
+                <div className="h-px flex-1 bg-zinc-200" />
+              </div>
+              {magicSent ? (
+                <p className="rounded-xl bg-emerald-50 px-4 py-3 text-center text-xs font-medium text-emerald-700">
+                  {t.loginSent}
+                </p>
+              ) : (
+                <div className="flex gap-2">
+                  <input
+                    type="email"
+                    dir="ltr"
+                    value={magicEmail}
+                    onChange={(e) => setMagicEmail(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        sendMagicLink();
+                      }
+                    }}
+                    placeholder={t.loginEmailPlaceholder}
+                    className="min-w-0 flex-1 rounded-xl border border-zinc-300 px-3 py-2.5 text-sm focus:border-blue-400 focus:outline-none"
+                  />
+                  <button
+                    onClick={sendMagicLink}
+                    disabled={loginBusy || !magicEmail.includes("@")}
+                    className="shrink-0 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-40"
+                  >
+                    {t.loginSend}
+                  </button>
+                </div>
+              )}
+              <button
+                onClick={() => setShowLogin(false)}
+                className="mt-4 w-full rounded-xl border border-zinc-200 px-4 py-2 text-xs text-zinc-500 hover:bg-zinc-50"
+              >
+                {t.back}
+              </button>
             </div>
           </div>
         )}
