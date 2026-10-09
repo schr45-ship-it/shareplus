@@ -1250,7 +1250,7 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
               className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm leading-relaxed ${
                 m.role === "user"
                   ? "rounded-tl-sm bg-zinc-100 text-zinc-800"
-                  : "rounded-tr-sm bg-amber-600 text-white"
+                  : "rounded-tr-sm bg-amber-500 text-white"
               }`}
             >
               {m.role === "user" && (
@@ -1400,22 +1400,16 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
           type="button"
           onClick={() => fileRef.current?.click()}
           title="📷"
-          className="rounded-xl border-2 border-zinc-400 bg-white px-3.5 py-3 text-xl text-zinc-700 shadow-sm transition hover:border-amber-500 hover:bg-amber-50 active:scale-95"
+          className="rounded-xl border-2 border-zinc-400 bg-white px-2 py-2 text-base text-zinc-700 shadow-sm transition hover:border-amber-500 hover:bg-amber-50 active:scale-95 sm:px-3 sm:py-2.5 sm:text-lg"
         >
           📷
         </button>
         <textarea
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              send();
-            }
-          }}
           placeholder={listening ? t.listening : t.inputPlaceholder}
-          rows={2}
-          className={`flex-1 resize-none rounded-xl border-2 px-4 py-3 text-sm shadow-sm focus:outline-none ${
+          rows={3}
+          className={`flex-1 resize-none rounded-xl border-2 px-4 py-3 text-base shadow-sm focus:outline-none ${
             listening
               ? "border-red-400 bg-red-50 focus:border-red-500"
               : "border-zinc-400 focus:border-amber-500"
@@ -1425,7 +1419,7 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
           type="button"
           onClick={startListening}
           title={listening ? t.listening : "🎤"}
-          className={`rounded-xl border-2 px-3.5 py-3 text-xl shadow-sm transition active:scale-95 ${
+          className={`rounded-xl border-2 px-2 py-2 text-base shadow-sm transition active:scale-95 sm:px-3 sm:py-2.5 sm:text-lg ${
             listening
               ? "border-red-400 bg-red-50 animate-pulse"
               : "border-zinc-400 bg-white hover:border-amber-500 hover:bg-amber-50"
@@ -1436,7 +1430,7 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
         <button
           type="submit"
           disabled={loading || (!input.trim() && !pendingImage)}
-          className="rounded-xl bg-amber-600 px-7 py-3 text-base font-bold text-white shadow-md transition hover:bg-amber-700 hover:shadow-lg active:scale-95 disabled:opacity-40 disabled:shadow-none"
+          className="rounded-xl bg-blue-600 px-6 py-3 text-base font-bold text-white shadow-md transition hover:bg-blue-700 hover:shadow-lg active:scale-95 disabled:opacity-40 disabled:shadow-none"
         >
           {t.send}
         </button>
