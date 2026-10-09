@@ -13,6 +13,10 @@ export default function middleware(req: NextRequest) {
     url.protocol = "https";
     return NextResponse.redirect(url, 301);
   }
+  // Auth callback must not get a locale prefix (/he/auth/callback would 404)
+  if (req.nextUrl.pathname.startsWith("/auth")) {
+    return NextResponse.next();
+  }
   return intl(req);
 }
 
