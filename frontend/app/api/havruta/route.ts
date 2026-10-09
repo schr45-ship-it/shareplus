@@ -131,7 +131,7 @@ async function uploadChatImage(dataUrl: string): Promise<string | null> {
 
 async function persist(
   sessionId: string | null,
-  fields: { topic?: string; source?: string; locale?: string; author?: string; tool?: string; mode?: string; parent?: string; ownerKey?: string; userId?: string },
+  fields: { topic?: string; source?: string; locale?: string; author?: string; tool?: string; mode?: string; parent?: string; ownerKey?: string; userId?: string; isPublic?: boolean },
   newMessages: { role: "user" | "model"; text: string; image?: string }[],
 ): Promise<{ sid: string | null; ids: string[] } | null> {
   if (!SUPABASE_URL || !SERVICE_KEY) return null;
@@ -151,6 +151,7 @@ async function persist(
           parent_session_id: fields.parent || null,
           owner_key: fields.ownerKey || null,
           user_id: fields.userId || null,
+          is_public: fields.isPublic !== false,
         }),
       });
       const rows = await res.json();
@@ -223,6 +224,7 @@ export async function POST(req: NextRequest) {
     mode?: string;
     parentSessionId?: string;
     ownerKey?: string;
+    isPublic?: boolean;
   };
   try {
     body = await req.json();
@@ -252,16 +254,20 @@ export async function POST(req: NextRequest) {
       ? body.sessionId
       : null;
   const ownerKey = String(body.ownerKey || "").trim().slice(0, 64);
-  // Forking from a locked discussion is blocked
+  let isPublic = typeof body.isPublic === "boolean" ? body.isPublic : true;
+  // Forking from a locked discussion is blocked; forks inherit a private parent
   if (parentSessionId && !sessionId) {
     try {
       const pr = await fetch(
-        `${SUPABASE_URL}/rest/v1/havruta_sessions?id=eq.${parentSessionId}&select=is_locked`,
+        `${SUPABASE_URL}/rest/v1/havruta_sessions?id=eq.${parentSessionId}&select=is_locked,is_public`,
         { headers: dbHeaders },
       );
       const prows = await pr.json();
-      if (Array.isArray(prows) && prows[0]?.is_locked) {
-        return NextResponse.json({ error: "locked" }, { status: 403 });
+      if (Array.isArray(prows) && prows[0]) {
+        if (prows[0].is_locked) {
+          return NextResponse.json({ error: "locked" }, { status: 403 });
+        }
+        if (prows[0].is_public === false) isPublic = false;
       }
     } catch {}
   }
@@ -337,7 +343,7 @@ export async function POST(req: NextRequest) {
         }
         const persisted = await persist(
           sessionId,
-          { topic, source, locale, author: authorName, tool, mode, parent: parentSessionId ?? undefined, ownerKey, userId: authUser?.id },
+          { topic, source, locale, author: authorName, tool, mode, parent: parentSessionId ?? undefined, ownerKey, userId: authUser?.id, isPublic },
           sessionId
             ? [messages[messages.length - 1] as { role: "user" | "model"; text: string; image?: string }, { role: "model", text: reply }]
             : [...messages as { role: "user" | "model"; text: string; image?: string }[], { role: "model", text: reply }],
@@ -367,7 +373,7 @@ export async function GET(req: NextRequest) {
     if (!u) return NextResponse.json({ sessions: [] });
     try {
       const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/havruta_sessions?user_id=eq.${u.id}&select=id,topic,updated_at&order=updated_at.desc&limit=20`,
+        `${SUPABASE_URL}/rest/v1/havruta_sessions?user_id=eq.${u.id}&select=id,topic,tool,is_public,updated_at,parent_session_id,havruta_messages(count)&order=updated_at.desc&limit=30`,
         { headers: dbHeaders },
       );
       const rows = await res.json();
@@ -386,7 +392,7 @@ export async function GET(req: NextRequest) {
       : `&tool=in.(havruta,teacher)`;
     try {
       const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/havruta_sessions?select=id,topic,locale,author_name,updated_at,parent_session_id,is_locked,havruta_messages(count)&order=updated_at.desc&limit=12${toolFilter}`,
+        `${SUPABASE_URL}/rest/v1/havruta_sessions?is_public=eq.true&select=id,topic,locale,author_name,updated_at,parent_session_id,is_locked,havruta_messages(count)&order=updated_at.desc&limit=12${toolFilter}`,
         { headers: dbHeaders, next: { revalidate: 60 } },
       );
       const rows = await res.json();
@@ -529,14 +535,30 @@ async function adminAuthorized(req: NextRequest): Promise<boolean> {
   }
 }
 
-// Admin: delete a discussion (messages cascade)
+// Admin or owner (logged-in user_id): delete a discussion (messages cascade)
 export async function DELETE(req: NextRequest) {
-  if (!(await adminAuthorized(req))) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
   const id = req.nextUrl.searchParams.get("session") ?? "";
   if (!/^[0-9a-f-]{36}$/.test(id)) {
     return NextResponse.json({ error: "invalid id" }, { status: 400 });
+  }
+  if (!(await adminAuthorized(req))) {
+    const authUser = await getAuthUser(req);
+    if (!authUser) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    }
+    try {
+      const sRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/havruta_sessions?id=eq.${id}&select=user_id`,
+        { headers: dbHeaders },
+      );
+      const sRows = await sRes.json();
+      const row = Array.isArray(sRows) ? sRows[0] : null;
+      if (!row || row.user_id !== authUser.id) {
+        return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+      }
+    } catch {
+      return NextResponse.json({ error: "failed" }, { status: 500 });
+    }
   }
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/havruta_sessions?id=eq.${id}`, {
@@ -550,9 +572,10 @@ export async function DELETE(req: NextRequest) {
   }
 }
 
-// Lock/unlock a discussion against forks (owner key or admin), or admin: edit a message
+// Owner/admin: lock/unlock a discussion against forks or toggle its public visibility;
+// admin: edit a message
 export async function PATCH(req: NextRequest) {
-  let body: { id?: string; content?: string; sessionId?: string; locked?: boolean; ownerKey?: string };
+  let body: { id?: string; content?: string; sessionId?: string; locked?: boolean; isPublic?: boolean; ownerKey?: string };
   try {
     body = await req.json();
   } catch {
@@ -563,7 +586,9 @@ export async function PATCH(req: NextRequest) {
     typeof body.sessionId === "string" && /^[0-9a-f-]{36}$/.test(body.sessionId)
       ? body.sessionId
       : null;
-  if (lockSid && typeof body.locked === "boolean") {
+  const wantsLock = typeof body.locked === "boolean";
+  const wantsPrivacy = typeof body.isPublic === "boolean";
+  if (lockSid && (wantsLock || wantsPrivacy)) {
     if (!SUPABASE_URL || !SERVICE_KEY) {
       return NextResponse.json({ error: "not_configured" }, { status: 500 });
     }
@@ -584,16 +609,19 @@ export async function PATCH(req: NextRequest) {
       if (!isAdmin && !isOwner) {
         return NextResponse.json({ error: "unauthorized" }, { status: 401 });
       }
+      const update: Record<string, boolean> = {};
+      if (wantsLock) update.is_locked = body.locked!;
+      if (wantsPrivacy) update.is_public = body.isPublic!;
       const up = await fetch(
         `${SUPABASE_URL}/rest/v1/havruta_sessions?id=eq.${lockSid}`,
         {
           method: "PATCH",
           headers: { ...dbHeaders, Prefer: "return=minimal" },
-          body: JSON.stringify({ is_locked: body.locked }),
+          body: JSON.stringify(update),
         },
       );
       if (!up.ok) return NextResponse.json({ error: "update failed" }, { status: 500 });
-      return NextResponse.json({ ok: true, locked: body.locked });
+      return NextResponse.json({ ok: true });
     } catch {
       return NextResponse.json({ error: "failed" }, { status: 500 });
     }

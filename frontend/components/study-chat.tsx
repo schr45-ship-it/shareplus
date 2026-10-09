@@ -68,6 +68,10 @@ const texts: Record<
     loginEmailPlaceholder: string;
     loginSend: string;
     loginSent: string;
+    profile: string;
+    publish: string;
+    makePrivate: string;
+    makePublic: string;
   }
 > = {
   he: {
@@ -125,6 +129,10 @@ const texts: Record<
     loginEmailPlaceholder: "המייל שלך — נשלח לינק כניסה",
     loginSend: "שלח לינק כניסה",
     loginSent: "נשלח! בדוק את המייל ולחץ על הלינק.",
+    profile: "הפרופיל שלי",
+    publish: "פרסם דיון בקהילה",
+    makePrivate: "הפוך לפרטי (הסתר מהקהילה)",
+    makePublic: "הפוך לציבורי (הצג בקהילה)",
     greeting: (topic) =>
       `שלום! אני החברותא שלך 📖 בחרת ללמוד על **${topic}**. איך תרצה שנתחיל את הלימוד?`,
   },
@@ -184,6 +192,10 @@ const texts: Record<
     loginEmailPlaceholder: "Your email — we'll send a sign-in link",
     loginSend: "Send sign-in link",
     loginSent: "Sent! Check your email and click the link.",
+    profile: "My profile",
+    publish: "Publish discussion to community",
+    makePrivate: "Make private (hide from community)",
+    makePublic: "Make public (show in community)",
     greeting: (topic) =>
       `Shalom! I'm your havruta 📖 You chose to study **${topic}**. How would you like to begin?`,
   },
@@ -243,6 +255,10 @@ const texts: Record<
     loginEmailPlaceholder: "Tu email — te enviaremos un enlace",
     loginSend: "Enviar enlace de acceso",
     loginSent: "¡Enviado! Revisa tu email y haz clic en el enlace.",
+    profile: "Mi perfil",
+    publish: "Publicar discusión en la comunidad",
+    makePrivate: "Hacer privada (ocultar de la comunidad)",
+    makePublic: "Hacer pública (mostrar en la comunidad)",
     greeting: (topic) =>
       `¡Shalom! Soy tu javruta 📖 Elegiste estudiar **${topic}**. ¿Cómo quieres comenzar?`,
   },
@@ -302,6 +318,10 @@ const texts: Record<
     loginEmailPlaceholder: "بريدك الإلكتروني — سنرسل رابط دخول",
     loginSend: "أرسل رابط الدخول",
     loginSent: "تم الإرسال! تحقق من بريدك وانقر على الرابط.",
+    profile: "ملفي الشخصي",
+    publish: "انشر النقاش للمجتمع",
+    makePrivate: "اجعله خاصًا (إخفاء من المجتمع)",
+    makePublic: "اجعله عامًا (إظهار في المجتمع)",
     greeting: (topic) =>
       `شالوم! أنا شريكك في الدراسة 📖 اخترت دراسة **${topic}**. كيف تريد أن نبدأ؟`,
   },
@@ -534,6 +554,7 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
   const [treeData, setTreeData] = useState<{ current: string; nodes: LinkedSession[] } | null>(null);
   const [ownerKey, setOwnerKey] = useState("");
   const [isLocked, setIsLocked] = useState(false);
+  const [isPublic, setIsPublic] = useState(true);
   const [lockBusy, setLockBusy] = useState(false);
   const supabase = useMemo(() => createClient(), []);
   const [user, setUser] = useState<User | null>(null);
@@ -728,6 +749,27 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
   }
 
   // Lock/unlock this discussion against forks — owner (browser key) or admin
+  // Toggle public/private visibility — owner or admin
+  async function togglePrivacy() {
+    if (!sessionId || lockBusy) return;
+    setLockBusy(true);
+    try {
+      const res = await fetch("/api/havruta", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...adminHeaders(), ...authHeaders() },
+        body: JSON.stringify({ sessionId, isPublic: !isPublic, ownerKey }),
+      });
+      if (res.ok) {
+        setIsPublic(!isPublic);
+      } else {
+        setError(res.status === 401 ? t.errNotOwner : t.errGeneric);
+      }
+    } catch {
+      setError(t.errGeneric);
+    }
+    setLockBusy(false);
+  }
+
   async function toggleLock() {
     if (!sessionId || lockBusy) return;
     setLockBusy(true);
@@ -913,6 +955,7 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
     setForkStartIdx(null);
     setForkDir("");
     setIsLocked(false);
+    setIsPublic(true);
     setRecent(loadSaved(storageKey));
     fetch(`/api/havruta?list=recent&tool=${tool}`)
       .then((r) => r.json())
@@ -929,6 +972,7 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
     setForkStartIdx(null);
     setForkDir("");
     setIsLocked(false);
+    setIsPublic(true);
     setMessages([{ role: "model", text: t.greeting(topicText) }]);
     setStarted(true);
     setError(null);
@@ -948,6 +992,7 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
           setMode(json.session.study_mode);
         }
         setIsLocked(!!json.session.is_locked);
+        setIsPublic(json.session.is_public !== false);
         setParent(json.parent ?? null);
         setChildren(Array.isArray(json.children) ? json.children : []);
         setForkStartIdx(null);
@@ -1026,6 +1071,7 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
           tool,
           mode,
           ownerKey,
+          isPublic,
           parentSessionId: !sessionId && parent ? parent.id : undefined,
         }),
       });
@@ -1189,6 +1235,17 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
               </>
             )}
             {modeChips}
+            {tool !== "shadchan" && (
+              <label className="flex items-center gap-2 text-xs text-zinc-600">
+                <input
+                  type="checkbox"
+                  checked={isPublic}
+                  onChange={(e) => setIsPublic(e.target.checked)}
+                  className="h-4 w-4 rounded border-zinc-300 accent-emerald-600"
+                />
+                🌐 {t.publish}
+              </label>
+            )}
             <button
               type="submit"
               disabled={(tool !== "shadchan" && !topic.trim()) || loading}
@@ -1232,13 +1289,21 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
                     {t.login} ✓
                   </span>
                 </span>
-                <button
-                  type="button"
-                  onClick={signOut}
-                  className="shrink-0 text-zinc-400 hover:text-red-600 hover:underline"
-                >
-                  {t.logout}
-                </button>
+                <span className="flex shrink-0 items-center gap-2">
+                  <a
+                    href={`/${locale}/profile`}
+                    className="rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 font-medium text-blue-700 hover:bg-blue-100"
+                  >
+                    {t.profile}
+                  </a>
+                  <button
+                    type="button"
+                    onClick={signOut}
+                    className="text-zinc-400 hover:text-red-600 hover:underline"
+                  >
+                    {t.logout}
+                  </button>
+                </span>
               </>
             ) : (
               <>
@@ -1486,6 +1551,7 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
           {tool === "shadchan" ? "💞" : tool === "teacher" ? "🎓" : "📖"}{" "}
           <span className="font-bold">{t.title}</span> · {topic}
           {isLocked ? " 🔒" : ""}
+          {!isPublic ? " 🙈" : ""}
           {authorName.trim() ? ` · ${authorName.trim()}` : ""}
         </div>
         <div className="flex items-center gap-2">
@@ -1501,18 +1567,32 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
           {sessionId &&
             tool !== "shadchan" &&
             (isAdmin || recent.some((s) => s.id === sessionId)) && (
-              <button
-                onClick={toggleLock}
-                disabled={lockBusy}
-                title={isLocked ? t.unlock : t.lock}
-                className={`rounded-lg border px-3 py-1.5 text-xs font-medium disabled:opacity-50 ${
-                  isLocked
-                    ? "border-zinc-400 bg-zinc-200 text-zinc-700 hover:bg-zinc-300"
-                    : "border-amber-300 bg-white text-amber-800 hover:bg-amber-100"
-                }`}
-              >
-                {isLocked ? "🔒" : "🔓"}
-              </button>
+              <>
+                <button
+                  onClick={toggleLock}
+                  disabled={lockBusy}
+                  title={isLocked ? t.unlock : t.lock}
+                  className={`rounded-lg border px-3 py-1.5 text-xs font-medium disabled:opacity-50 ${
+                    isLocked
+                      ? "border-zinc-400 bg-zinc-200 text-zinc-700 hover:bg-zinc-300"
+                      : "border-amber-300 bg-white text-amber-800 hover:bg-amber-100"
+                  }`}
+                >
+                  {isLocked ? "🔒" : "🔓"}
+                </button>
+                <button
+                  onClick={togglePrivacy}
+                  disabled={lockBusy}
+                  title={isPublic ? t.makePrivate : t.makePublic}
+                  className={`rounded-lg border px-3 py-1.5 text-xs font-medium disabled:opacity-50 ${
+                    isPublic
+                      ? "border-amber-300 bg-white text-amber-800 hover:bg-amber-100"
+                      : "border-zinc-400 bg-zinc-200 text-zinc-700 hover:bg-zinc-300"
+                  }`}
+                >
+                  {isPublic ? "🌐" : "🙈"}
+                </button>
+              </>
             )}
           <div className="relative">
             <button
