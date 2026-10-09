@@ -685,12 +685,17 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
     return accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
   }
 
+  function authRedirect(): string {
+    const next = `${window.location.pathname}${window.location.search}`;
+    return `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`;
+  }
+
   async function signInGoogle() {
     setLoginBusy(true);
     try {
       await supabase.auth.signInWithOAuth({
         provider: "google",
-        options: { redirectTo: window.location.href.split("?")[0] },
+        options: { redirectTo: authRedirect() },
       });
     } catch {}
     setLoginBusy(false);
@@ -703,7 +708,7 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
     try {
       const { error } = await supabase.auth.signInWithOtp({
         email,
-        options: { emailRedirectTo: window.location.href.split("?")[0] },
+        options: { emailRedirectTo: authRedirect() },
       });
       if (!error) setMagicSent(true);
       else setError(t.errGeneric);
