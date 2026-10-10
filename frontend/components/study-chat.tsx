@@ -1050,6 +1050,7 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
     setInput("");
     setPendingImage(null);
     recognitionRef.current?.stop();
+    recognitionRef.current = null;
     setListening(false);
     await requestReply(next);
   }
@@ -1110,6 +1111,7 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
   function startListening() {
     if (listening) {
       recognitionRef.current?.stop();
+      recognitionRef.current = null;
       setListening(false);
       return;
     }
@@ -1138,6 +1140,8 @@ export function StudyChat({ locale, tool = "havruta" }: { locale: string; tool?:
     rec.continuous = false;
     const base = input ? `${input} ` : "";
     rec.onresult = (e) => {
+      // Ignore results that arrive after stop (e.g. after sending)
+      if (recognitionRef.current !== rec) return;
       let finals = "";
       let interim = "";
       for (let i = 0; i < e.results.length; i++) {
